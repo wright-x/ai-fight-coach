@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Fight Coach</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .welcome-text {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .upload-section {
+            background: #f8f9fa;
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 1.3rem;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .file-info {
+            background: #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin: 0 10px;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .upload-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .progress-section {
+            background: linear-gradient(135deg, #e8f5e8, #d4edda);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            display: none;
+            text-align: center;
+        }
+
+        .progress-label {
+            color: #155724;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.08);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            width: 0%;
+            transition: width 0.5s cubic-bezier(.4,2,.6,1);
+            border-radius: 10px;
+        }
+
+        .result-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            display: none;
+        }
+
+        .success-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .status-text {
+            font-size: 1.3rem;
+            color: #28a745;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .video-container {
+            margin: 20px 0;
+        }
+
+        #result-video {
+            width: 100%;
+            max-width: 800px;
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        .download-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            text-decoration: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            margin: 10px;
+            transition: transform 0.2s;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .error-section {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            display: none;
+            color: #721c24;
+        }
+
+        .analysis-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .analysis-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .analysis-content {
+            text-align: left;
+        }
+
+        .analysis-content h3 {
+            color: #667eea;
+            margin: 25px 0 15px 0;
+            font-size: 1.3rem;
+        }
+
+        .highlight-item, .recommendation-item, .drill-item, .problem-item {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .highlight-item h4, .recommendation-item h4, .drill-item h4, .problem-item h4 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+
+        .timestamp {
+            color: #666;
+            font-size: 0.9rem;
+            font-style: italic;
+        }
+
+        .detailed-feedback {
+            color: #555;
+            line-height: 1.6;
+            margin: 10px 0;
+        }
+
+        .action-required {
+            color: #dc3545;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 40px;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+        }
+
+        .feature-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .feature-desc {
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .prompt-option.selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: 3px solid #667eea;
+        }
+
+        .prompt-option:not(.selected) {
+            background: white;
+            color: #333;
+            border: 3px solid #e1e5e9;
+        }
+
+        .prompt-option {
+            padding: 20px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .prompt-option:hover {
+            transform: translateY(-3px);
+        }
+
+        .prompt-option .prompt-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .prompt-option .prompt-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .prompt-option .prompt-desc {
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        .feedback-section {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 40px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+
+        .feedback-section h3 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .feedback-section p {
+            color: #666;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+
+        .feedback-btn {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 0 5px;
+        }
+
+        .feedback-btn:hover {
+            background: #f0f0f0;
+            border-color: #ccc;
+        }
+
+        .feedback-btn.selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+
+        #feedback-text {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 100px;
+            font-size: 1rem;
+        }
+
+        #submit-feedback {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        #submit-feedback:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+            <h1>🥊 AI Fight Coach</h1>
+            <div class="welcome-text" id="welcome-text">Welcome back!</div>
+        </div>
+
+        <div class="main-content">
+            <div class="upload-section" id="upload-section">
+                <div class="upload-icon">📹</div>
+                <div class="upload-text">Upload your boxing video for AI analysis</div>
+                
+                <div class="prompt-selection" style="margin: 20px 0;">
+                    <label style="display: block; margin-bottom: 25px; font-weight: 700; color: #333; text-align: center; font-size: 2.2rem; text-transform: uppercase; letter-spacing: 1px; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Choose Your Analysis Focus</label>
+                    <div class="prompt-options" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                        <div class="prompt-option" data-value="everything" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 15px; cursor: pointer; text-align: center; border: 3px solid #667eea; transition: all 0.3s ease;">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">🥊</div>
+                            <div style="font-weight: 600; margin-bottom: 5px;">Complete Analysis</div>
+                            <div style="font-size: 0.9rem; opacity: 0.9;">Everything - Defense, Punches, Footwork</div>
+                        </div>
+                        <div class="prompt-option" data-value="head_movement" style="background: white; color: #333; padding: 20px; border-radius: 15px; cursor: pointer; text-align: center; border: 3px solid #e1e5e9; transition: all 0.3s ease;">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">🛡️</div>
+                            <div style="font-weight: 600; margin-bottom: 5px;">Defense</div>
+                            <div style="font-size: 0.9rem; opacity: 0.7;">Guard, Blocks, Slips, Rolls</div>
+                        </div>
+                        <div class="prompt-option" data-value="punch_techniques" style="background: white; color: #333; padding: 20px; border-radius: 15px; cursor: pointer; text-align: center; border: 3px solid #e1e5e9; transition: all 0.3s ease;">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">💪</div>
+                            <div style="font-weight: 600; margin-bottom: 5px;">Punch Techniques</div>
+                            <div style="font-size: 0.9rem; opacity: 0.7;">Power & Mechanics</div>
+                        </div>
+                        <div class="prompt-option" data-value="footwork" style="background: white; color: #333; padding: 20px; border-radius: 15px; cursor: pointer; text-align: center; border: 3px solid #e1e5e9; transition: all 0.3s ease;">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">👟</div>
+                            <div style="font-weight: 600; margin-bottom: 5px;">Footwork</div>
+                            <div style="font-size: 0.9rem; opacity: 0.7;">Movement & Angles</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <input type="file" id="fileInput" accept="video/*">
+                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Choose Video File</button>
+                <button class="upload-btn" id="startBtn" onclick="startAnalysis()" disabled style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">Start Analysis</button>
+                <div class="file-info" id="fileInfo"></div>
+            </div>
+
+            <div class="progress-section" id="progress-section">
+                <div class="progress-label">Processing your video...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div style="margin-top: 20px; padding: 15px; background: rgba(102, 126, 234, 0.1); border-radius: 10px; border-left: 4px solid #667eea;">
+                    <div style="font-size: 0.9rem; color: #667eea; font-weight: 500;">
+                        💡 After you receive your feedback, could you give us some feedback? This will help us make this even better for passionate boxers like YOU. YOU'RE part of the special few that sees this in its early stages.
+                    </div>
+                </div>
+            </div>
+
+            <div class="result-section" id="result-section">
+                <div class="success-icon">✅</div>
+                <div class="status-text">Analysis Complete!</div>
+                <div class="video-container">
+                    <video id="result-video" controls>
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                <a href="#" class="download-btn" id="download-btn" download>
+                    📥 Download Final Video
+                </a>
+                <button class="upload-btn" id="run-another-btn" style="margin-top: 30px;">🔄 Run Another Analysis</button>
+            </div>
+
+            <div class="analysis-section" id="analysis-section">
+                <div class="analysis-title">📊 Detailed Analysis Report</div>
+                <div class="analysis-content" id="analysis-content">
+                    <!-- Analysis content will be populated here -->
+                </div>
+            </div>
+
+            <div class="error-section" id="error-section">
+                <div style="font-size: 3rem; margin-bottom: 15px;">❌</div>
+                <div id="error-text">An error occurred</div>
+            </div>
+
+            <div class="feedback-section" id="feedback-section" style="margin: 40px 0; padding: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); display: none;">
+                <h3 style="text-align: center; color: white; margin-bottom: 25px; font-size: 2.5rem; font-weight: 700;">💬 Help Us Improve!</h3>
+                <p style="text-align: center; color: rgba(255,255,255,0.9); margin-bottom: 35px; line-height: 1.8; font-size: 1.2rem;">
+                    YOU'RE part of the special few that sees this in its early stages. YOUR feedback will help us make this tool even better for passionate boxers like YOU.
+                </p>
+                <div style="max-width: 700px; margin: 0 auto;">
+                    <div style="margin-bottom: 30px;">
+                        <label style="display: block; margin-bottom: 15px; font-weight: 600; color: white; font-size: 1.3rem;">How was your experience?</label>
+                        <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                            <button class="feedback-btn" data-rating="1" style="padding: 15px 20px; border: 3px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer; transition: all 0.3s; color: white; font-size: 1.1rem; font-weight: 600;">😞 Poor</button>
+                            <button class="feedback-btn" data-rating="2" style="padding: 15px 20px; border: 3px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer; transition: all 0.3s; color: white; font-size: 1.1rem; font-weight: 600;">😐 Okay</button>
+                            <button class="feedback-btn" data-rating="3" style="padding: 15px 20px; border: 3px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer; transition: all 0.3s; color: white; font-size: 1.1rem; font-weight: 600;">😊 Good</button>
+                            <button class="feedback-btn" data-rating="4" style="padding: 15px 20px; border: 3px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer; transition: all 0.3s; color: white; font-size: 1.1rem; font-weight: 600;">😍 Great</button>
+                            <button class="feedback-btn" data-rating="5" style="padding: 15px 20px; border: 3px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer; transition: all 0.3s; color: white; font-size: 1.1rem; font-weight: 600;">🔥 Amazing</button>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 30px;">
+                        <label style="display: block; margin-bottom: 15px; font-weight: 600; color: white; font-size: 1.3rem;">What would you like to see improved?</label>
+                        <textarea id="feedback-text" placeholder="Share your thoughts..." style="width: 100%; padding: 20px; border: 3px solid rgba(255,255,255,0.3); border-radius: 15px; font-family: inherit; resize: vertical; min-height: 120px; font-size: 1.1rem; background: rgba(255,255,255,0.1); color: white;"></textarea>
+                    </div>
+                    <div style="text-align: center;">
+                        <button id="submit-feedback" style="background: rgba(255,255,255,0.2); color: white; border: 3px solid rgba(255,255,255,0.5); padding: 18px 40px; border-radius: 30px; font-weight: 700; cursor: pointer; transition: all 0.3s; font-size: 1.2rem;">Submit Feedback</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="features">
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <div class="feature-title">AI Highlight Detection</div>
+                    <div class="feature-desc">Automatically finds your best and worst moments</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">👤</div>
+                    <div class="feature-title">Head Tracking</div>
+                    <div class="feature-desc">Tracks your head movement and positioning</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <div class="feature-title">Professional Feedback</div>
+                    <div class="feature-desc">Get expert coaching advice on your technique</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎬</div>
+                    <div class="feature-title">Slow Motion Analysis</div>
+                    <div class="feature-desc">Review your moves in detail with slow-motion</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentJobId = null;
+        let progressInterval = null;
+        let selectedAnalysisType = 'everything'; // Default selection
+
+        // Check if user is registered
+        window.onload = function() {
+            const userName = localStorage.getItem('userName');
+            if (!userName) {
+                window.location.href = '/register';
+                return;
+            }
+            document.getElementById('welcome-text').textContent = `Welcome back, ${userName}!`;
+            
+            // Initialize prompt selection
+            initializePromptSelection();
+        };
+
+        function initializePromptSelection() {
+            const promptOptions = document.querySelectorAll('.prompt-option');
+            promptOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    // Remove selected class from all options
+                    promptOptions.forEach(opt => {
+                        opt.style.background = 'white';
+                        opt.style.color = '#333';
+                        opt.style.border = '3px solid #e1e5e9';
+                        opt.classList.remove('selected');
+                    });
+                    
+                    // Add selected class to clicked option
+                    this.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    this.style.color = 'white';
+                    this.style.border = '3px solid #667eea';
+                    this.classList.add('selected');
+                    
+                    selectedAnalysisType = this.dataset.value;
+                });
+            });
+            
+            // Set default selection
+            document.querySelector('[data-value="everything"]').click();
+        }
+
+        function logout() {
+            localStorage.removeItem('userName');
+            localStorage.removeItem('userEmail');
+            window.location.href = '/register';
+        }
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const fileInfo = document.getElementById('fileInfo');
+                fileInfo.innerHTML = `
+                    <strong>Selected:</strong> ${file.name}<br>
+                    <strong>Size:</strong> ${(file.size / (1024 * 1024)).toFixed(2)} MB
+                `;
+                fileInfo.style.display = 'block';
+                document.getElementById('startBtn').disabled = false;
+            }
+        });
+
+        async function startAnalysis() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a video file first.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('video', file);
+            formData.append('fighter_name', localStorage.getItem('userName') || 'FIGHTER');
+            formData.append('analysis_type', selectedAnalysisType);
+
+            // Show progress section
+            document.getElementById('upload-section').style.display = 'none';
+            document.getElementById('progress-section').style.display = 'block';
+            document.getElementById('result-section').style.display = 'none';
+            document.getElementById('analysis-section').style.display = 'none';
+            document.getElementById('error-section').style.display = 'none';
+            document.getElementById('feedback-section').style.display = 'none'; // Hide feedback section
+
+            // Start progress animation
+            updateProgress('processing', 'Uploading video...');
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Upload failed');
+                }
+
+                const result = await response.json();
+                currentJobId = result.job_id;
+                
+                updateProgress('processing', 'Analyzing video with AI...');
+                
+                // Start polling for status
+                pollStatus();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Failed to upload video. Please try again.');
+            }
+        }
+
+        function updateProgress(status, message) {
+            const progressFill = document.getElementById('progress-fill');
+            const progressLabel = document.querySelector('.progress-label');
+            
+            if (progressLabel) progressLabel.textContent = message;
+            
+            if (status === 'processing') {
+                if (!progressInterval) {
+                    let percent = 0;
+                    let startTime = Date.now();
+                    progressFill.style.width = '0%';
+                    
+                    // Define progressive status messages
+                    const statusMessages = [
+                        { time: 0, message: "Uploading your video..." },
+                        { time: 5, message: "Analyzing video frames..." },
+                        { time: 15, message: "Detecting boxing techniques..." },
+                        { time: 30, message: "Identifying key moments..." },
+                        { time: 45, message: "Generating AI feedback..." },
+                        { time: 60, message: "Creating highlight clips..." },
+                        { time: 75, message: "Adding head tracking..." },
+                        { time: 90, message: "Rendering final video..." },
+                        { time: 105, message: "Almost done..." },
+                        { time: 120, message: "Finalizing your analysis..." },
+                        { time: 135, message: "Preparing results..." },
+                        { time: 150, message: "Just a few more seconds..." }
+                    ];
+                    
+                    progressInterval = setInterval(() => {
+                        const elapsed = (Date.now() - startTime) / 1000; // seconds
+                        
+                        // Update status message based on elapsed time
+                        let currentMessage = "Processing your video...";
+                        for (let i = statusMessages.length - 1; i >= 0; i--) {
+                            if (elapsed >= statusMessages[i].time) {
+                                currentMessage = statusMessages[i].message;
+                                break;
+                            }
+                        }
+                        progressLabel.textContent = currentMessage;
+                        
+                        if (elapsed <= 30) {
+                            // First 30 seconds: jump to 50%
+                            percent = (elapsed / 30) * 50;
+                        } else if (elapsed <= 90) {
+                            // Next 60 seconds: slowly inch to 75%
+                            const remainingTime = elapsed - 30;
+                            percent = 50 + (remainingTime / 60) * 25;
+                        } else if (elapsed <= 105) {
+                            // Next 15 seconds: move to 90%
+                            const remainingTime = elapsed - 90;
+                            percent = 75 + (remainingTime / 15) * 15;
+                        } else if (elapsed <= 165) {
+                            // Final 60 seconds: move nominally to 100%
+                            const remainingTime = elapsed - 105;
+                            percent = 90 + (remainingTime / 60) * 10;
+                        } else {
+                            // After 165 seconds, stay at 95% until completion
+                            percent = 95;
+                        }
+                        
+                        progressFill.style.width = Math.min(percent, 95) + '%';
+                    }, 100); // Update every 100ms for smooth animation
+                }
+            } else if (status === 'completed') {
+                if (progressInterval) clearInterval(progressInterval);
+                progressInterval = null;
+                progressFill.style.width = '100%';
+                progressLabel.textContent = 'Analysis complete!';
+            }
+        }
+
+        async function pollStatus() {
+            if (!currentJobId) return;
+
+            try {
+                const response = await fetch(`/status/${currentJobId}`);
+                const result = await response.json();
+
+                if (result.status === 'processing') {
+                    updateProgress('processing', result.message || 'Processing...');
+                    setTimeout(pollStatus, 2000);
+                } else if (result.status === 'completed') {
+                    updateProgress('completed', 'Analysis completed!');
+                    setTimeout(() => {
+                        showResult(result.video_url);
+                        if (result.analysis_result) {
+                            displayAnalysis(result.analysis_result);
+                        }
+                    }, 1000);
+                } else if (result.status === 'error') {
+                    showError(result.message || 'Analysis failed');
+                }
+            } catch (error) {
+                console.error('Error polling status:', error);
+                showError('Failed to check status');
+            }
+        }
+
+        function showResult(videoUrl) {
+            document.getElementById('progress-section').style.display = 'none';
+            document.getElementById('result-section').style.display = 'block';
+            document.getElementById('analysis-section').style.display = 'block';
+            document.getElementById('feedback-section').style.display = 'block'; // Show feedback section
+            
+            const video = document.getElementById('result-video');
+            const downloadBtn = document.getElementById('download-btn');
+            
+            video.src = videoUrl;
+            downloadBtn.href = videoUrl;
+        }
+
+        function showError(message) {
+            document.getElementById('progress-section').style.display = 'none';
+            document.getElementById('error-section').style.display = 'block';
+            document.getElementById('feedback-section').style.display = 'none'; // Hide feedback on error
+            document.getElementById('error-text').textContent = message;
+            
+            setTimeout(() => {
+                document.getElementById('upload-section').style.display = 'block';
+            }, 3000);
+        }
+
+        function displayAnalysis(analysisResult) {
+            let html = '';
+            
+            // Highlights Section
+            if (analysisResult.highlights && analysisResult.highlights.length > 0) {
+                html += '<h3 style="font-size: 1.8rem; margin-bottom: 20px; color: #333; text-align: center;">🎯 Key Highlights</h3>';
+                analysisResult.highlights.forEach((highlight, index) => {
+                    html += `
+                        <div class="drill-item" style="margin-bottom: 25px; padding: 20px; background: white; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                            <h4 style="font-size: 1.3rem; margin-bottom: 15px; color: #667eea; font-weight: 600;">⏰ Highlight ${index + 1} (${highlight.timestamp}s)</h4>
+                            <div class="detailed-feedback" style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 15px; color: #333;">📝 <b>Analysis:</b> <i>${highlight.detailed_feedback}</i></div>
+                            <div class="action-required" style="font-size: 1.1rem; color: #e74c3c; font-weight: 600;">⚡ <b>Action Required:</b> ${highlight.action_required}</div>
+                        </div>
+                    `;
+                });
+            }
+            
+            // Recommended Drills Section
+            if (analysisResult.recommended_drills && analysisResult.recommended_drills.length > 0) {
+                html += '<h3 style="font-size: 1.8rem; margin: 30px 0 20px 0; color: #333; text-align: center;">🏋️ Recommended Drills</h3>';
+                analysisResult.recommended_drills.forEach((drill, index) => {
+                    html += `
+                        <div class="drill-item" style="margin-bottom: 25px; padding: 20px; background: white; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                            <h4 style="font-size: 1.3rem; margin-bottom: 15px; color: #28a745; font-weight: 600;">💪 ${drill.drill_name}</h4>
+                            <div class="detailed-feedback" style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 15px; color: #333;">📋 <b>Description:</b> <i>${drill.description}</i></div>
+                            <div class="problem-fixes" style="font-size: 1.1rem; color: #f39c12; font-weight: 600;">🎯 <b>Problem It Fixes:</b> ${drill.problem_it_fixes}</div>
+                        </div>
+                    `;
+                });
+            }
+            
+            // YouTube Recommendations Section
+            if (analysisResult.youtube_recommendations && analysisResult.youtube_recommendations.length > 0) {
+                html += '<h3 style="font-size: 1.8rem; margin: 30px 0 20px 0; color: #333; text-align: center;">📺 YouTube Recommendations</h3>';
+                analysisResult.youtube_recommendations.forEach((rec, index) => {
+                    // Extract video ID from YouTube URL
+                    let videoId = '';
+                    if (rec.url.includes('youtube.com/watch?v=')) {
+                        videoId = rec.url.split('v=')[1].split('&')[0];
+                    } else if (rec.url.includes('youtu.be/')) {
+                        videoId = rec.url.split('youtu.be/')[1].split('?')[0];
+                    }
+                    
+                    html += `
+                        <div class="drill-item" style="margin-bottom: 25px; padding: 20px; background: white; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                            <h4 style="font-size: 1.3rem; margin-bottom: 15px; color: #007bff; font-weight: 600;">🔗 Video ${index + 1}: <a href="${rec.url}" target="_blank" style="color:#007bff;font-weight:bold;text-decoration:underline;">${rec.title}</a></h4>
+                            <div class="detailed-feedback" style="font-size: 1.1rem; margin-bottom: 15px; color: #333;">🛠️ <b>Problem Solved:</b> <i>${rec.problem_solved}</i></div>
+                            ${videoId ? `
+                                <div style="margin-top: 15px;">
+                                    <iframe width="100%" height="200" 
+                                            src="https://www.youtube.com/embed/${videoId}" 
+                                            frameborder="0" 
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                            allowfullscreen 
+                                            style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                    </iframe>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+            }
+            
+            document.getElementById('analysis-content').innerHTML = html;
+        }
+
+        document.getElementById('run-another-btn').onclick = function() {
+            window.location.reload();
+        };
+
+        // Feedback functionality
+        let selectedRating = 0;
+        
+        document.querySelectorAll('.feedback-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Remove active class from all buttons
+                document.querySelectorAll('.feedback-btn').forEach(b => {
+                    b.style.background = 'rgba(255,255,255,0.1)';
+                    b.style.border = '3px solid rgba(255,255,255,0.3)';
+                });
+                
+                // Add active class to clicked button
+                this.style.background = 'rgba(255,255,255,0.3)';
+                this.style.border = '3px solid rgba(255,255,255,0.8)';
+                
+                selectedRating = parseInt(this.dataset.rating);
+            });
+        });
+        
+        document.getElementById('submit-feedback').addEventListener('click', async function() {
+            const feedbackText = document.getElementById('feedback-text').value.trim();
+            
+            if (selectedRating === 0) {
+                alert('Please select a rating before submitting feedback.');
+                return;
+            }
+            
+            if (!feedbackText) {
+                alert('Please provide feedback text before submitting.');
+                return;
+            }
+            
+            // Get user info from localStorage
+            const userName = localStorage.getItem('userName') || 'Anonymous';
+            const userEmail = localStorage.getItem('userEmail') || 'anonymous@example.com';
+            
+            // Show loading state
+            const submitBtn = document.getElementById('submit-feedback');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Submitting...';
+            submitBtn.disabled = true;
+            
+            try {
+                const formData = new FormData();
+                formData.append('name', userName);
+                formData.append('email', userEmail);
+                formData.append('rating', selectedRating);
+                formData.append('feedback_text', feedbackText);
+                
+                const response = await fetch('/submit-feedback', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Thank you for your feedback! It will help us improve the tool.');
+                    
+                    // Reset form
+                    selectedRating = 0;
+                    document.querySelectorAll('.feedback-btn').forEach(b => {
+                        b.style.background = 'rgba(255,255,255,0.1)';
+                        b.style.border = '3px solid rgba(255,255,255,0.3)';
+                    });
+                    document.getElementById('feedback-text').value = '';
+                    
+                    // Hide feedback section
+                    document.getElementById('feedback-section').style.display = 'none';
+                } else {
+                    alert('Failed to submit feedback. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error submitting feedback:', error);
+                alert('Failed to submit feedback. Please try again.');
+            } finally {
+                // Reset button state
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html> 
