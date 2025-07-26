@@ -10,7 +10,7 @@ RUN apt-get update && \
 
 # 2. Python deps – use headless OpenCV to cut bloat
 RUN pip install --upgrade pip && \
-    pip install mediapipe==0.13.2 opencv-python-headless==4.11.0.86 \
+    pip install mediapipe==0.10.21 opencv-python-headless==4.11.0.86 \
                moviepy==1.0.3 fastapi==0.109.2 uvicorn[standard]==0.27.1 \
                python-multipart==0.0.6 google-generativeai==0.3.2 \
                elevenlabs==0.2.27 numpy==1.24.3 Pillow==10.0.0 \
