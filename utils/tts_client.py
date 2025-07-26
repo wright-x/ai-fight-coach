@@ -12,10 +12,9 @@ class TTSClient:
         self.api_key = os.getenv("ELEVENLABS_API_KEY")
         if self.api_key:
             try:
-                from elevenlabs import generate, save, set_api_key
-                set_api_key(self.api_key)
-                self.generate_func = generate
-                self.save_func = save
+                import elevenlabs
+                elevenlabs.set_api_key(self.api_key)
+                self.elevenlabs = elevenlabs
                 print("✅ TTSClient initialized (ElevenLabs mode)")
             except ImportError as e:
                 print(f"⚠️ ElevenLabs import failed: {e}")
@@ -26,21 +25,21 @@ class TTSClient:
     def generate_speech(self, text: str, output_path: str) -> str:
         """Generate speech from text using ElevenLabs"""
         try:
-            if not self.api_key or not hasattr(self, 'generate_func'):
+            if not self.api_key or not hasattr(self, 'elevenlabs'):
                 print("⚠️ No ElevenLabs API key or import failed, skipping TTS")
                 return output_path
             
             print(f"🔊 Generating speech for: {text[:50]}...")
             
             # Generate audio
-            audio = self.generate_func(
+            audio = self.elevenlabs.generate(
                 text=text,
                 voice="Josh",  # Professional male voice
                 model="eleven_monolingual_v1"
             )
             
             # Save audio file
-            self.save_func(audio, output_path)
+            self.elevenlabs.save(audio, output_path)
             
             print(f"✅ Speech generated: {output_path}")
             return output_path
@@ -52,7 +51,7 @@ class TTSClient:
     def generate_highlight_audio(self, highlights: list, output_path: str) -> str:
         """Generate audio for all highlights"""
         try:
-            if not self.api_key or not hasattr(self, 'generate_func'):
+            if not self.api_key or not hasattr(self, 'elevenlabs'):
                 print("⚠️ No ElevenLabs API key or import failed, skipping highlight audio")
                 return output_path
             
