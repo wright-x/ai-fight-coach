@@ -640,7 +640,7 @@
             updateProgress('processing', 'Uploading video...');
 
             try {
-                const response = await fetch('/upload', {
+                const response = await fetch('/upload-video', {
                     method: 'POST',
                     body: formData
                 });

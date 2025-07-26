@@ -201,6 +201,16 @@ async def submit_feedback(
     except Exception as e:
         return JSONResponse(content={"success": False, "message": f"Feedback submission failed: {e}"})
 
+@app.post("/upload")
+async def upload_video_redirect(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    fighter_name: Optional[str] = Form("FIGHTER"),
+    analysis_type: Optional[str] = Form("everything")
+):
+    """Redirect /upload to /upload-video for compatibility"""
+    return await upload_video(background_tasks, file, fighter_name, analysis_type)
+
 @app.post("/upload-video")
 async def upload_video(
     background_tasks: BackgroundTasks,

@@ -102,7 +102,7 @@ class UserManager:
                     </div>
                     
                     <div style="text-align: center; margin-bottom: 30px;">
-                        <a href="http://localhost:8000/main" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block;">Start Your First Analysis</a>
+                        <a href="https://www.ai-boxing.com/main" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block;">Start Your First Analysis</a>
                     </div>
                     
                     <div style="border-top: 2px solid #eee; padding-top: 20px; text-align: center; color: #666;">
@@ -185,7 +185,7 @@ class UserManager:
                     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 15px; margin-bottom: 30px; text-align: center;">
                         <h3 style="margin-top: 0;">💬 Help Us Improve!</h3>
                         <p>You're part of the special few that sees this in its early stages. Your feedback will help us make this tool even better for passionate boxers like you!</p>
-                        <a href="http://localhost:8000/main" style="background: rgba(255,255,255,0.2); color: white; padding: 12px 25px; text-decoration: none; border-radius: 20px; font-weight: bold; display: inline-block; margin-top: 15px;">Give Us Feedback</a>
+                        <a href="https://www.ai-boxing.com/main" style="background: rgba(255,255,255,0.2); color: white; padding: 12px 25px; text-decoration: none; border-radius: 20px; font-weight: bold; display: inline-block; margin-top: 15px;">Give Us Feedback</a>
                     </div>
                     
                     <div style="text-align: center; color: #666; font-size: 14px;">
