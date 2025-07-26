@@ -624,7 +624,7 @@
             }
 
             const formData = new FormData();
-            formData.append('video', file);
+            formData.append('file', file);
             formData.append('fighter_name', localStorage.getItem('userName') || 'FIGHTER');
             formData.append('analysis_type', selectedAnalysisType);
 
