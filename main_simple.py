@@ -20,6 +20,10 @@ from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks, Response
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+# Set up detailed logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Initialize FastAPI app
 app = FastAPI(title="AI Fight Coach", version="1.0.0")
 
@@ -88,7 +92,7 @@ def schedule_file_deletion(job_id: str, delay_minutes: int = 15):
         time.sleep(delay_minutes * 60)
         if job_id in in_memory_files:
             del in_memory_files[job_id]
-            print(f"Deleted in-memory file for job {job_id}")
+            logger.info(f"🗑️ Deleted in-memory file for job {job_id}")
     
     thread = threading.Thread(target=delete_file, daemon=True)
     thread.start()
@@ -96,16 +100,17 @@ def schedule_file_deletion(job_id: str, delay_minutes: int = 15):
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup."""
-    print("🚀 AI Fight Coach starting up...")
-    print("📁 Creating directories...")
+    logger.info("🚀 AI Fight Coach starting up...")
+    logger.info("📁 Creating directories...")
     
     # Create directories
     for directory in ["uploads", "output", "static", "temp"]:
         Path(directory).mkdir(exist_ok=True)
-        print(f"✅ Created directory: {directory}")
+        logger.info(f"✅ Created directory: {directory}")
 
 @app.get("/health")
 async def health_check():
+    logger.info("🏥 Health check requested")
     return {
         "status": "healthy", 
         "timestamp": datetime.now().isoformat(),
@@ -127,6 +132,7 @@ async def health_check():
 @app.get("/")
 async def root():
     """Redirect to main page"""
+    logger.info("🏠 Root page requested")
     return HTMLResponse(content="""
     <html>
         <head><title>AI Fight Coach</title></head>
@@ -141,24 +147,29 @@ async def root():
 @app.get("/register")
 async def register_page():
     """Serve registration page"""
+    logger.info("📝 Registration page requested")
     try:
         with open("static/register.html", "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     except FileNotFoundError:
+        logger.error("❌ Registration page not found")
         return HTMLResponse(content="<h1>Registration page not found</h1>")
 
 @app.get("/main")
 async def main_page():
     """Serve main application page"""
+    logger.info("🎯 Main page requested")
     try:
         with open("static/index.html", "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     except FileNotFoundError:
+        logger.error("❌ Main page not found")
         return HTMLResponse(content="<h1>Main page not found</h1>")
 
 @app.post("/register-user")
 async def register_user(name: str = Form(...), email: str = Form(...)):
     """Register a new user"""
+    logger.info(f"👤 User registration: {name} ({email})")
     try:
         if user_manager:
             user_manager.register_user(name, email)
@@ -166,6 +177,7 @@ async def register_user(name: str = Form(...), email: str = Form(...)):
         else:
             return JSONResponse(content={"success": True, "message": "Registration successful! (demo mode)"})
     except Exception as e:
+        logger.error(f"❌ Registration failed: {e}")
         return JSONResponse(content={"success": False, "message": f"Registration failed: {e}"})
 
 @app.post("/submit-feedback")
@@ -176,6 +188,7 @@ async def submit_feedback(
     feedback_text: str = Form(...)
 ):
     """Submit user feedback"""
+    logger.info(f"📝 Feedback submitted: {name} ({email}) - Rating: {rating}")
     try:
         if user_manager:
             user_manager.send_feedback_email(name, email, rating, feedback_text)
@@ -183,6 +196,7 @@ async def submit_feedback(
         else:
             return JSONResponse(content={"success": True, "message": "Feedback submitted successfully! (demo mode)"})
     except Exception as e:
+        logger.error(f"❌ Feedback submission failed: {e}")
         return JSONResponse(content={"success": False, "message": f"Feedback submission failed: {e}"})
 
 @app.post("/upload")
@@ -193,6 +207,7 @@ async def upload_video_redirect(
     analysis_type: Optional[str] = Form("everything")
 ):
     """Redirect /upload to /upload-video for compatibility"""
+    logger.info("🔄 Upload redirect requested")
     return await upload_video(background_tasks, file, fighter_name, analysis_type)
 
 @app.post("/upload-video")
@@ -202,9 +217,11 @@ async def upload_video(
     fighter_name: Optional[str] = Form("FIGHTER"),
     analysis_type: Optional[str] = Form("everything")
 ):
+    logger.info(f"📤 Video upload started: {file.filename} ({file.content_type})")
     try:
         # Generate unique job ID
         job_id = str(uuid.uuid4())
+        logger.info(f"🆔 Generated job ID: {job_id}")
         
         # Read file content into memory (Railway-compatible)
         file_content = await file.read()
@@ -217,15 +234,16 @@ async def upload_video(
         # Schedule in-memory file deletion
         schedule_file_deletion(job_id, 15)
         
-        print(f"✅ Video uploaded to memory: {file.filename} ({len(file_content)} bytes)")
+        logger.info(f"✅ Video uploaded to memory: {file.filename} ({len(file_content)} bytes)")
         
         if not video_processor or not gemini_client:
             # Demo mode - accept upload but show limited functionality
+            logger.info(f"🎭 Demo mode activated for job {job_id}")
             active_jobs[job_id] = {
                 "status": "demo_mode",
                 "progress": 100,
                 "message": "Demo mode: Video uploaded successfully! Full analysis is currently unavailable in this environment.",
-                "video_url": None,  # No video URL in demo mode
+                "video_url": f"/video/{job_id}",  # Use our custom endpoint
                 "analysis_result": {
                     "highlights": [
                         {
@@ -251,6 +269,7 @@ async def upload_video(
             })
         
         # Start processing in background
+        logger.info(f"🚀 Starting background processing for job {job_id}")
         background_tasks.add_task(
             process_video_analysis, job_id, fighter_name, analysis_type
         )
@@ -262,7 +281,8 @@ async def upload_video(
         })
         
     except Exception as e:
-        print(f"Upload error: {e}")
+        logger.error(f"❌ Upload error: {e}")
+        logger.error(f"📋 Traceback: {traceback.format_exc()}")
         return JSONResponse(
             content={"success": False, "message": f"Upload failed: {str(e)}"},
             status_code=500
@@ -270,18 +290,45 @@ async def upload_video(
 
 @app.get("/status/{job_id}")
 async def get_status(job_id: str):
+    logger.info(f"📊 Status check requested for job: {job_id}")
     if job_id in active_jobs:
-        return JSONResponse(content=active_jobs[job_id])
+        status = active_jobs[job_id]
+        logger.info(f"📈 Job {job_id} status: {status.get('status', 'unknown')}")
+        return JSONResponse(content=status)
     else:
+        logger.warning(f"⚠️ Job {job_id} not found")
         return JSONResponse(content={"status": "not_found"}, status_code=404)
+
+@app.get("/video/{job_id}")
+async def serve_video(job_id: str):
+    """Serve the uploaded video"""
+    logger.info(f"🎥 Video request for job: {job_id}")
+    try:
+        if job_id in in_memory_files:
+            file_info = in_memory_files[job_id]
+            logger.info(f"✅ Serving video: {file_info['filename']} ({len(file_info['content'])} bytes)")
+            return Response(
+                content=file_info["content"],
+                media_type=file_info["content_type"],
+                headers={"Content-Disposition": f"inline; filename={file_info['filename']}"}
+            )
+        else:
+            logger.error(f"❌ Video not found for job: {job_id}")
+            return JSONResponse(content={"error": "Video not found"}, status_code=404)
+    except Exception as e:
+        logger.error(f"❌ Error serving video for job {job_id}: {e}")
+        logger.error(f"📋 Traceback: {traceback.format_exc()}")
+        return JSONResponse(content={"error": f"Error serving video: {e}"}, status_code=500)
 
 def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
     """Process video analysis in background"""
+    logger.info(f"🔍 Starting video analysis for job: {job_id}")
     try:
         active_jobs[job_id] = {"status": "processing", "progress": 0}
         
         # Check if file exists in memory
         if job_id not in in_memory_files:
+            logger.error(f"❌ Video file not found in memory for job: {job_id}")
             active_jobs[job_id] = {
                 "status": "failed",
                 "message": "Video file not found in memory"
@@ -290,10 +337,12 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
         
         # Update progress
         active_jobs[job_id]["progress"] = 10
+        logger.info(f"📈 Job {job_id} progress: 10%")
         time.sleep(1)
         
         # Process video (simplified for now)
         active_jobs[job_id]["progress"] = 50
+        logger.info(f"📈 Job {job_id} progress: 50%")
         time.sleep(1)
         
         # Return the original video as "processed" (since we can't actually process it)
@@ -302,7 +351,7 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
         active_jobs[job_id]["progress"] = 100
         active_jobs[job_id]["status"] = "completed"
         active_jobs[job_id]["message"] = "Analysis completed successfully"
-        active_jobs[job_id]["video_url"] = f"/static/original_{job_id}.mp4"  # Placeholder URL
+        active_jobs[job_id]["video_url"] = f"/video/{job_id}"  # Use our custom endpoint
         active_jobs[job_id]["analysis_result"] = {
             "highlights": [
                 {
@@ -330,30 +379,19 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
             ]
         }
         
+        logger.info(f"✅ Analysis completed for job: {job_id}")
+        
     except Exception as e:
+        logger.error(f"❌ Analysis failed for job {job_id}: {e}")
+        logger.error(f"📋 Traceback: {traceback.format_exc()}")
         active_jobs[job_id] = {
             "status": "failed",
             "message": f"Analysis failed: {e}"
         }
 
-@app.get("/static/original_{job_id}.mp4")
-async def serve_original_video(job_id: str):
-    """Serve the original uploaded video"""
-    try:
-        if job_id in in_memory_files:
-            file_info = in_memory_files[job_id]
-            return Response(
-                content=file_info["content"],
-                media_type=file_info["content_type"],
-                headers={"Content-Disposition": f"inline; filename={file_info['filename']}"}
-            )
-        else:
-            return JSONResponse(content={"error": "Video not found"}, status_code=404)
-    except Exception as e:
-        return JSONResponse(content={"error": f"Error serving video: {e}"}, status_code=500)
-
 @app.get("/users")
 async def get_users():
+    logger.info("👥 Users list requested")
     try:
         if user_manager:
             users = user_manager.get_all_users()
@@ -361,6 +399,7 @@ async def get_users():
         else:
             return JSONResponse(content={"users": [], "message": "User management not available"})
     except Exception as e:
+        logger.error(f"❌ Error getting users: {e}")
         return JSONResponse(content={"users": [], "message": f"Error: {e}"})
 
 if __name__ == "__main__":
