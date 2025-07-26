@@ -46,10 +46,10 @@ class VideoProcessor:
                 print(f"❌ Copied video file does not exist: {output_path}")
                 return video_path
             
-            # Try to add MoviePy overlay if available
+            # Try to add MoviePy overlay if available (without TextClip)
             try:
-                print(f"🎬 Attempting MoviePy overlay...")
-                from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip
+                print(f"🎬 Attempting MoviePy processing...")
+                from moviepy.editor import VideoFileClip
                 
                 # Load video
                 print(f"📹 Loading video with MoviePy...")
@@ -57,18 +57,18 @@ class VideoProcessor:
                 duration = video.duration
                 print(f"📊 Video duration: {duration} seconds")
                 
-                # Create a simple overlay with fighter name
-                print(f"🎨 Creating text overlay...")
-                name_clip = TextClip(
-                    "FIGHTER", 
-                    fontsize=40, 
-                    color='lime', 
-                    font='Arial-Bold'
-                ).set_position(('center', 50)).set_duration(duration)
+                # Create a simple color overlay instead of text
+                print(f"🎨 Creating color overlay...")
+                from moviepy.video.VideoClip import ColorClip
+                
+                # Create a small colored rectangle overlay
+                overlay = ColorClip(size=(200, 50), color=(0, 255, 0), duration=duration)
+                overlay = overlay.set_position(('center', 50))
                 
                 # Create composite video
                 print(f"🎬 Creating composite video...")
-                composite = CompositeVideoClip([video, name_clip])
+                from moviepy.editor import CompositeVideoClip
+                composite = CompositeVideoClip([video, overlay])
                 
                 # Write the final video
                 print(f"💾 Writing final video with overlay...")
@@ -83,7 +83,7 @@ class VideoProcessor:
                 # Clean up
                 video.close()
                 composite.close()
-                name_clip.close()
+                overlay.close()
                 
                 print(f"✅ Highlight video created with overlay: {output_path}")
                 
