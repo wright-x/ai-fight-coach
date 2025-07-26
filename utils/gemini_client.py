@@ -48,9 +48,25 @@ class GeminiClient:
                 3. Reaction time to incoming punches
                 4. Head positioning during attacks
                 
-                Return a JSON response with:
-                - highlights: array of key moments with timestamps, detailed_feedback, and action_required
-                - recommended_drills: array of drills with drill_name, description, and problem_it_fixes
+                IMPORTANT: Return ONLY a valid JSON object with this exact structure:
+                {
+                  "highlights": [
+                    {
+                      "timestamp": "00:15",
+                      "detailed_feedback": "Description of what was observed",
+                      "action_required": "What the fighter should do to improve"
+                    }
+                  ],
+                  "recommended_drills": [
+                    {
+                      "drill_name": "Name of the drill",
+                      "description": "How to perform the drill",
+                      "problem_it_fixes": "What problem this drill addresses"
+                    }
+                  ]
+                }
+                
+                Do not include any text before or after the JSON. Return ONLY the JSON object.
                 """
             elif analysis_type == "punch_techniques":
                 prompt = """
@@ -60,9 +76,25 @@ class GeminiClient:
                 3. Accuracy and precision
                 4. Combination effectiveness
                 
-                Return a JSON response with:
-                - highlights: array of key moments with timestamps, detailed_feedback, and action_required
-                - recommended_drills: array of drills with drill_name, description, and problem_it_fixes
+                IMPORTANT: Return ONLY a valid JSON object with this exact structure:
+                {
+                  "highlights": [
+                    {
+                      "timestamp": "00:15",
+                      "detailed_feedback": "Description of what was observed",
+                      "action_required": "What the fighter should do to improve"
+                    }
+                  ],
+                  "recommended_drills": [
+                    {
+                      "drill_name": "Name of the drill",
+                      "description": "How to perform the drill",
+                      "problem_it_fixes": "What problem this drill addresses"
+                    }
+                  ]
+                }
+                
+                Do not include any text before or after the JSON. Return ONLY the JSON object.
                 """
             elif analysis_type == "footwork":
                 prompt = """
@@ -72,9 +104,25 @@ class GeminiClient:
                 3. Positioning and angles
                 4. Defensive footwork
                 
-                Return a JSON response with:
-                - highlights: array of key moments with timestamps, detailed_feedback, and action_required
-                - recommended_drills: array of drills with drill_name, description, and problem_it_fixes
+                IMPORTANT: Return ONLY a valid JSON object with this exact structure:
+                {
+                  "highlights": [
+                    {
+                      "timestamp": "00:15",
+                      "detailed_feedback": "Description of what was observed",
+                      "action_required": "What the fighter should do to improve"
+                    }
+                  ],
+                  "recommended_drills": [
+                    {
+                      "drill_name": "Name of the drill",
+                      "description": "How to perform the drill",
+                      "problem_it_fixes": "What problem this drill addresses"
+                    }
+                  ]
+                }
+                
+                Do not include any text before or after the JSON. Return ONLY the JSON object.
                 """
             else:  # everything
                 prompt = """
@@ -85,9 +133,25 @@ class GeminiClient:
                 4. Movement and positioning
                 5. Areas for improvement
                 
-                Return a JSON response with:
-                - highlights: array of key moments with timestamps, detailed_feedback, and action_required
-                - recommended_drills: array of drills with drill_name, description, and problem_it_fixes
+                IMPORTANT: Return ONLY a valid JSON object with this exact structure:
+                {
+                  "highlights": [
+                    {
+                      "timestamp": "00:15",
+                      "detailed_feedback": "Description of what was observed",
+                      "action_required": "What the fighter should do to improve"
+                    }
+                  ],
+                  "recommended_drills": [
+                    {
+                      "drill_name": "Name of the drill",
+                      "description": "How to perform the drill",
+                      "problem_it_fixes": "What problem this drill addresses"
+                    }
+                  ]
+                }
+                
+                Do not include any text before or after the JSON. Return ONLY the JSON object.
                 """
             
             # Send to Gemini
@@ -105,10 +169,33 @@ class GeminiClient:
             
             # Parse response
             try:
-                result = json.loads(response.text)
-                return result
-            except json.JSONDecodeError:
+                # Clean up Gemini response - remove markdown code blocks and extract JSON
+                response_text = response.text.strip()
+                
+                # Remove markdown code blocks if present
+                if response_text.startswith('```json'):
+                    response_text = response_text[7:]  # Remove ```json
+                if response_text.startswith('```'):
+                    response_text = response_text[3:]  # Remove ```
+                if response_text.endswith('```'):
+                    response_text = response_text[:-3]  # Remove ```
+                
+                # Find JSON object in the response
+                start_idx = response_text.find('{')
+                end_idx = response_text.rfind('}') + 1
+                
+                if start_idx != -1 and end_idx != 0:
+                    json_text = response_text[start_idx:end_idx]
+                    result = json.loads(json_text)
+                    print(f"✅ Successfully parsed Gemini response")
+                    return result
+                else:
+                    print(f"❌ No JSON object found in response: {response_text}")
+                    return self._get_mock_analysis(analysis_type)
+                    
+            except json.JSONDecodeError as e:
                 print(f"❌ Failed to parse Gemini response: {response.text}")
+                print(f"📋 JSON Error: {e}")
                 return self._get_mock_analysis(analysis_type)
                 
         except Exception as e:
