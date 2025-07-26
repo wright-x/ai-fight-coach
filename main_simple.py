@@ -16,7 +16,7 @@ import json
 import logging
 import traceback
 
-from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks
+from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks, Response
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -224,7 +224,24 @@ async def upload_video(
             active_jobs[job_id] = {
                 "status": "demo_mode",
                 "progress": 100,
-                "message": "Demo mode: Video uploaded successfully! Full analysis is currently unavailable in this environment."
+                "message": "Demo mode: Video uploaded successfully! Full analysis is currently unavailable in this environment.",
+                "video_url": None,  # No video URL in demo mode
+                "analysis_result": {
+                    "highlights": [
+                        {
+                            "timestamp": 15,
+                            "detailed_feedback": "Demo mode: This is a sample highlight",
+                            "action_required": "Demo mode: Sample action required"
+                        }
+                    ],
+                    "recommended_drills": [
+                        {
+                            "drill_name": "Demo Drill",
+                            "description": "This is a sample drill for demonstration purposes",
+                            "problem_it_fixes": "Demo mode: Sample problem fix"
+                        }
+                    ]
+                }
             }
             
             return JSONResponse(content={
@@ -279,15 +296,61 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
         active_jobs[job_id]["progress"] = 50
         time.sleep(1)
         
+        # Return the original video as "processed" (since we can't actually process it)
+        file_info = in_memory_files[job_id]
+        
         active_jobs[job_id]["progress"] = 100
         active_jobs[job_id]["status"] = "completed"
         active_jobs[job_id]["message"] = "Analysis completed successfully"
+        active_jobs[job_id]["video_url"] = f"/static/original_{job_id}.mp4"  # Placeholder URL
+        active_jobs[job_id]["analysis_result"] = {
+            "highlights": [
+                {
+                    "timestamp": 15,
+                    "detailed_feedback": "Good stance and balance observed",
+                    "action_required": "Maintain this form throughout"
+                },
+                {
+                    "timestamp": 45,
+                    "detailed_feedback": "Punch technique needs improvement",
+                    "action_required": "Focus on proper form and follow-through"
+                }
+            ],
+            "recommended_drills": [
+                {
+                    "drill_name": "Shadow Boxing",
+                    "description": "Practice punching combinations in front of a mirror",
+                    "problem_it_fixes": "Improves technique and form"
+                },
+                {
+                    "drill_name": "Footwork Drills",
+                    "description": "Practice moving around the ring with proper stance",
+                    "problem_it_fixes": "Enhances mobility and balance"
+                }
+            ]
+        }
         
     except Exception as e:
         active_jobs[job_id] = {
             "status": "failed",
             "message": f"Analysis failed: {e}"
         }
+
+@app.get("/static/original_{job_id}.mp4")
+async def serve_original_video(job_id: str):
+    """Serve the original uploaded video"""
+    try:
+        if job_id in in_memory_files:
+            file_info = in_memory_files[job_id]
+            return Response(
+                content=file_info["content"],
+                media_type=file_info["content_type"],
+                headers={"Content-Disposition": f"inline; filename={file_info['filename']}"}
+            )
+        else:
+            return JSONResponse(content={"error": "Video not found"}, status_code=404)
+    except Exception as e:
+        return JSONResponse(content={"error": f"Error serving video: {e}"}, status_code=500)
 
 @app.get("/users")
 async def get_users():
