@@ -1,6 +1,0 @@
-2025-07-26 23:26:15,270 - ai_fight_coach - INFO - info:64 - MediaPipe pose detection initialized successfully
-2025-07-26 23:26:15,270 - ai_fight_coach - INFO - info:64 - VideoProcessor initialized with temp_dir: temp
-2025-07-26 23:26:15,271 - ai_fight_coach - INFO - info:64 - GeminiClient initialized successfully
-2025-07-26 23:26:15,700 - ai_fight_coach - INFO - info:64 - TTSClient initialized with 32 available voices
-2025-07-26 23:26:15,712 - ai_fight_coach - INFO - info:64 - AI Fight Coach application starting up...
-2025-07-26 23:26:15,712 - ai_fight_coach - INFO - info:64 - All directories created and components initialized
