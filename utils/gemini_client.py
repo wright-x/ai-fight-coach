@@ -90,30 +90,23 @@ class GeminiClient:
             # Send to Gemini
             response = self.model.generate_content([
                 prompt,
-                {
-                    "inline_data": {
-                        "mime_type": "video/mp4",
-                        "data": video_b64
-                    }
-                }
+                {"inline_data": {"mime_type": "video/mp4", "data": video_b64}}
             ])
             
             print(f"✅ Gemini analysis completed")
             
-            # Parse response
             try:
-                # Clean up Gemini response - remove markdown code blocks and extract JSON
                 response_text = response.text.strip()
+                print(f"📄 Raw response length: {len(response_text)} characters")
+                print(f"📄 Response preview: {response_text[:200]}...")
                 
-                # Remove markdown code blocks if present
                 if response_text.startswith('```json'):
-                    response_text = response_text[7:]  # Remove ```json
+                    response_text = response_text[7:]
                 if response_text.startswith('```'):
-                    response_text = response_text[3:]  # Remove ```
+                    response_text = response_text[3:]
                 if response_text.endswith('```'):
-                    response_text = response_text[:-3]  # Remove ```
+                    response_text = response_text[:-3]
                 
-                # Find JSON object in the response
                 start_idx = response_text.find('{')
                 end_idx = response_text.rfind('}') + 1
                 
