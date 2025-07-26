@@ -8,6 +8,7 @@ import shutil
 from typing import List, Dict, Any, Optional
 import tempfile
 import time
+import traceback
 
 class VideoProcessor:
     """Video processor for Railway environment using MoviePy"""
@@ -29,20 +30,35 @@ class VideoProcessor:
         """Create highlight video with overlays using MoviePy"""
         try:
             print(f"🎬 Creating highlight video: {video_path}")
+            print(f"📊 Number of highlights: {len(highlights)}")
+            print(f"📁 Output path: {output_path}")
             
             # For now, just copy the video and add a simple overlay
             # This ensures we get a processed video even if MoviePy fails
+            print(f"📋 Copying video to output path...")
             shutil.copy2(video_path, output_path)
+            print(f"✅ Video copied to: {output_path}")
+            
+            # Check if the copied file exists
+            if os.path.exists(output_path):
+                file_size = os.path.getsize(output_path)
+                print(f"✅ Copied video file exists: {output_path} ({file_size} bytes)")
+            else:
+                print(f"❌ Copied video file does not exist: {output_path}")
             
             # Try to add MoviePy overlay if available
             try:
+                print(f"🎬 Attempting MoviePy overlay...")
                 from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip
                 
                 # Load video
+                print(f"📹 Loading video with MoviePy...")
                 video = VideoFileClip(video_path)
                 duration = video.duration
+                print(f"📊 Video duration: {duration} seconds")
                 
                 # Create a simple overlay with fighter name
+                print(f"🎨 Creating text overlay...")
                 name_clip = TextClip(
                     "FIGHTER", 
                     fontsize=40, 
@@ -51,9 +67,11 @@ class VideoProcessor:
                 ).set_position(('center', 50)).set_duration(duration)
                 
                 # Create composite video
+                print(f"🎬 Creating composite video...")
                 composite = CompositeVideoClip([video, name_clip])
                 
                 # Write the final video
+                print(f"💾 Writing final video with overlay...")
                 composite.write_videofile(
                     output_path, 
                     codec='libx264', 
@@ -71,12 +89,21 @@ class VideoProcessor:
                 
             except Exception as e:
                 print(f"⚠️ MoviePy overlay failed, using copied video: {e}")
+                print(f"📋 MoviePy error traceback: {traceback.format_exc()}")
                 # The video was already copied above, so we're good
+            
+            # Final check
+            if os.path.exists(output_path):
+                final_size = os.path.getsize(output_path)
+                print(f"✅ Final video file exists: {output_path} ({final_size} bytes)")
+            else:
+                print(f"❌ Final video file does not exist: {output_path}")
             
             return output_path
             
         except Exception as e:
             print(f"Error creating highlight video: {e}")
+            print(f"📋 Full error traceback: {traceback.format_exc()}")
             return video_path
     
     def _parse_timestamp(self, timestamp: str) -> float:
