@@ -19,9 +19,28 @@ class VideoProcessor:
     
     def __init__(self):
         self.supported_formats = ['.mp4', '.avi', '.mov', '.mkv']
-        self.mp_pose = mp.solutions.pose
-        self.mp_drawing = mp.solutions.drawing_utils
-        print("✅ VideoProcessor initialized (Professional Boxing Analysis)")
+        
+        # Try to initialize MediaPipe with fallback
+        try:
+            import cv2
+            import mediapipe as mp
+            import numpy as np
+            
+            self.mp_pose = mp.solutions.pose
+            self.mp_drawing = mp.solutions.drawing_utils
+            self.cv2 = cv2
+            self.np = np
+            self.mediapipe_available = True
+            print("✅ VideoProcessor initialized (Professional Boxing Analysis with MediaPipe)")
+            
+        except ImportError as e:
+            print(f"⚠️ MediaPipe import failed: {e}")
+            self.mediapipe_available = False
+            print("✅ VideoProcessor initialized (Professional Boxing Analysis - MediaPipe fallback mode)")
+        except Exception as e:
+            print(f"⚠️ MediaPipe initialization failed: {e}")
+            self.mediapipe_available = False
+            print("✅ VideoProcessor initialized (Professional Boxing Analysis - MediaPipe fallback mode)")
     
     def create_highlight_video(self, video_path: str, highlights: List[Dict], output_path: str) -> str:
         """Create professional boxing analysis video"""
@@ -168,9 +187,14 @@ class VideoProcessor:
             # Parse timestamp and clamp to video length
             highlight_time = self._parse_timestamp(timestamp)
             
+            # Check if MediaPipe is available
+            if not self.mediapipe_available:
+                print(f"⚠️ MediaPipe not available, using fallback frame")
+                return self._create_fallback_frame(feedback, duration)
+            
             # Extract frame at timestamp
-            cap = cv2.VideoCapture(video_path)
-            cap.set(cv2.CAP_PROP_POS_MSEC, highlight_time * 1000)
+            cap = self.cv2.VideoCapture(video_path)
+            cap.set(self.cv2.CAP_PROP_POS_MSEC, highlight_time * 1000)
             ret, frame = cap.read()
             cap.release()
             
@@ -186,7 +210,7 @@ class VideoProcessor:
                 min_detection_confidence=0.5
             ) as pose:
                 # Convert BGR to RGB
-                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                rgb_frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
                 results = pose.process(rgb_frame)
                 
                 # Draw pose landmarks
@@ -207,7 +231,7 @@ class VideoProcessor:
                 
                 # Save frame
                 temp_frame_path = f"temp/analysis_frame_{int(highlight_time)}.jpg"
-                cv2.imwrite(temp_frame_path, annotated_frame)
+                self.cv2.imwrite(temp_frame_path, annotated_frame)
                 
                 # Create video clip from frame
                 frame_clip = VideoFileClip(temp_frame_path).set_duration(duration)
@@ -217,7 +241,7 @@ class VideoProcessor:
             print(f"⚠️ MediaPipe analysis failed: {e}")
             return self._create_fallback_frame(feedback, duration)
     
-    def _add_error_arrow(self, frame: np.ndarray, landmarks, problem_location: str) -> np.ndarray:
+    def _add_error_arrow(self, frame, landmarks, problem_location: str):
         """Add red arrow pointing to specific body part"""
         try:
             if not landmarks:
@@ -260,7 +284,7 @@ class VideoProcessor:
             print(f"⚠️ Error arrow failed: {e}")
             return frame
     
-    def _add_analysis_text(self, frame: np.ndarray, feedback: str, problem_location: str) -> np.ndarray:
+    def _add_analysis_text(self, frame, feedback: str, problem_location: str):
         """Add analysis text overlay"""
         try:
             # Add background rectangle
@@ -389,20 +413,27 @@ class VideoProcessor:
     def _create_fallback_frame(self, feedback: str, duration: float) -> VideoFileClip:
         """Create fallback frame when MediaPipe fails"""
         try:
-            # Create simple black frame with text
-            frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
-            
-            # Add text
-            cv2.putText(frame, "ANALYSIS FRAME", (800, 400), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 3)
-            cv2.putText(frame, feedback[:50] + "...", (600, 500), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            
-            temp_frame_path = "temp/fallback_frame.jpg"
-            cv2.imwrite(temp_frame_path, frame)
-            
-            frame_clip = VideoFileClip(temp_frame_path).set_duration(duration)
-            return frame_clip
+            if self.mediapipe_available:
+                # Create simple black frame with text
+                frame = self.np.zeros((1080, 1920, 3), dtype=self.np.uint8)
+                
+                # Add text
+                self.cv2.putText(frame, "ANALYSIS FRAME", (800, 400), 
+                               self.cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 3)
+                self.cv2.putText(frame, feedback[:50] + "...", (600, 500), 
+                               self.cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                
+                temp_frame_path = "temp/fallback_frame.jpg"
+                self.cv2.imwrite(temp_frame_path, frame)
+                
+                frame_clip = VideoFileClip(temp_frame_path).set_duration(duration)
+                return frame_clip
+            else:
+                # Create simple text overlay without OpenCV
+                bg = ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
+                title = TextClip("ANALYSIS FRAME", fontsize=80, color='white', font='Arial-Bold').set_position('center').set_duration(duration)
+                subtitle = TextClip(feedback[:50] + "...", fontsize=40, color='white', font='Arial').set_position(('center', 600)).set_duration(duration)
+                return CompositeVideoClip([bg, title, subtitle])
             
         except Exception as e:
             print(f"⚠️ Fallback frame failed: {e}")
