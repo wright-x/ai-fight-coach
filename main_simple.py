@@ -420,79 +420,77 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
         logger.info(f"📈 Job {job_id} progress: 80%")
         
         # Create highlight video with overlays and head tracking
-        if analysis_result.get("highlights"):
-            logger.info(f"🎬 Creating highlight video with overlays for job: {job_id}")
-            logger.info(f"📊 Analysis result highlights: {len(analysis_result.get('highlights', []))}")
-            highlight_video_path = f"output/highlight_{job_id}.mp4"
-            
-            try:
-                if video_processor:
-                    logger.info(f"🎬 VideoProcessor available, creating highlight video...")
-                    processed_video_path = video_processor.create_highlight_video(
-                        temp_video_path, 
-                        analysis_result["highlights"], 
-                        highlight_video_path
-                    )
-                    logger.info(f"✅ Highlight video created: {processed_video_path}")
-                    
-                    # Check if the processed video file exists
-                    if os.path.exists(processed_video_path):
-                        logger.info(f"✅ Processed video file exists: {processed_video_path}")
-                        file_size = os.path.getsize(processed_video_path)
-                        logger.info(f"📊 Processed video file size: {file_size} bytes")
-                    else:
-                        logger.error(f"❌ Processed video file does not exist: {processed_video_path}")
-                    
-                    # Generate TTS audio for highlights
-                    if tts_client:
-                        logger.info(f"🔊 Generating TTS audio for highlights: {job_id}")
-                        audio_path = f"output/audio_{job_id}.mp3"
-                        tts_client.generate_highlight_audio(analysis_result["highlights"], audio_path)
-                        
-                        # Add audio to video
-                        final_video_path = f"output/final_{job_id}.mp4"
-                        logger.info(f"🎬 Adding audio to video: {final_video_path}")
-                        video_processor.add_audio_to_video(processed_video_path, audio_path, final_video_path)
-                        logger.info(f"✅ Final video with audio created: {final_video_path}")
-                        
-                        # Store the final video in memory
-                        try:
-                            with open(final_video_path, 'rb') as f:
-                                final_video_content = f.read()
-                            in_memory_files[job_id] = {
-                                "content": final_video_content,
-                                "filename": f"final_{job_id}.mp4",
-                                "content_type": "video/mp4"
-                            }
-                            logger.info(f"✅ Final video stored in memory: {len(final_video_content)} bytes")
-                        except Exception as e:
-                            logger.error(f"❌ Error storing final video in memory: {e}")
-                            final_video_path = processed_video_path
-                    else:
-                        final_video_path = processed_video_path
-                        
-                        # Store the processed video in memory
-                        try:
-                            with open(processed_video_path, 'rb') as f:
-                                processed_video_content = f.read()
-                            in_memory_files[job_id] = {
-                                "content": processed_video_content,
-                                "filename": f"highlight_{job_id}.mp4",
-                                "content_type": "video/mp4"
-                            }
-                            logger.info(f"✅ Processed video stored in memory: {len(processed_video_content)} bytes")
-                        except Exception as e:
-                            logger.error(f"❌ Error storing processed video in memory: {e}")
+        logger.info(f"🎬 Starting video processing for job: {job_id}")
+        logger.info(f"📊 Analysis result: {analysis_result}")
+        
+        # Always attempt video processing, even if no highlights
+        highlight_video_path = f"output/highlight_{job_id}.mp4"
+        
+        try:
+            if video_processor:
+                logger.info(f"🎬 VideoProcessor available, creating highlight video...")
+                processed_video_path = video_processor.create_highlight_video(
+                    temp_video_path, 
+                    analysis_result.get("highlights", []), 
+                    highlight_video_path
+                )
+                logger.info(f"✅ Highlight video created: {processed_video_path}")
+                
+                # Check if the processed video file exists
+                if os.path.exists(processed_video_path):
+                    logger.info(f"✅ Processed video file exists: {processed_video_path}")
+                    file_size = os.path.getsize(processed_video_path)
+                    logger.info(f"📊 Processed video file size: {file_size} bytes")
                 else:
-                    logger.warning(f"⚠️ VideoProcessor not available, using original video")
-                    final_video_path = temp_video_path
+                    logger.error(f"❌ Processed video file does not exist: {processed_video_path}")
+                
+                # Generate TTS audio for highlights
+                if tts_client and analysis_result.get("highlights"):
+                    logger.info(f"🔊 Generating TTS audio for highlights: {job_id}")
+                    audio_path = f"output/audio_{job_id}.mp3"
+                    tts_client.generate_highlight_audio(analysis_result["highlights"], audio_path)
                     
-            except Exception as e:
-                logger.error(f"❌ Error creating highlight video: {e}")
-                logger.error(f"📋 Traceback: {traceback.format_exc()}")
+                    # Add audio to video
+                    final_video_path = f"output/final_{job_id}.mp4"
+                    logger.info(f"🎬 Adding audio to video: {final_video_path}")
+                    video_processor.add_audio_to_video(processed_video_path, audio_path, final_video_path)
+                    logger.info(f"✅ Final video with audio created: {final_video_path}")
+                    
+                    # Store the final video in memory
+                    try:
+                        with open(final_video_path, 'rb') as f:
+                            final_video_content = f.read()
+                        in_memory_files[job_id] = {
+                            "content": final_video_content,
+                            "filename": f"final_{job_id}.mp4",
+                            "content_type": "video/mp4"
+                        }
+                        logger.info(f"✅ Final video stored in memory: {len(final_video_content)} bytes")
+                    except Exception as e:
+                        logger.error(f"❌ Error storing final video in memory: {e}")
+                        final_video_path = processed_video_path
+                else:
+                    final_video_path = processed_video_path
+                    
+                    # Store the processed video in memory
+                    try:
+                        with open(processed_video_path, 'rb') as f:
+                            processed_video_content = f.read()
+                        in_memory_files[job_id] = {
+                            "content": processed_video_content,
+                            "filename": f"highlight_{job_id}.mp4",
+                            "content_type": "video/mp4"
+                        }
+                        logger.info(f"✅ Processed video stored in memory: {len(processed_video_content)} bytes")
+                    except Exception as e:
+                        logger.error(f"❌ Error storing processed video in memory: {e}")
+            else:
+                logger.warning(f"⚠️ VideoProcessor not available, using original video")
                 final_video_path = temp_video_path
-        else:
-            logger.warning(f"⚠️ No highlights found in analysis result")
+                
+        except Exception as e:
+            logger.error(f"❌ Error creating highlight video: {e}")
+            logger.error(f"📋 Traceback: {traceback.format_exc()}")
             final_video_path = temp_video_path
         
         # Clean up temp file

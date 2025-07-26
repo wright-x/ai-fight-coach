@@ -33,8 +33,7 @@ class VideoProcessor:
             print(f"📊 Number of highlights: {len(highlights)}")
             print(f"📁 Output path: {output_path}")
             
-            # For now, just copy the video and add a simple overlay
-            # This ensures we get a processed video even if MoviePy fails
+            # Always copy the video first to ensure we have a processed video
             print(f"📋 Copying video to output path...")
             shutil.copy2(video_path, output_path)
             print(f"✅ Video copied to: {output_path}")
@@ -45,6 +44,7 @@ class VideoProcessor:
                 print(f"✅ Copied video file exists: {output_path} ({file_size} bytes)")
             else:
                 print(f"❌ Copied video file does not exist: {output_path}")
+                return video_path
             
             # Try to add MoviePy overlay if available
             try:
@@ -96,10 +96,10 @@ class VideoProcessor:
             if os.path.exists(output_path):
                 final_size = os.path.getsize(output_path)
                 print(f"✅ Final video file exists: {output_path} ({final_size} bytes)")
+                return output_path
             else:
                 print(f"❌ Final video file does not exist: {output_path}")
-            
-            return output_path
+                return video_path
             
         except Exception as e:
             print(f"Error creating highlight video: {e}")
