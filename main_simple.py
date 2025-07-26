@@ -412,8 +412,21 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
                 )
                 logger.info(f"✅ Highlight video created: {processed_video_path}")
                 
+                # Generate TTS audio for highlights
+                if tts_client:
+                    logger.info(f"🔊 Generating TTS audio for highlights: {job_id}")
+                    audio_path = f"output/audio_{job_id}.mp3"
+                    tts_client.generate_highlight_audio(analysis_result["highlights"], audio_path)
+                    
+                    # Add audio to video
+                    final_video_path = f"output/final_{job_id}.mp4"
+                    video_processor.add_audio_to_video(processed_video_path, audio_path, final_video_path)
+                    logger.info(f"✅ Final video with audio created: {final_video_path}")
+                else:
+                    final_video_path = processed_video_path
+                
                 # Use the processed video instead of original
-                final_video_path = processed_video_path
+                final_video_path = final_video_path
             except Exception as e:
                 logger.error(f"❌ Error creating highlight video: {e}")
                 final_video_path = temp_video_path
