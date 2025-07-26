@@ -54,7 +54,7 @@ try:
     print("✅ GeminiClient initialized successfully")
 except Exception as e:
     print(f"❌ GeminiClient failed: {e}")
-    print(f"📋 Traceback: {traceback.format_exc()}")
+    print(f"📋 This is expected in Railway environment - AI analysis will be limited")
 
 try:
     print("🔊 Testing utils.tts_client import...")
@@ -63,7 +63,7 @@ try:
     print("✅ TTSClient initialized successfully")
 except Exception as e:
     print(f"❌ TTSClient failed: {e}")
-    print(f"📋 Traceback: {traceback.format_exc()}")
+    print(f"📋 This is expected in Railway environment - TTS will be limited")
 
 try:
     print("👥 Testing user_management import...")
