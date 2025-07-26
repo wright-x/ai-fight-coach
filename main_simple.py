@@ -44,47 +44,59 @@ user_manager = None
 in_memory_files = {}  # {job_id: file_content}
 active_jobs = {}
 
-print("🔧 Starting component initialization...")
+def initialize_components():
+    """Initialize all components with detailed logging"""
+    global video_processor, gemini_client, tts_client, user_manager
+    
+    logger.info("🔧 Starting component initialization...")
 
-# Test each component individually
-try:
-    print("📁 Testing utils.video_processor import...")
-    from utils.video_processor import VideoProcessor
-    video_processor = VideoProcessor()
-    print("✅ VideoProcessor initialized successfully")
-except Exception as e:
-    print(f"❌ VideoProcessor failed: {e}")
-    print(f"📋 This is expected in Railway environment - video processing will be limited")
+    # Test each component individually
+    try:
+        logger.info("📁 Testing utils.video_processor import...")
+        from utils.video_processor import VideoProcessor
+        video_processor = VideoProcessor()
+        logger.info("✅ VideoProcessor initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ VideoProcessor failed: {e}")
+        logger.error(f"📋 Traceback: {traceback.format_exc()}")
+        logger.info("📋 This is expected in Railway environment - video processing will be limited")
 
-try:
-    print("🤖 Testing utils.gemini_client import...")
-    from utils.gemini_client import GeminiClient
-    gemini_client = GeminiClient()
-    print("✅ GeminiClient initialized successfully")
-except Exception as e:
-    print(f"❌ GeminiClient failed: {e}")
-    print(f"📋 This is expected in Railway environment - AI analysis will be limited")
+    try:
+        logger.info("🤖 Testing utils.gemini_client import...")
+        from utils.gemini_client import GeminiClient
+        gemini_client = GeminiClient()
+        logger.info("✅ GeminiClient initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ GeminiClient failed: {e}")
+        logger.error(f"📋 Traceback: {traceback.format_exc()}")
+        logger.info("📋 This is expected in Railway environment - AI analysis will be limited")
 
-try:
-    print("🔊 Testing utils.tts_client import...")
-    from utils.tts_client import TTSClient
-    tts_client = TTSClient()
-    print("✅ TTSClient initialized successfully")
-except Exception as e:
-    print(f"❌ TTSClient failed: {e}")
-    print(f"📋 This is expected in Railway environment - TTS will be limited")
+    try:
+        logger.info("🔊 Testing utils.tts_client import...")
+        from utils.tts_client import TTSClient
+        tts_client = TTSClient()
+        logger.info("✅ TTSClient initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ TTSClient failed: {e}")
+        logger.error(f"📋 Traceback: {traceback.format_exc()}")
+        logger.info("📋 This is expected in Railway environment - TTS will be limited")
 
-try:
-    print("👥 Testing user_management import...")
-    from user_management import UserManager
-    from email_config import SMTP_CONFIG, ADMIN_EMAIL
-    user_manager = UserManager(csv_file="users.csv", smtp_config=SMTP_CONFIG)
-    print("✅ UserManager initialized successfully")
-except Exception as e:
-    print(f"❌ UserManager failed: {e}")
-    print(f"📋 Traceback: {traceback.format_exc()}")
+    try:
+        logger.info("👥 Testing user_management import...")
+        from user_management import UserManager
+        from email_config import SMTP_CONFIG, ADMIN_EMAIL
+        user_manager = UserManager(csv_file="users.csv", smtp_config=SMTP_CONFIG)
+        logger.info("✅ UserManager initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ UserManager failed: {e}")
+        logger.error(f"📋 Traceback: {traceback.format_exc()}")
 
-print("🏁 Component initialization complete!")
+    logger.info("🏁 Component initialization complete!")
+    logger.info(f"📊 Component Status:")
+    logger.info(f"   - VideoProcessor: {'✅' if video_processor else '❌'}")
+    logger.info(f"   - GeminiClient: {'✅' if gemini_client else '❌'}")
+    logger.info(f"   - TTSClient: {'✅' if tts_client else '❌'}")
+    logger.info(f"   - UserManager: {'✅' if user_manager else '❌'}")
 
 def schedule_file_deletion(job_id: str, delay_minutes: int = 15):
     """Schedule in-memory file deletion after the specified delay."""
@@ -107,6 +119,8 @@ async def startup_event():
     for directory in ["uploads", "output", "static", "temp"]:
         Path(directory).mkdir(exist_ok=True)
         logger.info(f"✅ Created directory: {directory}")
+
+    initialize_components()
 
 @app.get("/health")
 async def health_check():
@@ -235,6 +249,11 @@ async def upload_video(
         schedule_file_deletion(job_id, 15)
         
         logger.info(f"✅ Video uploaded to memory: {file.filename} ({len(file_content)} bytes)")
+        
+        # Check if components are available
+        logger.info(f"🔍 Checking component availability:")
+        logger.info(f"   - VideoProcessor: {'✅' if video_processor else '❌'}")
+        logger.info(f"   - GeminiClient: {'✅' if gemini_client else '❌'}")
         
         if not video_processor or not gemini_client:
             # Demo mode - accept upload but show limited functionality
