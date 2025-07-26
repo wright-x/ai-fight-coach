@@ -8,6 +8,7 @@ import uuid
 import shutil
 import threading
 import time
+import io
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from pathlib import Path
@@ -34,6 +35,10 @@ video_processor = None
 gemini_client = None
 tts_client = None
 user_manager = None
+
+# In-memory storage for Railway compatibility
+in_memory_files = {}  # {job_id: file_content}
+active_jobs = {}
 
 print("🔧 Starting component initialization...")
 
@@ -77,59 +82,30 @@ except Exception as e:
 
 print("🏁 Component initialization complete!")
 
-# Store active jobs
-active_jobs = {}
-
-# Store files for auto-deletion
-files_to_delete = {}
-
-def schedule_file_deletion(file_path: str, delay_minutes: int = 15):
-    """Schedule a file for deletion after the specified delay."""
-    deletion_time = time.time() + (delay_minutes * 60)
-    files_to_delete[file_path] = deletion_time
-    print(f"Scheduled deletion of {file_path} in {delay_minutes} minutes")
-
-def cleanup_old_files():
-    """Remove files that have passed their deletion time."""
-    current_time = time.time()
-    files_to_remove = []
+def schedule_file_deletion(job_id: str, delay_minutes: int = 15):
+    """Schedule in-memory file deletion after the specified delay."""
+    def delete_file():
+        time.sleep(delay_minutes * 60)
+        if job_id in in_memory_files:
+            del in_memory_files[job_id]
+            print(f"Deleted in-memory file for job {job_id}")
     
-    for file_path, deletion_time in files_to_delete.items():
-        if current_time >= deletion_time:
-            try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    print(f"Deleted old file: {file_path}")
-            except Exception as e:
-                print(f"Error deleting file {file_path}: {e}")
-            files_to_remove.append(file_path)
-    
-    for file_path in files_to_remove:
-        del files_to_delete[file_path]
-
-def cleanup_worker():
-    """Background worker to clean up old files."""
-    while True:
-        cleanup_old_files()
-        time.sleep(60)
-
-# Start cleanup worker
-cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
-cleanup_thread.start()
+    thread = threading.Thread(target=delete_file, daemon=True)
+    thread.start()
 
 @app.on_event("startup")
 async def startup_event():
-    print("🚀 AI Fight Coach application starting up...")
-    print("📁 All directories created and components initialized")
-    print(f"🔧 Component Status:")
-    print(f"   - VideoProcessor: {'✅' if video_processor else '❌ (Limited functionality)'}")
-    print(f"   - GeminiClient: {'✅' if gemini_client else '❌'}")
-    print(f"   - TTSClient: {'✅' if tts_client else '❌'}")
-    print(f"   - UserManager: {'✅' if user_manager else '❌'}")
+    """Initialize application on startup."""
+    print("🚀 AI Fight Coach starting up...")
+    print("📁 Creating directories...")
+    
+    # Create directories
+    for directory in ["uploads", "output", "static", "temp"]:
+        Path(directory).mkdir(exist_ok=True)
+        print(f"✅ Created directory: {directory}")
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for deployment platforms"""
     return {
         "status": "healthy", 
         "timestamp": datetime.now().isoformat(),
@@ -150,37 +126,45 @@ async def health_check():
 
 @app.get("/")
 async def root():
+    """Redirect to main page"""
     return HTMLResponse(content="""
-    <script>
-        window.location.href = '/register';
-    </script>
+    <html>
+        <head><title>AI Fight Coach</title></head>
+        <body>
+            <h1>AI Fight Coach</h1>
+            <p><a href="/main">Go to Main Application</a></p>
+            <p><a href="/register">Register</a></p>
+        </body>
+    </html>
     """)
 
 @app.get("/register")
 async def register_page():
+    """Serve registration page"""
     try:
         with open("static/register.html", "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
-    except Exception as e:
-        return HTMLResponse(content=f"<h1>Error loading registration page: {e}</h1>")
+    except FileNotFoundError:
+        return HTMLResponse(content="<h1>Registration page not found</h1>")
 
 @app.get("/main")
 async def main_page():
+    """Serve main application page"""
     try:
         with open("static/index.html", "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
-    except Exception as e:
-        return HTMLResponse(content=f"<h1>Error loading main page: {e}</h1>")
+    except FileNotFoundError:
+        return HTMLResponse(content="<h1>Main page not found</h1>")
 
 @app.post("/register-user")
 async def register_user(name: str = Form(...), email: str = Form(...)):
+    """Register a new user"""
     try:
         if user_manager:
             user_manager.register_user(name, email)
-            return JSONResponse(content={"success": True, "message": "User registered successfully"})
+            return JSONResponse(content={"success": True, "message": "Registration successful!"})
         else:
-            # Fallback: just return success without actually registering
-            return JSONResponse(content={"success": True, "message": "User registered successfully (demo mode)"})
+            return JSONResponse(content={"success": True, "message": "Registration successful! (demo mode)"})
     except Exception as e:
         return JSONResponse(content={"success": False, "message": f"Registration failed: {e}"})
 
@@ -191,13 +175,13 @@ async def submit_feedback(
     rating: int = Form(...),
     feedback_text: str = Form(...)
 ):
+    """Submit user feedback"""
     try:
         if user_manager:
-            user_manager.send_feedback_to_admin(name, email, rating, feedback_text)
-            return JSONResponse(content={"success": True, "message": "Feedback submitted successfully"})
+            user_manager.send_feedback_email(name, email, rating, feedback_text)
+            return JSONResponse(content={"success": True, "message": "Feedback submitted successfully!"})
         else:
-            # Fallback: just return success
-            return JSONResponse(content={"success": True, "message": "Feedback submitted successfully (demo mode)"})
+            return JSONResponse(content={"success": True, "message": "Feedback submitted successfully! (demo mode)"})
     except Exception as e:
         return JSONResponse(content={"success": False, "message": f"Feedback submission failed: {e}"})
 
@@ -222,13 +206,18 @@ async def upload_video(
         # Generate unique job ID
         job_id = str(uuid.uuid4())
         
-        # Save uploaded file
-        file_path = f"uploads/{job_id}_{file.filename}"
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Read file content into memory (Railway-compatible)
+        file_content = await file.read()
+        in_memory_files[job_id] = {
+            "content": file_content,
+            "filename": file.filename,
+            "content_type": file.content_type
+        }
         
-        # Schedule file deletion
-        schedule_file_deletion(file_path)
+        # Schedule in-memory file deletion
+        schedule_file_deletion(job_id, 15)
+        
+        print(f"✅ Video uploaded to memory: {file.filename} ({len(file_content)} bytes)")
         
         if not video_processor or not gemini_client:
             # Demo mode - accept upload but show limited functionality
@@ -246,7 +235,7 @@ async def upload_video(
         
         # Start processing in background
         background_tasks.add_task(
-            process_video_analysis, job_id, file_path, fighter_name, analysis_type
+            process_video_analysis, job_id, fighter_name, analysis_type
         )
         
         return JSONResponse(content={
@@ -269,10 +258,18 @@ async def get_status(job_id: str):
     else:
         return JSONResponse(content={"status": "not_found"}, status_code=404)
 
-def process_video_analysis(job_id: str, video_path: str, fighter_name: str, analysis_type: str):
+def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
     """Process video analysis in background"""
     try:
         active_jobs[job_id] = {"status": "processing", "progress": 0}
+        
+        # Check if file exists in memory
+        if job_id not in in_memory_files:
+            active_jobs[job_id] = {
+                "status": "failed",
+                "message": "Video file not found in memory"
+            }
+            return
         
         # Update progress
         active_jobs[job_id]["progress"] = 10
