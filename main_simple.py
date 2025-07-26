@@ -219,15 +219,6 @@ async def upload_video(
     analysis_type: Optional[str] = Form("everything")
 ):
     try:
-        if not video_processor or not gemini_client:
-            return JSONResponse(
-                content={
-                    "success": False, 
-                    "message": "Video processing is currently unavailable in this environment. Please try again later or contact support."
-                },
-                status_code=503
-            )
-        
         # Generate unique job ID
         job_id = str(uuid.uuid4())
         
@@ -238,6 +229,20 @@ async def upload_video(
         
         # Schedule file deletion
         schedule_file_deletion(file_path)
+        
+        if not video_processor or not gemini_client:
+            # Demo mode - accept upload but show limited functionality
+            active_jobs[job_id] = {
+                "status": "demo_mode",
+                "progress": 100,
+                "message": "Demo mode: Video uploaded successfully! Full analysis is currently unavailable in this environment."
+            }
+            
+            return JSONResponse(content={
+                "success": True,
+                "job_id": job_id,
+                "message": "Video uploaded successfully (demo mode)"
+            })
         
         # Start processing in background
         background_tasks.add_task(
@@ -251,8 +256,9 @@ async def upload_video(
         })
         
     except Exception as e:
+        print(f"Upload error: {e}")
         return JSONResponse(
-            content={"success": False, "message": f"Upload failed: {e}"},
+            content={"success": False, "message": f"Upload failed: {str(e)}"},
             status_code=500
         )
 

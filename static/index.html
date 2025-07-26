@@ -753,6 +753,11 @@
                             displayAnalysis(result.analysis_result);
                         }
                     }, 1000);
+                } else if (result.status === 'demo_mode') {
+                    updateProgress('completed', 'Demo mode: Upload successful!');
+                    setTimeout(() => {
+                        showDemoResult(result.message);
+                    }, 1000);
                 } else if (result.status === 'error') {
                     showError(result.message || 'Analysis failed');
                 }
@@ -773,6 +778,29 @@
             
             video.src = videoUrl;
             downloadBtn.href = videoUrl;
+        }
+
+        function showDemoResult(message) {
+            document.getElementById('progress-section').style.display = 'none';
+            document.getElementById('result-section').style.display = 'block';
+            document.getElementById('analysis-section').style.display = 'block';
+            document.getElementById('feedback-section').style.display = 'block';
+            
+            // Show demo message instead of video
+            const video = document.getElementById('result-video');
+            video.style.display = 'none';
+            
+            const demoMessage = document.createElement('div');
+            demoMessage.innerHTML = `
+                <div style="text-align: center; padding: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 15px; margin: 20px 0;">
+                    <h2 style="margin-bottom: 20px;">🎉 Demo Mode Active!</h2>
+                    <p style="font-size: 1.2rem; margin-bottom: 20px;">${message}</p>
+                    <p style="font-size: 1rem; opacity: 0.9;">Your video was uploaded successfully. Full AI analysis will be available in the production environment.</p>
+                </div>
+            `;
+            
+            const resultSection = document.getElementById('result-section');
+            resultSection.appendChild(demoMessage);
         }
 
         function showError(message) {
