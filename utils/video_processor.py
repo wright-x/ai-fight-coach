@@ -46,10 +46,11 @@ class VideoProcessor:
                 print(f"❌ Copied video file does not exist: {output_path}")
                 return video_path
             
-            # Try to add MoviePy overlay if available (without TextClip)
+            # Try to add MoviePy overlay if available
             try:
                 print(f"🎬 Attempting MoviePy processing...")
-                from moviepy.editor import VideoFileClip
+                from moviepy.editor import VideoFileClip, CompositeVideoClip
+                from moviepy.video.VideoClip import ColorClip
                 
                 # Load video
                 print(f"📹 Loading video with MoviePy...")
@@ -57,36 +58,53 @@ class VideoProcessor:
                 duration = video.duration
                 print(f"📊 Video duration: {duration} seconds")
                 
-                # Create a simple color overlay instead of text
-                print(f"🎨 Creating prominent overlay...")
-                from moviepy.video.VideoClip import ColorClip
-                
                 # Get video dimensions
                 video_width = video.w
                 video_height = video.h
                 print(f"📊 Video dimensions: {video_width}x{video_height}")
                 
-                # Create a large banner overlay at the top
-                banner_height = 80
-                banner = ColorClip(size=(video_width, banner_height), color=(0, 255, 0), duration=duration)
-                banner = banner.set_position(('center', 0))
+                # Create overlays for each highlight
+                overlay_clips = []
                 
-                # Create a large banner overlay at the bottom
-                bottom_banner = ColorClip(size=(video_width, banner_height), color=(255, 0, 0), duration=duration)
-                bottom_banner = bottom_banner.set_position(('center', video_height - banner_height))
+                for i, highlight in enumerate(highlights):
+                    timestamp = highlight.get('timestamp', '00:00')
+                    feedback = highlight.get('detailed_feedback', 'No feedback')
+                    action = highlight.get('action_required', 'No action')
+                    
+                    print(f"🎯 Processing highlight {i+1}: {timestamp}")
+                    
+                    # Parse timestamp to get start time
+                    start_time = self._parse_timestamp(timestamp)
+                    end_time = min(start_time + 5, duration)  # Show for 5 seconds or until end
+                    
+                    # Create background banner for text
+                    banner_height = 120
+                    banner = ColorClip(
+                        size=(video_width, banner_height), 
+                        color=(0, 0, 0, 180),  # Semi-transparent black
+                        duration=end_time - start_time
+                    )
+                    banner = banner.set_position(('center', video_height - banner_height))
+                    banner = banner.set_start(start_time)
+                    
+                    # Create highlight indicator (colored bar)
+                    indicator_height = 10
+                    indicator = ColorClip(
+                        size=(video_width, indicator_height),
+                        color=(255, 255, 0),  # Yellow
+                        duration=end_time - start_time
+                    )
+                    indicator = indicator.set_position(('center', video_height - banner_height - 20))
+                    indicator = indicator.set_start(start_time)
+                    
+                    overlay_clips.extend([banner, indicator])
                 
-                # Create a corner indicator
-                corner_size = 100
-                corner = ColorClip(size=(corner_size, corner_size), color=(0, 0, 255), duration=duration)
-                corner = corner.set_position(('right', 'top'))
-                
-                # Create composite video with multiple overlays
-                print(f"🎬 Creating composite video...")
-                from moviepy.editor import CompositeVideoClip
-                composite = CompositeVideoClip([video, banner, bottom_banner, corner])
+                # Create composite video with overlays
+                print(f"🎬 Creating composite video with {len(overlay_clips)} overlays...")
+                composite = CompositeVideoClip([video] + overlay_clips)
                 
                 # Write the final video
-                print(f"💾 Writing final video with overlay...")
+                print(f"💾 Writing final video with overlays...")
                 composite.write_videofile(
                     output_path, 
                     codec='libx264', 
@@ -98,14 +116,17 @@ class VideoProcessor:
                 # Clean up
                 video.close()
                 composite.close()
-                overlay.close()
+                for clip in overlay_clips:
+                    clip.close()
                 
-                print(f"✅ Highlight video created with overlay: {output_path}")
+                print(f"✅ Highlight video created with overlays: {output_path}")
+                return output_path
                 
             except Exception as e:
                 print(f"⚠️ MoviePy overlay failed, using copied video: {e}")
                 print(f"📋 MoviePy error traceback: {traceback.format_exc()}")
                 # The video was already copied above, so we're good
+                return output_path
             
             # Final check
             if os.path.exists(output_path):
