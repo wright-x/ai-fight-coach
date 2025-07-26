@@ -357,46 +357,61 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
         # Update progress
         active_jobs[job_id]["progress"] = 10
         logger.info(f"📈 Job {job_id} progress: 10%")
-        time.sleep(1)
         
-        # Process video (simplified for now)
-        active_jobs[job_id]["progress"] = 50
-        logger.info(f"📈 Job {job_id} progress: 50%")
-        time.sleep(1)
-        
-        # Return the original video as "processed" (since we can't actually process it)
+        # Save video file temporarily for Gemini analysis
         file_info = in_memory_files[job_id]
+        temp_video_path = f"temp/video_{job_id}.mp4"
         
+        with open(temp_video_path, 'wb') as f:
+            f.write(file_info["content"])
+        
+        logger.info(f"💾 Saved video to temp file: {temp_video_path}")
+        
+        # Update progress
+        active_jobs[job_id]["progress"] = 30
+        logger.info(f"📈 Job {job_id} progress: 30%")
+        
+        # Analyze with Gemini
+        if gemini_client:
+            logger.info(f"🤖 Calling Gemini analysis for job: {job_id}")
+            analysis_result = gemini_client.analyze_video(temp_video_path, analysis_type)
+            logger.info(f"✅ Gemini analysis completed for job: {job_id}")
+        else:
+            logger.warning(f"⚠️ Gemini client not available, using mock analysis")
+            analysis_result = {
+                "highlights": [
+                    {
+                        "timestamp": 15,
+                        "detailed_feedback": "Mock analysis: Good technique observed",
+                        "action_required": "Continue practicing"
+                    }
+                ],
+                "recommended_drills": [
+                    {
+                        "drill_name": "Mock Drill",
+                        "description": "This is a mock drill for demonstration",
+                        "problem_it_fixes": "Mock problem fix"
+                    }
+                ]
+            }
+        
+        # Update progress
+        active_jobs[job_id]["progress"] = 80
+        logger.info(f"📈 Job {job_id} progress: 80%")
+        
+        # Clean up temp file
+        try:
+            os.remove(temp_video_path)
+            logger.info(f"🗑️ Cleaned up temp file: {temp_video_path}")
+        except:
+            pass
+        
+        # Complete processing
         active_jobs[job_id]["progress"] = 100
         active_jobs[job_id]["status"] = "completed"
         active_jobs[job_id]["message"] = "Analysis completed successfully"
         active_jobs[job_id]["video_url"] = f"/video/{job_id}"  # Use our custom endpoint
-        active_jobs[job_id]["analysis_result"] = {
-            "highlights": [
-                {
-                    "timestamp": 15,
-                    "detailed_feedback": "Good stance and balance observed",
-                    "action_required": "Maintain this form throughout"
-                },
-                {
-                    "timestamp": 45,
-                    "detailed_feedback": "Punch technique needs improvement",
-                    "action_required": "Focus on proper form and follow-through"
-                }
-            ],
-            "recommended_drills": [
-                {
-                    "drill_name": "Shadow Boxing",
-                    "description": "Practice punching combinations in front of a mirror",
-                    "problem_it_fixes": "Improves technique and form"
-                },
-                {
-                    "drill_name": "Footwork Drills",
-                    "description": "Practice moving around the ring with proper stance",
-                    "problem_it_fixes": "Enhances mobility and balance"
-                }
-            ]
-        }
+        active_jobs[job_id]["analysis_result"] = analysis_result
         
         logger.info(f"✅ Analysis completed for job: {job_id}")
         
