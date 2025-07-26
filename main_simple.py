@@ -381,7 +381,7 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
             analysis_result = {
                 "highlights": [
                     {
-                        "timestamp": 15,
+                        "timestamp": "00:15",
                         "detailed_feedback": "Mock analysis: Good technique observed",
                         "action_required": "Continue practicing"
                     }
@@ -398,6 +398,27 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
         # Update progress
         active_jobs[job_id]["progress"] = 80
         logger.info(f"📈 Job {job_id} progress: 80%")
+        
+        # Create highlight video with overlays and head tracking
+        if video_processor and analysis_result.get("highlights"):
+            logger.info(f"🎬 Creating highlight video with overlays for job: {job_id}")
+            highlight_video_path = f"output/highlight_{job_id}.mp4"
+            
+            try:
+                processed_video_path = video_processor.create_highlight_video(
+                    temp_video_path, 
+                    analysis_result["highlights"], 
+                    highlight_video_path
+                )
+                logger.info(f"✅ Highlight video created: {processed_video_path}")
+                
+                # Use the processed video instead of original
+                final_video_path = processed_video_path
+            except Exception as e:
+                logger.error(f"❌ Error creating highlight video: {e}")
+                final_video_path = temp_video_path
+        else:
+            final_video_path = temp_video_path
         
         # Clean up temp file
         try:

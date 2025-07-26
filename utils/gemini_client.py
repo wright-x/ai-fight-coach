@@ -63,6 +63,13 @@ class GeminiClient:
                       "description": "How to perform the drill",
                       "problem_it_fixes": "What problem this drill addresses"
                     }
+                  ],
+                  "youtube_recommendations": [
+                    {
+                      "title": "Title of the YouTube video",
+                      "url": "https://www.youtube.com/watch?v=VIDEO_ID",
+                      "problem_solved": "What problem this video helps solve"
+                    }
                   ]
                 }
                 
@@ -90,6 +97,13 @@ class GeminiClient:
                       "drill_name": "Name of the drill",
                       "description": "How to perform the drill",
                       "problem_it_fixes": "What problem this drill addresses"
+                    }
+                  ],
+                  "youtube_recommendations": [
+                    {
+                      "title": "Title of the YouTube video",
+                      "url": "https://www.youtube.com/watch?v=VIDEO_ID",
+                      "problem_solved": "What problem this video helps solve"
                     }
                   ]
                 }
@@ -119,6 +133,13 @@ class GeminiClient:
                       "description": "How to perform the drill",
                       "problem_it_fixes": "What problem this drill addresses"
                     }
+                  ],
+                  "youtube_recommendations": [
+                    {
+                      "title": "Title of the YouTube video",
+                      "url": "https://www.youtube.com/watch?v=VIDEO_ID",
+                      "problem_solved": "What problem this video helps solve"
+                    }
                   ]
                 }
                 
@@ -147,6 +168,13 @@ class GeminiClient:
                       "drill_name": "Name of the drill",
                       "description": "How to perform the drill",
                       "problem_it_fixes": "What problem this drill addresses"
+                    }
+                  ],
+                  "youtube_recommendations": [
+                    {
+                      "title": "Title of the YouTube video",
+                      "url": "https://www.youtube.com/watch?v=VIDEO_ID",
+                      "problem_solved": "What problem this video helps solve"
                     }
                   ]
                 }
