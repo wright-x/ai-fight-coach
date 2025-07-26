@@ -34,7 +34,7 @@ class TTSClient:
             # Generate audio
             audio = self.elevenlabs.generate(
                 text=text,
-                voice="Antoni",  # Use a different voice that should be available
+                voice="21m00Tcm4TlvDq8ikWAM",  # Use a default voice ID
                 model="eleven_monolingual_v1"
             )
             

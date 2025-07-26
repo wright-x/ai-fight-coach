@@ -58,17 +58,32 @@ class VideoProcessor:
                 print(f"📊 Video duration: {duration} seconds")
                 
                 # Create a simple color overlay instead of text
-                print(f"🎨 Creating color overlay...")
+                print(f"🎨 Creating prominent overlay...")
                 from moviepy.video.VideoClip import ColorClip
                 
-                # Create a small colored rectangle overlay
-                overlay = ColorClip(size=(200, 50), color=(0, 255, 0), duration=duration)
-                overlay = overlay.set_position(('center', 50))
+                # Get video dimensions
+                video_width = video.w
+                video_height = video.h
+                print(f"📊 Video dimensions: {video_width}x{video_height}")
                 
-                # Create composite video
+                # Create a large banner overlay at the top
+                banner_height = 80
+                banner = ColorClip(size=(video_width, banner_height), color=(0, 255, 0), duration=duration)
+                banner = banner.set_position(('center', 0))
+                
+                # Create a large banner overlay at the bottom
+                bottom_banner = ColorClip(size=(video_width, banner_height), color=(255, 0, 0), duration=duration)
+                bottom_banner = bottom_banner.set_position(('center', video_height - banner_height))
+                
+                # Create a corner indicator
+                corner_size = 100
+                corner = ColorClip(size=(corner_size, corner_size), color=(0, 0, 255), duration=duration)
+                corner = corner.set_position(('right', 'top'))
+                
+                # Create composite video with multiple overlays
                 print(f"🎬 Creating composite video...")
                 from moviepy.editor import CompositeVideoClip
-                composite = CompositeVideoClip([video, overlay])
+                composite = CompositeVideoClip([video, banner, bottom_banner, corner])
                 
                 # Write the final video
                 print(f"💾 Writing final video with overlay...")
