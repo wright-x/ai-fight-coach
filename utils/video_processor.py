@@ -1,31 +1,25 @@
 """
-Video Processor - Professional Highlight Reel System
-Creates cinematic highlight videos with MediaPipe analysis, captions, and transitions
+Video Processor - Professional Highlight Reel System (Simplified)
+Creates cinematic highlight videos with captions and transitions
 """
 
 import os
 import shutil
-import cv2
-import mediapipe as mp
-import numpy as np
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 import tempfile
 import time
 import traceback
 from moviepy.editor import VideoFileClip, CompositeVideoClip, ColorClip, TextClip, concatenate_videoclips
-from moviepy.video.fx import resize
 
 class VideoProcessor:
     """Professional video processor for creating highlight reels"""
     
     def __init__(self):
         self.supported_formats = ['.mp4', '.avi', '.mov', '.mkv']
-        self.mp_pose = mp.solutions.pose
-        self.mp_drawing = mp.solutions.drawing_utils
         print("✅ VideoProcessor initialized (Professional mode)")
     
     def create_highlight_video(self, video_path: str, highlights: List[Dict], output_path: str) -> str:
-        """Create professional highlight reel with MediaPipe analysis"""
+        """Create professional highlight reel with captions and transitions"""
         try:
             print(f"🎬 Creating professional highlight reel: {video_path}")
             print(f"📊 Number of highlights: {len(highlights)}")
@@ -52,7 +46,7 @@ class VideoProcessor:
                     transition_clip = self._create_transition_screen(f"HIGHLIGHT {i+1}", duration=2)
                     all_clips.append(transition_clip)
                 
-                # Create highlight clip with MediaPipe analysis
+                # Create highlight clip with captions
                 highlight_clip = self._create_highlight_clip(video, highlight, i+1)
                 all_clips.append(highlight_clip)
             
@@ -144,7 +138,7 @@ class VideoProcessor:
             return ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
     
     def _create_highlight_clip(self, video: VideoFileClip, highlight: Dict, highlight_num: int) -> VideoFileClip:
-        """Create individual highlight clip with MediaPipe analysis"""
+        """Create individual highlight clip with captions"""
         try:
             timestamp = highlight.get('timestamp', '00:00')
             feedback = highlight.get('detailed_feedback', 'No feedback')
@@ -167,24 +161,14 @@ class VideoProcessor:
             # Slow down the clip (0.5x speed)
             slow_clip = video_clip.speedx(0.5)
             
-            # Create MediaPipe analysis frame
-            analysis_frame = self._create_mediapipe_analysis_frame(
-                video_path=video.filename,
-                timestamp=highlight_time,
-                problem_location=problem_location,
-                feedback=feedback
-            )
-            
-            # Create analysis clip (3 seconds)
-            analysis_clip = VideoFileClip(analysis_frame).set_duration(3)
-            
-            # Create caption overlay
-            caption_clip = self._create_caption_overlay(feedback, action, clip_duration)
+            # Create analysis frame (3 seconds)
+            analysis_clip = self._create_analysis_frame(feedback, problem_location, 3)
             
             # Combine analysis frame + slow motion clip
             final_clip = concatenate_videoclips([analysis_clip, slow_clip], method="compose")
             
             # Add captions
+            caption_clip = self._create_caption_overlay(feedback, action, final_clip.duration)
             final_clip = CompositeVideoClip([final_clip, caption_clip])
             
             return final_clip
@@ -197,152 +181,37 @@ class VideoProcessor:
             end_time = min(video.duration, highlight_time + 3)
             return video.subclip(start_time, end_time)
     
-    def _create_mediapipe_analysis_frame(self, video_path: str, timestamp: float, problem_location: str, feedback: str) -> str:
-        """Create MediaPipe analysis frame with body tracking and error pointer"""
+    def _create_analysis_frame(self, feedback: str, problem_location: str, duration: float) -> VideoFileClip:
+        """Create analysis frame with text overlay"""
         try:
-            # Open video
-            cap = cv2.VideoCapture(video_path)
-            cap.set(cv2.CAP_PROP_POS_MSEC, timestamp * 1000)
-            ret, frame = cap.read()
-            cap.release()
+            # Create black background
+            bg = ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
             
-            if not ret:
-                print(f"⚠️ Could not read frame at {timestamp}s")
-                return self._create_fallback_frame(feedback)
+            # Create problem location text
+            location_text = TextClip(
+                f"PROBLEM: {problem_location.upper()}",
+                fontsize=80,
+                color='#FF6B35',
+                font='Arial-Bold'
+            ).set_position(('center', 300)).set_duration(duration)
             
-            # Initialize MediaPipe Pose
-            with self.mp_pose.Pose(
-                static_image_mode=True,
-                model_complexity=2,
-                enable_segmentation=True,
-                min_detection_confidence=0.5
-            ) as pose:
-                # Convert BGR to RGB
-                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                results = pose.process(rgb_frame)
-                
-                # Draw pose landmarks
-                annotated_frame = frame.copy()
-                self.mp_drawing.draw_landmarks(
-                    annotated_frame,
-                    results.pose_landmarks,
-                    self.mp_pose.POSE_CONNECTIONS,
-                    landmark_drawing_spec=self.mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
-                    connection_drawing_spec=self.mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=2)
-                )
-                
-                # Add error pointer based on problem location
-                annotated_frame = self._add_error_pointer(annotated_frame, results.pose_landmarks, problem_location)
-                
-                # Add text overlay
-                annotated_frame = self._add_text_overlay(annotated_frame, feedback, problem_location)
-                
-                # Save frame
-                output_frame = f"temp/analysis_frame_{int(timestamp)}.jpg"
-                cv2.imwrite(output_frame, annotated_frame)
-                
-                return output_frame
-                
-        except Exception as e:
-            print(f"⚠️ MediaPipe analysis failed: {e}")
-            return self._create_fallback_frame(feedback)
-    
-    def _add_error_pointer(self, frame: np.ndarray, landmarks, problem_location: str) -> np.ndarray:
-        """Add error pointer arrow to specific body part"""
-        try:
-            if not landmarks:
-                return frame
+            # Create feedback text (wrapped)
+            feedback_text = TextClip(
+                feedback[:100] + "..." if len(feedback) > 100 else feedback,
+                fontsize=50,
+                color='white',
+                font='Arial',
+                method='caption',
+                size=(1600, 200)
+            ).set_position(('center', 500)).set_duration(duration)
             
-            # Define landmark indices for different body parts
-            body_parts = {
-                'head': 0,  # nose
-                'left_hand': 19,  # left wrist
-                'right_hand': 20,  # right wrist
-                'left_shoulder': 11,
-                'right_shoulder': 12,
-                'left_elbow': 13,
-                'right_elbow': 14,
-                'left_hip': 23,
-                'right_hip': 24,
-                'left_knee': 25,
-                'right_knee': 26,
-                'left_foot': 31,
-                'right_foot': 32
-            }
-            
-            # Get landmark position
-            if problem_location in body_parts:
-                landmark_idx = body_parts[problem_location]
-                landmark = landmarks.landmark[landmark_idx]
-                
-                # Convert to pixel coordinates
-                h, w, _ = frame.shape
-                x = int(landmark.x * w)
-                y = int(landmark.y * h)
-                
-                # Draw red arrow pointing to the problem area
-                cv2.arrowedLine(frame, (x-50, y-50), (x, y), (0, 0, 255), 5, tipLength=0.3)
-                cv2.circle(frame, (x, y), 10, (0, 0, 255), -1)
-                
-            return frame
+            # Create composite
+            analysis = CompositeVideoClip([bg, location_text, feedback_text])
+            return analysis
             
         except Exception as e:
-            print(f"⚠️ Error pointer failed: {e}")
-            return frame
-    
-    def _add_text_overlay(self, frame: np.ndarray, feedback: str, problem_location: str) -> np.ndarray:
-        """Add text overlay to analysis frame"""
-        try:
-            # Add background rectangle
-            cv2.rectangle(frame, (50, 50), (frame.shape[1]-50, 200), (0, 0, 0, 180), -1)
-            
-            # Add text
-            cv2.putText(frame, f"Problem: {problem_location.upper()}", (70, 90), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            
-            # Wrap feedback text
-            words = feedback.split()
-            lines = []
-            current_line = ""
-            for word in words:
-                if len(current_line + word) < 60:
-                    current_line += word + " "
-                else:
-                    lines.append(current_line)
-                    current_line = word + " "
-            if current_line:
-                lines.append(current_line)
-            
-            # Add wrapped text
-            for i, line in enumerate(lines[:3]):  # Max 3 lines
-                cv2.putText(frame, line, (70, 130 + i*30), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            
-            return frame
-            
-        except Exception as e:
-            print(f"⚠️ Text overlay failed: {e}")
-            return frame
-    
-    def _create_fallback_frame(self, feedback: str) -> str:
-        """Create fallback frame when MediaPipe fails"""
-        try:
-            # Create simple black frame with text
-            frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
-            
-            # Add text
-            cv2.putText(frame, "ANALYSIS FRAME", (800, 400), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 3)
-            cv2.putText(frame, feedback[:50] + "...", (600, 500), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            
-            output_frame = "temp/fallback_frame.jpg"
-            cv2.imwrite(output_frame, frame)
-            return output_frame
-            
-        except Exception as e:
-            print(f"⚠️ Fallback frame failed: {e}")
-            return ""
+            print(f"⚠️ Analysis frame failed: {e}")
+            return ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
     
     def _create_caption_overlay(self, feedback: str, action: str, duration: float) -> VideoFileClip:
         """Create caption overlay for highlight clip"""

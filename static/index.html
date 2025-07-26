@@ -860,7 +860,7 @@
                     html += `
                         <div class="drill-item" style="margin-bottom: 25px; padding: 20px; background: white; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
                             <h4 style="font-size: 1.3rem; margin-bottom: 15px; color: #007bff; font-weight: 600;">🔗 Video ${index + 1}: <a href="${rec.url}" target="_blank" style="color:#007bff;font-weight:bold;text-decoration:underline;">${rec.title}</a></h4>
-                            <div class="detailed-feedback" style="font-size: 1.1rem; margin-bottom: 15px; color: #333;">🛠️ <b>Problem Solved:</b> <i>${rec.problem_solved}</i></div>
+                            <div class="detailed-feedback" style="font-size: 1.1rem; margin-bottom: 15px; color: #333;">🛠️ <b>Problem Solved:</b> <i>${rec.problem_it_fixes || 'General improvement'}</i></div>
                             ${videoId ? `
                                 <div style="margin-top: 15px;">
                                     <iframe width="100%" height="200" 
