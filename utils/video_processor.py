@@ -35,78 +35,19 @@ class VideoProcessor:
             video = VideoFileClip(video_path)
             duration = video.duration
             
-            # Create clips for each highlight
-            highlight_clips = []
+            # Create a simple overlay with fighter name
+            name_clip = TextClip(
+                "FIGHTER", 
+                fontsize=40, 
+                color='lime', 
+                font='Arial-Bold'
+            ).set_position(('center', 50)).set_duration(duration)
             
-            for highlight in highlights:
-                timestamp = self._parse_timestamp(highlight.get('timestamp', '0'))
-                if timestamp < duration:
-                    # Create text overlay for this highlight
-                    feedback = highlight.get('detailed_feedback', '')
-                    action = highlight.get('action_required', '')
-                    
-                    # Create text clips
-                    feedback_clip = TextClip(
-                        feedback, 
-                        fontsize=24, 
-                        color='white', 
-                        font='Arial-Bold',
-                        size=(video.w - 40, None),
-                        method='caption'
-                    ).set_position(('center', 50)).set_duration(5)
-                    
-                    action_clip = TextClip(
-                        f"Action: {action}", 
-                        fontsize=20, 
-                        color='yellow', 
-                        font='Arial-Bold'
-                    ).set_position(('center', 150)).set_duration(5)
-                    
-                    # Create fighter name overlay
-                    name_clip = TextClip(
-                        "FIGHTER", 
-                        fontsize=30, 
-                        color='lime', 
-                        font='Arial-Bold'
-                    ).set_position(('center', video.h - 100)).set_duration(5)
-                    
-                    # Create highlight section
-                    start_time = max(0, timestamp - 2)
-                    end_time = min(duration, timestamp + 3)
-                    
-                    video_section = video.subclip(start_time, end_time)
-                    
-                    # Composite the clips
-                    composite = CompositeVideoClip([
-                        video_section,
-                        feedback_clip.set_start(2),
-                        action_clip.set_start(2),
-                        name_clip.set_start(2)
-                    ])
-                    
-                    highlight_clips.append(composite)
-            
-            # If no highlights, create a simple overlay version
-            if not highlight_clips:
-                # Add fighter name to entire video
-                name_clip = TextClip(
-                    "FIGHTER", 
-                    fontsize=40, 
-                    color='lime', 
-                    font='Arial-Bold'
-                ).set_position(('center', 50)).set_duration(duration)
-                
-                composite = CompositeVideoClip([video, name_clip])
-                highlight_clips = [composite]
-            
-            # Concatenate all highlight clips
-            if len(highlight_clips) > 1:
-                final_video = CompositeVideoClip(highlight_clips)
-            else:
-                final_video = highlight_clips[0]
+            # Create composite video
+            composite = CompositeVideoClip([video, name_clip])
             
             # Write the final video
-            final_video.write_videofile(
+            composite.write_videofile(
                 output_path, 
                 codec='libx264', 
                 audio_codec='aac',
@@ -116,9 +57,8 @@ class VideoProcessor:
             
             # Clean up
             video.close()
-            final_video.close()
-            for clip in highlight_clips:
-                clip.close()
+            composite.close()
+            name_clip.close()
             
             print(f"✅ Highlight video created: {output_path}")
             return output_path

@@ -255,7 +255,7 @@ async def upload_video(
         logger.info(f"   - VideoProcessor: {'✅' if video_processor else '❌'}")
         logger.info(f"   - GeminiClient: {'✅' if gemini_client else '❌'}")
         
-        if not video_processor or not gemini_client:
+        if not gemini_client:
             # Demo mode - accept upload but show limited functionality
             logger.info(f"🎭 Demo mode activated for job {job_id}")
             active_jobs[job_id] = {
@@ -287,7 +287,7 @@ async def upload_video(
                 "message": "Video uploaded successfully (demo mode)"
             })
         
-        # Start processing in background
+        # Start processing in background (even if video_processor is not available)
         logger.info(f"🚀 Starting background processing for job {job_id}")
         background_tasks.add_task(
             process_video_analysis, job_id, fighter_name, analysis_type
