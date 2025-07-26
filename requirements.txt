@@ -1,8 +1,8 @@
 fastapi==0.109.2
 uvicorn[standard]==0.27.1
 python-multipart==0.0.6
-opencv-python
-opencv-contrib-python
+opencv-python-headless
+opencv-contrib-python-headless
 mediapipe
 moviepy
 google-generativeai
