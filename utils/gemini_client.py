@@ -39,113 +39,18 @@ class GeminiClient:
             # Encode to base64
             video_b64 = base64.b64encode(video_data).decode('utf-8')
             
-            # Create prompt based on analysis type
-            if analysis_type == "head_movement":
-                prompt = """
-                Analyze this boxing video focusing on head movement and defense. Look for:
-                1. Head movement patterns (slipping, weaving, bobbing)
-                2. Defensive positioning
-                3. Reaction time to incoming punches
-                4. Head positioning during attacks
-                
-                IMPORTANT: Return ONLY a valid JSON object with this exact structure:
-                {
-                  "highlights": [
-                    {
-                      "timestamp": "00:15",
-                      "detailed_feedback": "Description of what was observed",
-                      "action_required": "What the fighter should do to improve"
-                    }
-                  ],
-                  "recommended_drills": [
-                    {
-                      "drill_name": "Name of the drill",
-                      "description": "How to perform the drill",
-                      "problem_it_fixes": "What problem this drill addresses"
-                    }
-                  ],
-                  "youtube_recommendations": [
-                    {
-                      "title": "Title of the YouTube video",
-                      "url": "https://www.youtube.com/watch?v=VIDEO_ID",
-                      "problem_solved": "What problem this video helps solve"
-                    }
-                  ]
-                }
-                
-                Do not include any text before or after the JSON. Return ONLY the JSON object.
-                """
-            elif analysis_type == "punch_techniques":
-                prompt = """
-                Analyze this boxing video focusing on punch techniques. Look for:
-                1. Proper form and technique
-                2. Power generation
-                3. Accuracy and precision
-                4. Combination effectiveness
-                
-                IMPORTANT: Return ONLY a valid JSON object with this exact structure:
-                {
-                  "highlights": [
-                    {
-                      "timestamp": "00:15",
-                      "detailed_feedback": "Description of what was observed",
-                      "action_required": "What the fighter should do to improve"
-                    }
-                  ],
-                  "recommended_drills": [
-                    {
-                      "drill_name": "Name of the drill",
-                      "description": "How to perform the drill",
-                      "problem_it_fixes": "What problem this drill addresses"
-                    }
-                  ],
-                  "youtube_recommendations": [
-                    {
-                      "title": "Title of the YouTube video",
-                      "url": "https://www.youtube.com/watch?v=VIDEO_ID",
-                      "problem_solved": "What problem this video helps solve"
-                    }
-                  ]
-                }
-                
-                Do not include any text before or after the JSON. Return ONLY the JSON object.
-                """
-            elif analysis_type == "footwork":
-                prompt = """
-                Analyze this boxing video focusing on footwork. Look for:
-                1. Balance and stability
-                2. Movement efficiency
-                3. Positioning and angles
-                4. Defensive footwork
-                
-                IMPORTANT: Return ONLY a valid JSON object with this exact structure:
-                {
-                  "highlights": [
-                    {
-                      "timestamp": "00:15",
-                      "detailed_feedback": "Description of what was observed",
-                      "action_required": "What the fighter should do to improve"
-                    }
-                  ],
-                  "recommended_drills": [
-                    {
-                      "drill_name": "Name of the drill",
-                      "description": "How to perform the drill",
-                      "problem_it_fixes": "What problem this drill addresses"
-                    }
-                  ],
-                  "youtube_recommendations": [
-                    {
-                      "title": "Title of the YouTube video",
-                      "url": "https://www.youtube.com/watch?v=VIDEO_ID",
-                      "problem_solved": "What problem this video helps solve"
-                    }
-                  ]
-                }
-                
-                Do not include any text before or after the JSON. Return ONLY the JSON object.
-                """
-            else:  # everything
+            # Read prompt from file based on analysis type
+            prompt_file = f"prompts/{analysis_type}_prompt.txt"
+            if analysis_type == "everything":
+                prompt_file = "prompts/everything_prompt.txt"
+            
+            try:
+                with open(prompt_file, 'r', encoding='utf-8') as f:
+                    prompt = f.read()
+                print(f"📄 Loaded prompt from: {prompt_file}")
+            except FileNotFoundError:
+                print(f"⚠️ Prompt file not found: {prompt_file}, using default")
+                # Fallback to default prompt
                 prompt = """
                 Analyze this boxing video comprehensively. Look for:
                 1. Overall technique and form
