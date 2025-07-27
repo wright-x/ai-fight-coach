@@ -56,16 +56,32 @@ class VideoProcessor:
             # Load source video - PRESERVE ORIGINAL DIMENSIONS
             source_clip = VideoFileClip(video_path)
             
-            # --- PRESERVE ORIGINAL DIMENSIONS - NO RESIZING ---
-            # We will NOT downscale or resize the video at all
-            # This preserves the original aspect ratio completely
-            print(f"📹 Source video: {source_clip.duration:.2f}s at {source_clip.fps}fps, {source_clip.size}")
-            print(f"🔒 PRESERVING ORIGINAL ASPECT RATIO: {source_clip.size[0]}x{source_clip.size[1]}")
+            # --- SMART DOWNSCALING TO PREVENT CORRUPTION ---
+            # We need to downscale to prevent file corruption, but preserve aspect ratio
+            MAX_HEIGHT = 720  # Safe maximum height to prevent corruption
+            w, h = source_clip.size
             
-            # Use original dimensions throughout
+            if h > MAX_HEIGHT:
+                print(f"🔥 High-resolution video detected ({h}p). Smart downscaling to {MAX_HEIGHT}p to prevent corruption.")
+                print(f"📐 Original aspect ratio: {w}:{h} = {w/h:.2f}")
+                
+                # Calculate new width to preserve aspect ratio
+                new_height = MAX_HEIGHT
+                new_width = int((w / h) * new_height)
+                
+                # Resize while preserving aspect ratio
+                source_clip = source_clip.resize(newsize=(new_width, new_height))
+                print(f"✅ Smart downscaled. New size: {source_clip.size} (aspect ratio preserved: {new_width/new_height:.2f})")
+            else:
+                print(f"✅ Video resolution is safe ({h}p). No downscaling needed.")
+            
+            # Use final dimensions throughout
             source_fps = source_clip.fps
             source_duration = source_clip.duration
             source_width, source_height = source_clip.size
+            
+            print(f"📹 Source video: {source_duration:.2f}s at {source_fps}fps, {source_width}x{source_height}")
+            print(f"🔒 FINAL ASPECT RATIO: {source_width}:{source_height} = {source_width/source_height:.2f}")
             
             # CRITICAL: Create empty list for final clips
             final_clips = []
@@ -109,7 +125,8 @@ class VideoProcessor:
             print(f"🎬 Concatenating {len(final_clips)} clips with original aspect ratio...")
             final_video = concatenate_videoclips(final_clips)
             
-            # Write final video with proper codec
+            # Write final video with proper codec and memory optimization
+            print(f"🎬 Writing final video to {output_path}")
             final_video.write_videofile(
                 output_path,
                 codec="libx264",
@@ -117,7 +134,9 @@ class VideoProcessor:
                 temp_audiofile="temp-audio.m4a",
                 remove_temp=True,
                 verbose=False,
-                logger=None
+                logger=None,
+                preset='fast',  # Faster encoding to prevent corruption
+                threads=2  # Limit threads to prevent memory issues
             )
             
             # Cleanup
