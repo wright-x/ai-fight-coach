@@ -1070,6 +1070,70 @@
         .youtube-embed iframe {
             border-radius: 10px;
         }
+
+        /* New Results Page Styles */
+        .results-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+        }
+
+        .results-header h1 {
+            color: #dc143c;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .results-header p {
+            color: #ffffff;
+            font-size: 1.2rem;
+            opacity: 0.8;
+        }
+
+        .video-player-section {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            border: 1px solid rgba(220, 20, 60, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .action-buttons-section {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .highlights-section, .drills-section, .youtube-section {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            border: 1px solid rgba(220, 20, 60, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+
+        .section-title {
+            color: #dc143c;
+            font-size: 1.8rem;
+            margin-bottom: 25px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        /* YouTube Embed Styling */
+        .youtube-embed {
+            margin-top: 15px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .youtube-embed iframe {
+            border-radius: 10px;
+            width: 100%;
+            height: 200px;
+        }
     </style>
 </head>
 <body>
@@ -1233,39 +1297,48 @@
 
             <!-- Results Page -->
             <div id="resultsPage" class="page">
-                <div class="result-container">
-                    <!-- Video Section at Top -->
+                <!-- Main Title -->
+                <div class="results-header">
+                    <h1>Your Analysis is Ready</h1>
+                    <p>Review your boxing technique with AI-powered insights</p>
+                </div>
+
+                <!-- Video Player Section -->
+                <div id="videoPlayerContainer" class="video-player-section">
+                    <h2 class="section-title">Your Analyzed Video</h2>
                     <div class="video-container">
                         <video id="resultVideo" controls>
                             Your browser does not support the video tag.
                         </video>
-                        <div class="video-buttons">
-                            <button class="download-btn" onclick="downloadVideo()">Download Video</button>
-                            <button class="analyze-again-btn" onclick="runAnotherAnalysis()">Run Another Analysis</button>
-                        </div>
                     </div>
-                    
-                    <!-- Analysis Results Section -->
-                    <div class="highlights-container" id="highlightsContainer">
-                        <h3 class="section-title">Analysis Results</h3>
-                        <!-- Highlights will be populated here -->
-                    </div>
+                </div>
+
+                <!-- Action Buttons Section -->
+                <div id="actionButtonsContainer" class="action-buttons-section">
+                    <button class="download-btn" onclick="downloadVideo()">Download Video</button>
+                    <button class="analyze-again-btn" onclick="runAnotherAnalysis()">Run Another Analysis</button>
+                </div>
+
+                <!-- Key Highlights Section -->
+                <div id="highlightsContainer" class="highlights-section">
+                    <h2 class="section-title">Key Highlights</h2>
+                    <!-- Highlights will be dynamically generated here -->
                 </div>
 
                 <!-- Recommended Drills Section -->
-                <div class="drills-container" id="drillsContainer">
-                    <h3 class="section-title">Recommended Drills</h3>
-                    <!-- Drills will be populated here -->
+                <div id="drillsContainer" class="drills-section">
+                    <h2 class="section-title">Recommended Drills</h2>
+                    <!-- Drills will be dynamically generated here -->
                 </div>
 
                 <!-- YouTube Recommendations Section -->
-                <div class="youtube-container" id="youtubeContainer">
-                    <h3 class="section-title">YouTube Recommendations</h3>
-                    <!-- YouTube videos will be populated here -->
+                <div id="youtubeContainer" class="youtube-section">
+                    <h2 class="section-title">YouTube Recommendations</h2>
+                    <!-- YouTube videos will be dynamically generated here -->
                 </div>
 
                 <!-- Feedback Section -->
-                <div class="feedback-section">
+                <div id="feedbackFormContainer" class="feedback-section">
                     <div class="feedback-box">
                         <div class="feedback-icon">💬</div>
                         <div class="feedback-content">
@@ -1367,63 +1440,8 @@
                     if (data.status === 'completed') {
                         console.log("[POLL] SUCCESS: Job is complete. Rendering results now.");
                         
-                        // Show results page
-                        showPage('resultsPage');
-                        
-                        const videoElement = document.getElementById('resultVideo');
-                        const highlightsContainer = document.getElementById('highlightsContainer');
-                        const drillsContainer = document.getElementById('drillsContainer');
-                        const youtubeContainer = document.getElementById('youtubeContainer');
-
-                        if (!videoElement || !highlightsContainer) {
-                            alert("CRITICAL ERROR: The results page is missing essential HTML elements.");
-                            return;
-                        }
-                        
-                        // Display the video
-                        videoElement.src = `/video/${jobId}`;
-                        videoElement.load();
-                        console.log('[VIDEO] Video src set to:', `/video/${jobId}`);
-                        
-                        // Use the data embedded in the status response if available
-                        if (data.analysis_result) {
-                            console.log('[ANALYSIS] Using embedded analysis data');
-                            displayHighlights(data.analysis_result.highlights || []);
-                            displayDrills(data.analysis_result.recommended_drills || []);
-                            displayYouTube(data.analysis_result.youtube_recommendations || []);
-                        } else {
-                            // Fallback to fetching separately if not in status
-                            console.log('[ANALYSIS] Fetching analysis data separately');
-                            fetch(`/analysis/${jobId}`)
-                                .then(res => {
-                                    if (!res.ok) {
-                                        throw new Error(`Analysis fetch failed: ${res.status}`);
-                                    }
-                                    return res.json();
-                                })
-                                .then(analysisData => {
-                                    console.log('[ANALYSIS] Analysis data received:', analysisData);
-                                    displayHighlights(analysisData.highlights || []);
-                                    displayDrills(analysisData.recommended_drills || []);
-                                    displayYouTube(analysisData.youtube_recommendations || []);
-                                })
-                                .catch(error => {
-                                    console.error('[ANALYSIS] Error fetching analysis:', error);
-                                    // Show fallback content
-                                    displayHighlights([{
-                                        timestamp: "00:00",
-                                        short_text: "Analysis completed",
-                                        long_text: "Your video has been processed successfully. Please review the video above.",
-                                        action_required: "Review your technique"
-                                    }]);
-                                    displayDrills([{
-                                        drill_name: "Basic Technique Review",
-                                        description: "Review your uploaded video to identify areas for improvement.",
-                                        problem_it_fixes: "General technique improvement"
-                                    }]);
-                                    displayYouTube([]);
-                                });
-                        }
+                        // Call the new showResults function
+                        showResults(jobId);
 
                     } else if (data.status === 'processing') {
                         // Update progress and poll again
@@ -1500,106 +1518,206 @@
             }
         }
 
-        function displayHighlights(highlights) {
-            console.log('displayHighlights called with:', highlights);
-            const container = document.getElementById('highlightsContainer');
-            console.log('Highlights container:', container);
+        // NEW ROBUST DISPLAY FUNCTIONS - FROM SCRATCH REWRITE
+        
+        function showResults(jobId) {
+            console.log('[SHOWRESULTS] Starting results display for job:', jobId);
             
-            // Always show the container
-            container.style.display = 'block';
-            container.innerHTML = '<h3 class="section-title">Analysis Results</h3>';
+            // Step 1: Show the results page
+            showPage('resultsPage');
+            
+            // Step 2: Set the video source
+            const videoElement = document.getElementById('resultVideo');
+            if (videoElement) {
+                videoElement.src = `/video/${jobId}`;
+                videoElement.load();
+                console.log('[SHOWRESULTS] Video src set to:', `/video/${jobId}`);
+            } else {
+                console.error('[SHOWRESULTS] Video element not found!');
+            }
+            
+            // Step 3: Fetch analysis data
+            console.log('[SHOWRESULTS] Fetching analysis data...');
+            fetch(`/analysis/${jobId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Analysis fetch failed: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('[SHOWRESULTS] Analysis data received:', data);
+                    
+                    // Step 4: Call display functions with the data
+                    displayHighlights(data.highlights || []);
+                    displayDrills(data.recommended_drills || []);
+                    displayYouTube(data.youtube_recommendations || []);
+                })
+                .catch(error => {
+                    console.error('[SHOWRESULTS] Critical error:', error);
+                    // Show fallback content on error
+                    displayHighlights([{
+                        timestamp: "00:00",
+                        short_text: "Analysis completed",
+                        long_text: "Your video has been processed successfully. Please review the video above.",
+                        action_required: "Review your technique"
+                    }]);
+                    displayDrills([{
+                        drill_name: "Basic Technique Review",
+                        description: "Review your uploaded video to identify areas for improvement.",
+                        problem_it_fixes: "General technique improvement"
+                    }]);
+                    displayYouTube([]);
+                });
+        }
+
+        function displayHighlights(highlights) {
+            console.log('[DISPLAY] Rendering highlights:', highlights);
+            const container = document.getElementById('highlightsContainer');
+            
+            if (!container) {
+                console.error('[DISPLAY] Highlights container not found!');
+                return;
+            }
+            
+            // Clear container and add title
+            container.innerHTML = '<h2 class="section-title">Key Highlights</h2>';
             
             if (highlights && highlights.length > 0) {
                 highlights.forEach((highlight, index) => {
                     const card = document.createElement('div');
                     card.className = 'highlight-card';
                     card.innerHTML = `
-                        <div class="highlight-title">Highlight ${index + 1} - ${highlight.timestamp}</div>
-                        <div class="highlight-description">${highlight.long_text || 'No description available'}</div>
-                        <div class="highlight-action">Action Required: ${highlight.action_required || 'No action specified'}</div>
+                        <div class="highlight-title">Highlight ${index + 1} - ${highlight.timestamp || 'N/A'}</div>
+                        <div class="highlight-description">${highlight.long_text || highlight.short_text || 'No description available'}</div>
+                        <div class="highlight-action">Action Required: ${highlight.action_required || 'Continue practicing'}</div>
                     `;
                     container.appendChild(card);
                 });
+                console.log('[DISPLAY] Rendered', highlights.length, 'highlight cards');
             } else {
-                // Show default message if no highlights
-                const card = document.createElement('div');
-                card.className = 'highlight-card';
-                card.innerHTML = `
+                // Fallback message
+                const fallbackCard = document.createElement('div');
+                fallbackCard.className = 'highlight-card';
+                fallbackCard.innerHTML = `
                     <div class="highlight-title">Analysis Complete</div>
                     <div class="highlight-description">Your video has been processed successfully. Review the video above to see your technique.</div>
                     <div class="highlight-action">Action Required: Continue practicing and improving your technique</div>
                 `;
-                container.appendChild(card);
+                container.appendChild(fallbackCard);
+                console.log('[DISPLAY] Rendered fallback highlight card');
             }
-            console.log('Highlights displayed, container now has', container.children.length, 'children');
         }
 
         function displayDrills(drills) {
-            console.log('displayDrills called with:', drills);
+            console.log('[DISPLAY] Rendering drills:', drills);
             const container = document.getElementById('drillsContainer');
-            console.log('Drills container:', container);
             
-            // Always show the container
-            container.style.display = 'block';
-            container.innerHTML = '<h3 class="section-title">Recommended Drills</h3>';
+            if (!container) {
+                console.error('[DISPLAY] Drills container not found!');
+                return;
+            }
+            
+            // Clear container and add title
+            container.innerHTML = '<h2 class="section-title">Recommended Drills</h2>';
             
             if (drills && drills.length > 0) {
                 drills.forEach(drill => {
                     const card = document.createElement('div');
                     card.className = 'drill-card';
                     card.innerHTML = `
-                        <div class="drill-name">${drill.drill_name || 'Unnamed Drill'}</div>
+                        <div class="drill-name">${drill.drill_name || 'Recommended Drill'}</div>
                         <div class="drill-description">${drill.description || 'No description available'}</div>
-                        <div class="drill-problem">Fixes: ${drill.problem_it_fixes || 'No problem specified'}</div>
+                        <div class="drill-problem">Fixes: ${drill.problem_it_fixes || 'General technique improvement'}</div>
                     `;
                     container.appendChild(card);
                 });
+                console.log('[DISPLAY] Rendered', drills.length, 'drill cards');
             } else {
-                // Show default drill if none provided
-                const card = document.createElement('div');
-                card.className = 'drill-card';
-                card.innerHTML = `
+                // Fallback message
+                const fallbackCard = document.createElement('div');
+                fallbackCard.className = 'drill-card';
+                fallbackCard.innerHTML = `
                     <div class="drill-name">Basic Technique Review</div>
                     <div class="drill-description">Review your uploaded video to identify areas for improvement. Focus on your stance, guard position, and movement.</div>
                     <div class="drill-problem">Fixes: General technique improvement and awareness</div>
                 `;
-                container.appendChild(card);
+                container.appendChild(fallbackCard);
+                console.log('[DISPLAY] Rendered fallback drill card');
             }
-            console.log('Drills displayed, container now has', container.children.length, 'children');
         }
 
         function displayYouTube(videos) {
-            console.log('displayYouTube called with:', videos);
+            console.log('[DISPLAY] Rendering YouTube videos:', videos);
             const container = document.getElementById('youtubeContainer');
-            console.log('YouTube container:', container);
             
-            // Always show the container
-            container.style.display = 'block';
-            container.innerHTML = '<h3 class="section-title">YouTube Recommendations</h3>';
+            if (!container) {
+                console.error('[DISPLAY] YouTube container not found!');
+                return;
+            }
+            
+            // Clear container and add title
+            container.innerHTML = '<h2 class="section-title">YouTube Recommendations</h2>';
             
             if (videos && videos.length > 0) {
                 videos.forEach(video => {
                     const card = document.createElement('div');
                     card.className = 'youtube-card';
-                    card.innerHTML = `
-                        <div class="youtube-title-text">${video.title || 'Untitled Video'}</div>
-                        <div class="youtube-problem">${video.problem_solved || 'No problem specified'}</div>
-                        <a href="${video.url || '#'}" target="_blank" class="youtube-link">Watch Video</a>
-                    `;
+                    
+                    // Extract YouTube video ID from URL
+                    const videoId = extractYouTubeId(video.url || video.youtube_url || '');
+                    
+                    if (videoId) {
+                        // Create embedded iframe
+                        card.innerHTML = `
+                            <div class="youtube-title-text">${video.title || 'Boxing Tutorial'}</div>
+                            <div class="youtube-problem">${video.problem_solved || video.problem_it_fixes || 'Learn boxing techniques'}</div>
+                            <div class="youtube-embed">
+                                <iframe width="100%" height="200" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                            </div>
+                        `;
+                    } else {
+                        // Fallback to link if no valid video ID
+                        card.innerHTML = `
+                            <div class="youtube-title-text">${video.title || 'Boxing Tutorial'}</div>
+                            <div class="youtube-problem">${video.problem_solved || video.problem_it_fixes || 'Learn boxing techniques'}</div>
+                            <a href="${video.url || '#'}" target="_blank" class="youtube-link">Watch Video</a>
+                        `;
+                    }
+                    
                     container.appendChild(card);
                 });
+                console.log('[DISPLAY] Rendered', videos.length, 'YouTube cards');
             } else {
-                // Show default YouTube recommendation if none provided
-                const card = document.createElement('div');
-                card.className = 'youtube-card';
-                card.innerHTML = `
+                // Fallback message
+                const fallbackCard = document.createElement('div');
+                fallbackCard.className = 'youtube-card';
+                fallbackCard.innerHTML = `
                     <div class="youtube-title-text">Boxing Technique Fundamentals</div>
                     <div class="youtube-problem">Learn the basics of proper boxing stance, guard, and movement</div>
                     <a href="https://www.youtube.com/results?search_query=boxing+technique+fundamentals" target="_blank" class="youtube-link">Search YouTube</a>
                 `;
-                container.appendChild(card);
+                container.appendChild(fallbackCard);
+                console.log('[DISPLAY] Rendered fallback YouTube card');
             }
-            console.log('YouTube videos displayed, container now has', container.children.length, 'children');
+        }
+
+        // Helper function to extract YouTube video ID
+        function extractYouTubeId(url) {
+            if (!url) return null;
+            
+            const patterns = [
+                /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+                /youtube\.com\/v\/([^&\n?#]+)/,
+                /youtube\.com\/watch\?.*v=([^&\n?#]+)/
+            ];
+            
+            for (const pattern of patterns) {
+                const match = url.match(pattern);
+                if (match) return match[1];
+            }
+            
+            return null;
         }
 
         function extractYouTubeId(url) {
