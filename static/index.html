@@ -618,40 +618,7 @@
             display: block;
         }
 
-        .nav-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin: 20px 0;
-        }
 
-        .nav-btn {
-            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 20px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .nav-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(220, 20, 60, 0.3);
-        }
-
-        .nav-btn.active {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
 
         /* New styles for progress page */
         .feedback-section {
@@ -884,41 +851,26 @@
 
             <!-- Results Page -->
             <div id="resultsPage" class="page">
-                <div class="nav-buttons">
-                    <button class="nav-btn active" onclick="showTab('analysis')">Analysis</button>
-                    <button class="nav-btn" onclick="showTab('drills')">Recommended Drills</button>
-                    <button class="nav-btn" onclick="showTab('youtube')">YouTube Videos</button>
-                </div>
-
-                <!-- Analysis Tab -->
-                <div id="analysisTab" class="tab-content active">
-                    <div class="result-container">
-                        <div class="video-container">
-                            <video id="resultVideo" controls>
-                                Your browser does not support the video tag.
-                            </video>
-                        </div>
-                        
-                        <div class="highlights-container" id="highlightsContainer">
-                            <!-- Highlights will be populated here -->
-                        </div>
+                <div class="result-container">
+                    <div class="video-container">
+                        <video id="resultVideo" controls>
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                    
+                    <div class="highlights-container" id="highlightsContainer">
+                        <!-- Highlights will be populated here -->
                     </div>
                 </div>
 
-                <!-- Drills Tab -->
-                <div id="drillsTab" class="tab-content">
-                    <div class="drills-container" id="drillsContainer">
-                        <h3 class="drills-title">Recommended Drills</h3>
-                        <!-- Drills will be populated here -->
-                    </div>
+                <div class="drills-container" id="drillsContainer">
+                    <h3 class="drills-title">Recommended Drills</h3>
+                    <!-- Drills will be populated here -->
                 </div>
 
-                <!-- YouTube Tab -->
-                <div id="youtubeTab" class="tab-content">
-                    <div class="youtube-container" id="youtubeContainer">
-                        <h3 class="youtube-title">YouTube Recommendations</h3>
-                        <!-- YouTube videos will be populated here -->
-                    </div>
+                <div class="youtube-container" id="youtubeContainer">
+                    <h3 class="youtube-title">YouTube Recommendations</h3>
+                    <!-- YouTube videos will be populated here -->
                 </div>
             </div>
         </div>
@@ -1085,15 +1037,7 @@
             document.getElementById(pageId).classList.add('active');
         }
 
-        function showTab(tabName) {
-            // Update nav buttons
-            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-            
-            // Show tab content
-            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-            document.getElementById(tabName + 'Tab').classList.add('active');
-        }
+
     </script>
 </body>
 </html> 
