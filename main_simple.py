@@ -199,15 +199,107 @@ async def test_endpoint():
 
 @app.get("/")
 async def root():
-    """Redirect to main page"""
+    """Check if user is registered and redirect appropriately"""
     logger.info("🏠 Root page requested")
+    
+    # Provide a landing page that checks localStorage for registration status
     return HTMLResponse(content="""
     <html>
-        <head><title>AI Fight Coach</title></head>
+        <head>
+            <title>AI Fight Coach</title>
+            <style>
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    min-height: 100vh;
+                    margin: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                }
+                .container {
+                    text-align: center;
+                    background: rgba(255,255,255,0.1);
+                    padding: 40px;
+                    border-radius: 20px;
+                    backdrop-filter: blur(10px);
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                }
+                h1 {
+                    font-size: 3rem;
+                    margin-bottom: 20px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 15px;
+                }
+                .btn {
+                    display: inline-block;
+                    background: rgba(255,255,255,0.2);
+                    color: white;
+                    padding: 15px 30px;
+                    margin: 10px;
+                    border-radius: 25px;
+                    text-decoration: none;
+                    font-weight: 600;
+                    transition: all 0.3s ease;
+                    border: 2px solid rgba(255,255,255,0.3);
+                }
+                .btn:hover {
+                    background: rgba(255,255,255,0.3);
+                    transform: translateY(-2px);
+                }
+                .btn-primary {
+                    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                    border-color: #28a745;
+                }
+                .btn-primary:hover {
+                    background: linear-gradient(135deg, #218838 0%, #1ea085 100%);
+                }
+            </style>
+        </head>
         <body>
-            <h1>AI Fight Coach</h1>
-            <p><a href="/main">Go to Main Application</a></p>
-            <p><a href="/register">Register</a></p>
+            <div class="container">
+                <h1>🥊 AI Fight Coach</h1>
+                <p style="font-size: 1.2rem; margin-bottom: 30px; opacity: 0.9;">
+                    Professional Boxing Analysis Powered by AI
+                </p>
+                <div id="welcome-message" style="display: none;">
+                    <p style="font-size: 1.1rem; margin-bottom: 20px;">Welcome back!</p>
+                    <a href="/main" class="btn btn-primary">Continue to Analysis</a>
+                </div>
+                <div id="new-user" style="display: none;">
+                    <p style="font-size: 1.1rem; margin-bottom: 20px;">Get started with AI-powered boxing analysis</p>
+                    <a href="/register" class="btn">Register First</a>
+                    <a href="/main" class="btn btn-primary">Try Demo</a>
+                </div>
+                <div id="loading">
+                    <p>Checking your status...</p>
+                </div>
+            </div>
+            
+            <script>
+                // Check if user is registered in localStorage
+                window.onload = function() {
+                    const userName = localStorage.getItem('userName');
+                    const userEmail = localStorage.getItem('userEmail');
+                    
+                    const welcomeDiv = document.getElementById('welcome-message');
+                    const newUserDiv = document.getElementById('new-user');
+                    const loadingDiv = document.getElementById('loading');
+                    
+                    if (userName && userEmail) {
+                        // User is registered
+                        loadingDiv.style.display = 'none';
+                        welcomeDiv.style.display = 'block';
+                    } else {
+                        // New user
+                        loadingDiv.style.display = 'none';
+                        newUserDiv.style.display = 'block';
+                    }
+                };
+            </script>
         </body>
     </html>
     """)

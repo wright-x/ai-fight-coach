@@ -492,7 +492,7 @@
                     </div>
                 </div>
                 
-                <form id="uploadForm" enctype="multipart/form-data">
+                <form id="uploadForm" enctype="multipart/form-data" onsubmit="event.preventDefault(); startAnalysis();">
                     <div class="prompt-selection" style="margin: 20px 0;">
                         <label style="display: block; margin-bottom: 25px; font-weight: 700; color: #333; text-align: center; font-size: 2.2rem; text-transform: uppercase; letter-spacing: 1px; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Choose Your Analysis Focus</label>
                         <div class="prompt-options" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
