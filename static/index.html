@@ -395,6 +395,39 @@
             50% { transform: translateX(100%); }
         }
 
+        .loading-stages {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .stage {
+            padding: 10px 15px;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            border: 1px solid rgba(220, 20, 60, 0.2);
+            border-radius: 8px;
+            color: #cccccc;
+            font-size: 0.9rem;
+            opacity: 0.5;
+            transition: all 0.3s ease;
+        }
+
+        .stage.active {
+            border-color: #dc143c;
+            color: #ffffff;
+            opacity: 1;
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
+            box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
+        }
+
+        .stage.completed {
+            border-color: #28a745;
+            color: #ffffff;
+            opacity: 0.8;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
         .result-container {
             background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
             border: 1px solid rgba(220, 20, 60, 0.3);
@@ -813,6 +846,14 @@
                         <div class="progress-fill" id="progressFill"></div>
                     </div>
                     <p id="progressText">Initializing analysis...</p>
+                    <div class="loading-stages">
+                        <div class="stage" id="stage1">📹 Uploading video...</div>
+                        <div class="stage" id="stage2">🤖 AI analyzing footage...</div>
+                        <div class="stage" id="stage3">🎯 Detecting highlights...</div>
+                        <div class="stage" id="stage4">🎬 Processing video...</div>
+                        <div class="stage" id="stage5">🔊 Generating audio...</div>
+                        <div class="stage" id="stage6">✨ Finalizing results...</div>
+                    </div>
                 </div>
 
                 <div class="feedback-section">
@@ -946,11 +987,22 @@
                 if (data.status === 'processing') {
                     const progress = data.progress || 0;
                     progressFill.style.width = `${progress}%`;
-                    progressText.textContent = data.message || 'Processing...';
+                    
+                    // Update loading stages based on progress
+                    updateLoadingStages(progress);
+                    
+                    // Update progress text based on stage
+                    const stageText = getStageText(progress);
+                    progressText.textContent = stageText;
+                    
                     setTimeout(() => pollStatus(jobId), 1000);
                 } else if (data.status === 'completed') {
                     progressFill.style.width = '100%';
                     progressText.textContent = 'Analysis complete!';
+                    
+                    // Mark all stages as completed
+                    markAllStagesCompleted();
+                    
                     setTimeout(() => showResults(jobId), 1000);
                 } else {
                     alert('Analysis failed: ' + (data.error || 'Unknown error'));
@@ -964,17 +1016,71 @@
             });
         }
 
+        function updateLoadingStages(progress) {
+            const stages = [
+                { id: 'stage1', threshold: 0, text: '📹 Uploading video...' },
+                { id: 'stage2', threshold: 15, text: '🤖 AI analyzing footage...' },
+                { id: 'stage3', threshold: 30, text: '🎯 Detecting highlights...' },
+                { id: 'stage4', threshold: 50, text: '🎬 Processing video...' },
+                { id: 'stage5', threshold: 75, text: '🔊 Generating audio...' },
+                { id: 'stage6', threshold: 90, text: '✨ Finalizing results...' }
+            ];
+
+            stages.forEach((stage, index) => {
+                const stageElement = document.getElementById(stage.id);
+                if (stageElement) {
+                    // Remove all classes
+                    stageElement.classList.remove('active', 'completed');
+                    
+                    if (progress >= stage.threshold) {
+                        if (progress >= stage.threshold + 10 || progress >= 95) {
+                            stageElement.classList.add('completed');
+                        } else {
+                            stageElement.classList.add('active');
+                        }
+                    }
+                }
+            });
+        }
+
+        function getStageText(progress) {
+            if (progress < 15) return '📹 Uploading video...';
+            if (progress < 30) return '🤖 AI analyzing footage...';
+            if (progress < 50) return '🎯 Detecting highlights...';
+            if (progress < 75) return '🎬 Processing video...';
+            if (progress < 90) return '🔊 Generating audio...';
+            return '✨ Finalizing results...';
+        }
+
+        function markAllStagesCompleted() {
+            for (let i = 1; i <= 6; i++) {
+                const stageElement = document.getElementById(`stage${i}`);
+                if (stageElement) {
+                    stageElement.classList.remove('active');
+                    stageElement.classList.add('completed');
+                }
+            }
+        }
+
         function showResults(jobId) {
+            console.log('showResults called with jobId:', jobId);
             showPage('resultsPage');
             
             // Load video
             const video = document.getElementById('resultVideo');
+            console.log('Video element:', video);
             video.src = `/video/${jobId}`;
+            console.log('Video src set to:', `/video/${jobId}`);
             
             // Load analysis data
+            console.log('Fetching analysis data...');
             fetch(`/analysis/${jobId}`)
-            .then(response => response.json())
+            .then(response => {
+                console.log('Analysis response:', response);
+                return response.json();
+            })
             .then(data => {
+                console.log('Analysis data received:', data);
                 displayHighlights(data.highlights || []);
                 displayDrills(data.recommended_drills || []);
                 displayYouTube(data.youtube_recommendations || []);
@@ -985,7 +1091,9 @@
         }
 
         function displayHighlights(highlights) {
+            console.log('displayHighlights called with:', highlights);
             const container = document.getElementById('highlightsContainer');
+            console.log('Highlights container:', container);
             container.innerHTML = '';
             
             highlights.forEach((highlight, index) => {
@@ -998,10 +1106,13 @@
                 `;
                 container.appendChild(card);
             });
+            console.log('Highlights displayed, container now has', container.children.length, 'children');
         }
 
         function displayDrills(drills) {
+            console.log('displayDrills called with:', drills);
             const container = document.getElementById('drillsContainer');
+            console.log('Drills container:', container);
             container.innerHTML = '<h3 class="drills-title">Recommended Drills</h3>';
             
             drills.forEach(drill => {
@@ -1014,10 +1125,13 @@
                 `;
                 container.appendChild(card);
             });
+            console.log('Drills displayed, container now has', container.children.length, 'children');
         }
 
         function displayYouTube(videos) {
+            console.log('displayYouTube called with:', videos);
             const container = document.getElementById('youtubeContainer');
+            console.log('YouTube container:', container);
             container.innerHTML = '<h3 class="youtube-title">YouTube Recommendations</h3>';
             
             videos.forEach(video => {
@@ -1030,11 +1144,19 @@
                 `;
                 container.appendChild(card);
             });
+            console.log('YouTube videos displayed, container now has', container.children.length, 'children');
         }
 
         function showPage(pageId) {
-            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-            document.getElementById(pageId).classList.add('active');
+            console.log('showPage called with pageId:', pageId);
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+                console.log('Removed active from page:', page.id);
+            });
+            const targetPage = document.getElementById(pageId);
+            console.log('Target page element:', targetPage);
+            targetPage.classList.add('active');
+            console.log('Added active to page:', pageId);
         }
 
 
