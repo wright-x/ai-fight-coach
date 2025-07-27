@@ -43,7 +43,7 @@ class VideoProcessor:
             print("✅ VideoProcessor initialized (Professional Boxing Analysis - MediaPipe fallback mode)")
     
     def create_highlight_video(self, video_path: str, highlights: List[Dict], output_path: str) -> str:
-        """Create professional boxing analysis video"""
+        """Create professional boxing analysis video with proper structure"""
         try:
             print(f"🎬 Creating professional boxing analysis: {video_path}")
             print(f"📊 Number of highlights: {len(highlights)}")
@@ -58,18 +58,21 @@ class VideoProcessor:
             all_clips = []
             
             # 1. OPENING CARD (1.5 seconds)
+            print("🎬 Creating opening card...")
             opening_clip = self._create_opening_card(duration=1.5)
             all_clips.append(opening_clip)
             
-            # 2. FOR EACH HIGHLIGHT
+            # 2. FOR EACH HIGHLIGHT - USE DIFFERENT CLIPS
             for i, highlight in enumerate(highlights):
                 print(f"🎯 Processing highlight {i+1}/{len(highlights)}")
                 
-                # a. Black screen: "HIGHLIGHT <n>" (1 second)
+                # a. Title Card: "HIGHLIGHT <n>" (1 second)
+                print(f"📝 Creating title card for highlight {i+1}...")
                 highlight_title = self._create_highlight_title(f"HIGHLIGHT {i+1}", duration=1.0)
                 all_clips.append(highlight_title)
                 
-                # b. Freeze-frame with MediaPipe analysis (3 seconds)
+                # b. Analysis Frame: Freeze-frame with MediaPipe (3 seconds)
+                print(f"🔍 Creating analysis frame for highlight {i+1}...")
                 freeze_frame = self._create_mediapipe_analysis_frame(
                     video_path=video_path,
                     highlight=highlight,
@@ -77,15 +80,18 @@ class VideoProcessor:
                 )
                 all_clips.append(freeze_frame)
                 
-                # c. Slow-motion clip with captions and TTS
+                # c. Slow Motion Clip: Different clip for each highlight (6 seconds at 0.5x)
+                print(f"🎬 Creating slow motion clip for highlight {i+1}...")
                 slow_motion_clip = self._create_slow_motion_clip(
                     video=video,
                     highlight=highlight,
-                    slow_factor=0.7
+                    slow_factor=0.5,
+                    clip_duration=6.0  # 6 seconds total
                 )
                 all_clips.append(slow_motion_clip)
             
             # 3. END CARD (1.5 seconds)
+            print("🎬 Creating end card...")
             end_clip = self._create_end_card(duration=1.5)
             all_clips.append(end_clip)
             
@@ -119,7 +125,7 @@ class VideoProcessor:
             print(f"📋 Traceback: {traceback.format_exc()}")
             # Fallback to simple copy
             shutil.copy2(video_path, output_path)
-            return output_path
+            return video_path
     
     def _create_opening_card(self, duration: float = 1.5) -> VideoFileClip:
         """Create opening card with "AI Boxing Analysis" text"""
@@ -186,7 +192,7 @@ class VideoProcessor:
             return ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
     
     def _create_mediapipe_analysis_frame(self, video_path: str, highlight: Dict, duration: float = 3.0) -> VideoFileClip:
-        """Create MediaPipe analysis frame with pose skeleton and arrow"""
+        """Create MediaPipe analysis frame with pose skeleton and arrow - DIFFERENT FRAME FOR EACH HIGHLIGHT"""
         try:
             timestamp = highlight.get('timestamp', '00:00')
             problem_location = highlight.get('problem_location', 'general')
@@ -333,23 +339,24 @@ class VideoProcessor:
         try:
             h, w, _ = frame.shape
             
-            # Create semi-transparent background at bottom
+            # Create semi-transparent background at bottom (larger area)
             overlay = frame.copy()
-            cv2.rectangle(overlay, (0, h-150), (w, h), (0, 0, 0, 180), -1)
+            cv2.rectangle(overlay, (0, h-200), (w, h), (0, 0, 0, 180), -1)
             frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
             
             # Add problem location text (top of bottom section)
-            cv2.putText(frame, f"PROBLEM: {problem_location.upper()}", 
-                       (w//2, h-120), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
-            cv2.putText(frame, f"PROBLEM: {problem_location.upper()}", 
-                       (w//2, h-120), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 1)
+            problem_text = f"PROBLEM: {problem_location.upper()}"
+            cv2.putText(frame, problem_text, 
+                       (w//2, h-160), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
+            cv2.putText(frame, problem_text, 
+                       (w//2, h-160), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 1)
             
-            # Wrap feedback text
+            # Wrap feedback text (shorter lines to prevent cutoff)
             words = feedback.split()
             lines = []
             current_line = ""
             for word in words:
-                if len(current_line + word) < 40:
+                if len(current_line + word) < 35:  # Shorter lines
                     current_line += word + " "
                 else:
                     lines.append(current_line)
@@ -357,13 +364,13 @@ class VideoProcessor:
             if current_line:
                 lines.append(current_line)
             
-            # Add wrapped feedback text (centered)
-            for i, line in enumerate(lines[:2]):  # Max 2 lines
-                y_pos = h - 80 + (i * 30)
+            # Add wrapped feedback text (centered, max 3 lines)
+            for i, line in enumerate(lines[:3]):  # Max 3 lines
+                y_pos = h - 120 + (i * 25)  # Closer spacing
                 cv2.putText(frame, line, (w//2, y_pos), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
                 cv2.putText(frame, line, (w//2, y_pos), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 1)
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 1)
             
             return frame
             
@@ -371,8 +378,8 @@ class VideoProcessor:
             print(f"⚠️ Analysis text failed: {e}")
             return frame
     
-    def _create_slow_motion_clip(self, video: VideoFileClip, highlight: Dict, slow_factor: float = 0.5) -> VideoFileClip:
-        """Create slow-motion clip with captions and TTS"""
+    def _create_slow_motion_clip(self, video: VideoFileClip, highlight: Dict, slow_factor: float = 0.5, clip_duration: float = 6.0) -> VideoFileClip:
+        """Create slow-motion clip with captions and TTS - DIFFERENT CLIP FOR EACH HIGHLIGHT"""
         try:
             timestamp = highlight.get('timestamp', '00:00')
             feedback = highlight.get('detailed_feedback', 'No feedback')
@@ -386,6 +393,14 @@ class VideoProcessor:
             start_time = max(0, highlight_time - 3)
             end_time = min(video_duration, highlight_time + 3)
             
+            # Ensure we get a 6-second clip (3 seconds before and after highlight)
+            actual_clip_duration = end_time - start_time
+            if actual_clip_duration < 6.0:
+                # Extend the clip if possible
+                extra_time = (6.0 - actual_clip_duration) / 2
+                start_time = max(0, start_time - extra_time)
+                end_time = min(video_duration, end_time + extra_time)
+            
             print(f"🎯 Slow motion: {start_time}s - {end_time}s (original: {highlight_time}s)")
             
             # Extract video clip
@@ -393,6 +408,15 @@ class VideoProcessor:
             
             # Apply slow motion (0.5x speed)
             slow_clip = video_clip.speedx(slow_factor)
+            
+            # Ensure the final clip is exactly 6 seconds
+            if slow_clip.duration > clip_duration:
+                slow_clip = slow_clip.subclip(0, clip_duration)
+            elif slow_clip.duration < clip_duration:
+                # Pad with black frames if needed
+                padding_duration = clip_duration - slow_clip.duration
+                padding = ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=padding_duration)
+                slow_clip = concatenate_videoclips([slow_clip, padding])
             
             # Create caption overlay with TTS text
             caption_clip = self._create_caption_overlay(feedback, action, slow_clip.duration)
