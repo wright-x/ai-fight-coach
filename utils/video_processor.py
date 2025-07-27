@@ -171,7 +171,7 @@ class VideoProcessor:
             return self._create_fallback_clip(source_clip, highlight, source_fps)
 
     def _generate_highlight_tts(self, highlight, clip_id):
-        """Generate TTS audio for a single highlight"""
+        """Generate TTS audio for a single highlight with sentence-by-sentence pacing"""
         try:
             if not self.tts_client:
                 return None
@@ -181,20 +181,73 @@ class VideoProcessor:
             if not action_text:
                 return None
             
+            print(f"🔊 Generating paced TTS for: {action_text[:50]}...")
+            
             # Create audio directory if it doesn't exist
             os.makedirs("output/audio", exist_ok=True)
             audio_path = f"output/audio/{clip_id}.mp3"
             
-            # Generate TTS
-            audio = self.tts_client["generate"](
-                text=action_text,
-                voice="21m00Tcm4TlvDq8ikWAM",
-                model="eleven_monolingual_v1"
-            )
+            # Split text into sentences for paced narration
+            sentences = [s.strip() for s in action_text.split('.') if s.strip()]
             
-            # Save audio
-            self.tts_client["save"](audio, audio_path)
-            print(f"✅ TTS generated: {audio_path}")
+            if not sentences:
+                return None
+            
+            # Create empty list for audio clips
+            audio_clips = []
+            
+            # Generate TTS for each sentence individually
+            for i, sentence in enumerate(sentences):
+                print(f"🔊 Generating TTS for sentence {i+1}/{len(sentences)}: {sentence[:30]}...")
+                
+                try:
+                    # Generate TTS for this sentence
+                    audio = self.tts_client["generate"](
+                        text=sentence,
+                        voice="21m00Tcm4TlvDq8ikWAM",
+                        model="eleven_monolingual_v1"
+                    )
+                    
+                    # Save individual sentence audio temporarily
+                    temp_audio_path = f"output/audio/{clip_id}_sentence_{i}.mp3"
+                    self.tts_client["save"](audio, temp_audio_path)
+                    
+                    # Load as AudioFileClip
+                    sentence_clip = AudioFileClip(temp_audio_path)
+                    audio_clips.append(sentence_clip)
+                    
+                    # Add silence after each sentence (except the last one)
+                    if i < len(sentences) - 1:
+                        # Create 0.4 seconds of silence
+                        silence_duration = 0.4
+                        silence_clip = AudioFileClip(temp_audio_path).set_duration(silence_duration)
+                        silence_clip = silence_clip.volumex(0)  # Mute the audio to create silence
+                        audio_clips.append(silence_clip)
+                    
+                    # Clean up temp file
+                    os.remove(temp_audio_path)
+                    
+                except Exception as e:
+                    print(f"⚠️ TTS generation failed for sentence {i+1}: {e}")
+                    continue
+            
+            if not audio_clips:
+                print("⚠️ No audio clips generated")
+                return None
+            
+            # Concatenate all audio clips (speech + silence + speech + silence...)
+            print(f"🔊 Concatenating {len(audio_clips)} audio clips...")
+            final_audio = CompositeAudioClip(audio_clips)
+            
+            # Save final composite audio
+            final_audio.write_audiofile(audio_path, verbose=False, logger=None)
+            
+            # Clean up audio clips
+            for clip in audio_clips:
+                clip.close()
+            final_audio.close()
+            
+            print(f"✅ Paced TTS generated: {audio_path}")
             return audio_path
             
         except Exception as e:
@@ -278,31 +331,71 @@ class VideoProcessor:
     def _create_text_card(self, text: str, width: int, height: int, fps: float, duration: float = 2.0):
         """Create a text card with neon aesthetic - FIXED to return proper CompositeVideoClip"""
         try:
-            print(f"🎬 Creating text card: '{text}' for {duration}s")
+            print(f"🎬 Creating text card: '{text}' for {duration}s at {width}x{height}")
             
             # Create a black background
             bg_color = (0, 0, 0)  # Black
             card = ColorClip(size=(width, height), color=bg_color, duration=duration)
+            print(f"✅ Background card created: {card.size}")
+            
+            # Calculate dynamic font size
+            font_size = int(width * 0.08)  # 8% of frame width
+            print(f"📝 Using font size: {font_size}")
             
             # Create text clip with neon purple color
-            text_clip = TextClip(
-                text,
-                fontsize=int(width * 0.08),  # Dynamic font size
-                color='white',
-                stroke_color='purple',
-                stroke_width=3,
-                font='Arial-Bold'
-            ).set_position('center').set_duration(duration)
+            try:
+                text_clip = TextClip(
+                    text,
+                    fontsize=font_size,
+                    color='white',
+                    stroke_color='purple',
+                    stroke_width=3,
+                    font='Arial-Bold'
+                ).set_position('center').set_duration(duration)
+                print(f"✅ Text clip created: {text_clip.size}")
+            except Exception as text_error:
+                print(f"⚠️ Text clip creation failed: {text_error}")
+                # Fallback to default font
+                text_clip = TextClip(
+                    text,
+                    fontsize=font_size,
+                    color='white',
+                    stroke_color='purple',
+                    stroke_width=3
+                ).set_position('center').set_duration(duration)
+                print(f"✅ Text clip created with fallback font: {text_clip.size}")
             
             # CRITICAL: Return proper CompositeVideoClip
             final_card = CompositeVideoClip([card, text_clip])
-            print(f"✅ Text card '{text}' created successfully")
+            print(f"✅ Text card '{text}' created successfully - Final size: {final_card.size}")
+            
+            # Verify the card has content by checking a frame
+            try:
+                test_frame = final_card.get_frame(1.0)  # Get frame at 1 second
+                if test_frame is not None:
+                    print(f"✅ Test frame retrieved successfully - Shape: {test_frame.shape}")
+                else:
+                    print("⚠️ Test frame is None")
+            except Exception as frame_error:
+                print(f"⚠️ Test frame retrieval failed: {frame_error}")
+            
             return final_card
             
         except Exception as e:
-            print(f"⚠️ Text card creation failed: {e}")
-            # Fallback: simple color clip
-            return ColorClip(size=(width, height), color=(0, 0, 0), duration=duration)
+            print(f"❌ Text card creation failed: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback: simple color clip with text
+            try:
+                fallback_card = ColorClip(size=(width, height), color=(0, 0, 0), duration=duration)
+                fallback_text = TextClip(
+                    text,
+                    fontsize=30,
+                    color='white'
+                ).set_position('center').set_duration(duration)
+                return CompositeVideoClip([fallback_card, fallback_text])
+            except:
+                return ColorClip(size=(width, height), color=(0, 0, 0), duration=duration)
 
     def _add_overlays(self, frame, action_text, user_name, pose):
         """
@@ -405,7 +498,7 @@ class VideoProcessor:
                         line,
                         font=font,
                         fill=self.colors['white'],
-                        stroke_width=4,  # THICK outline
+                        stroke_width=6,  # THICKER outline for better readability
                         stroke_fill=self.colors['black']
                     )
                     
