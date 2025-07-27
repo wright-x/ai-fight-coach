@@ -791,6 +791,11 @@
             transform: none;
         }
 
+        .feedback-btn.active {
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
+            box-shadow: 0 4px 15px rgba(220, 20, 60, 0.5);
+        }
+
         .section-title {
             color: #dc143c;
             font-size: 1.5rem;
@@ -894,6 +899,88 @@
         .youtube-link:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
+        }
+
+        .feedback-section {
+            display: flex;
+            justify-content: center;
+            margin: 40px 0;
+        }
+
+        .feedback-box {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            border: 1px solid rgba(220, 20, 60, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 8px 25px rgba(220, 20, 60, 0.2);
+        }
+
+        .feedback-icon {
+            font-size: 2rem;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .feedback-content h4 {
+            color: #dc143c;
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .feedback-content p {
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        #feedbackText {
+            width: 100%;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            border: 1px solid rgba(220, 20, 60, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            color: white;
+            font-size: 1rem;
+            resize: vertical;
+            margin-bottom: 15px;
+        }
+
+        #feedbackText:focus {
+            outline: none;
+            border-color: #dc143c;
+            box-shadow: 0 0 10px rgba(220, 20, 60, 0.3);
+        }
+
+        .submit-feedback-btn {
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
+            display: block;
+            margin: 0 auto;
+        }
+
+        .submit-feedback-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(220, 20, 60, 0.5);
+        }
+
+        .youtube-embed {
+            margin: 15px 0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .youtube-embed iframe {
+            border-radius: 10px;
         }
     </style>
 </head>
@@ -1091,11 +1178,15 @@
                         <div class="feedback-content">
                             <h4>How was your analysis experience?</h4>
                             <p>We'd love to hear your feedback to make this tool even better for boxers like you!</p>
-                            <div class="feedback-buttons">
-                                <button class="feedback-btn positive" onclick="submitFeedback('positive')">👍 Great!</button>
-                                <button class="feedback-btn neutral" onclick="submitFeedback('neutral')">😐 Okay</button>
-                                <button class="feedback-btn negative" onclick="submitFeedback('negative')">👎 Needs Work</button>
-                            </div>
+                            <form id="feedbackForm" onsubmit="submitFeedback(event)">
+                                <textarea id="feedbackText" placeholder="Tell us what you think about the analysis, what worked well, and what could be improved..." rows="4"></textarea>
+                                <div class="feedback-buttons">
+                                    <button type="button" class="feedback-btn positive" onclick="setFeedbackRating('positive')">👍 Great!</button>
+                                    <button type="button" class="feedback-btn neutral" onclick="setFeedbackRating('neutral')">😐 Okay</button>
+                                    <button type="button" class="feedback-btn negative" onclick="setFeedbackRating('negative')">👎 Needs Work</button>
+                                </div>
+                                <button type="submit" class="submit-feedback-btn">Send Feedback</button>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -1106,6 +1197,7 @@
     <script>
         let selectedAnalysisType = 'everything';
         let currentJobId = null;
+        let selectedFeedbackRating = null;
 
         // Analysis option selection
         document.querySelectorAll('.analysis-option').forEach(option => {
@@ -1150,8 +1242,8 @@
             .then(data => {
                 if (data.job_id) {
                     currentJobId = data.job_id;
-                    // Start real polling instead of simulated loading
-                    pollStatus(data.job_id);
+                    // Start simulated loading with exact timing
+                    startSimulatedLoading(data.job_id);
                 } else {
                     alert('Upload failed: ' + (data.message || 'Unknown error'));
                     showPage('uploadPage');
@@ -1162,6 +1254,79 @@
                 alert('Upload failed. Please try again.');
                 showPage('uploadPage');
             });
+        }
+
+        // Simulated loading with exact timing
+        function startSimulatedLoading(jobId) {
+            let progress = 0;
+            let startTime = Date.now();
+            let stage = 0;
+            
+            const stages = [
+                { start: 0, end: 50, duration: 30000, texts: [
+                    "📹 Uploading video...",
+                    "🤖 Initializing AI analysis...",
+                    "🔍 Analyzing video frames...",
+                    "📊 Processing movement data...",
+                    "🎯 Detecting key moments...",
+                    "⚡ Parsing technique data...",
+                    "📈 Calculating performance metrics...",
+                    "🎬 Preparing video processing..."
+                ]},
+                { start: 50, end: 75, duration: 90000, texts: [
+                    "🎬 Processing video clips...",
+                    "🎯 Generating highlight segments...",
+                    "🔊 Creating audio narration...",
+                    "📝 Writing detailed feedback...",
+                    "🎨 Adding visual overlays...",
+                    "⚡ Optimizing video quality...",
+                    "📊 Finalizing analysis data...",
+                    "🎯 Almost there..."
+                ]},
+                { start: 75, end: 95, duration: 15000, texts: [
+                    "✨ Finalizing results...",
+                    "🎬 Rendering final video...",
+                    "🔊 Syncing audio tracks...",
+                    "📊 Preparing analysis report...",
+                    "🎯 Almost done..."
+                ]}
+            ];
+            
+            function updateProgress() {
+                const elapsed = Date.now() - startTime;
+                const currentStage = stages[stage];
+                
+                if (currentStage) {
+                    const stageProgress = Math.min(elapsed / currentStage.duration, 1);
+                    progress = currentStage.start + (currentStage.end - currentStage.start) * stageProgress;
+                    
+                    // Update progress bar
+                    const progressFill = document.getElementById('progressFill');
+                    progressFill.style.width = `${progress}%`;
+                    
+                    // Update text with cycling messages
+                    const textIndex = Math.floor((elapsed / 3000) % currentStage.texts.length);
+                    const progressText = document.getElementById('progressText');
+                    progressText.textContent = currentStage.texts[textIndex];
+                    
+                    // Update loading stages
+                    updateLoadingStages(progress);
+                    
+                    if (progress >= currentStage.end && stage < stages.length - 1) {
+                        stage++;
+                        startTime = Date.now();
+                    }
+                    
+                    if (progress < 99) {
+                        setTimeout(updateProgress, 100);
+                    } else {
+                        // Wait for actual completion
+                        pollStatus(jobId);
+                    }
+                }
+            }
+            
+            updateProgress();
         }
 
         function pollStatus(jobId) {
@@ -1319,7 +1484,6 @@
         }
 
         function displayHighlights(highlights) {
-            console.log('displayHighlights called with:', highlights);
             const container = document.getElementById('highlightsContainer');
             console.log('Highlights container:', container);
             container.innerHTML = '<h3 class="section-title">Analysis Results</h3>';
@@ -1329,9 +1493,9 @@
                     const card = document.createElement('div');
                     card.className = 'highlight-card';
                     card.innerHTML = `
-                        <div class="highlight-title">Highlight ${index + 1} - ${highlight.timestamp}</div>
-                        <div class="highlight-description">${highlight.long_text || 'No description available'}</div>
-                        <div class="highlight-action">Action Required: ${highlight.action_required || 'No action specified'}</div>
+                        <div class="highlight-title">Highlight ${index + 1} - ${highlight.timestamp || '00:00'}</div>
+                        <div class="highlight-description">${highlight.long_text || highlight.description || 'Analysis completed'}</div>
+                        <div class="highlight-action">Action Required: ${highlight.action_required || 'Review your technique'}</div>
                     `;
                     container.appendChild(card);
                 });
@@ -1350,7 +1514,6 @@
         }
 
         function displayDrills(drills) {
-            console.log('displayDrills called with:', drills);
             const container = document.getElementById('drillsContainer');
             console.log('Drills container:', container);
             container.innerHTML = '<h3 class="section-title">Recommended Drills</h3>';
@@ -1360,9 +1523,9 @@
                     const card = document.createElement('div');
                     card.className = 'drill-card';
                     card.innerHTML = `
-                        <div class="drill-name">${drill.drill_name || 'Unnamed Drill'}</div>
-                        <div class="drill-description">${drill.description || 'No description available'}</div>
-                        <div class="drill-problem">Fixes: ${drill.problem_it_fixes || 'No problem specified'}</div>
+                        <div class="drill-name">${drill.drill_name || drill.name || 'Technique Drill'}</div>
+                        <div class="drill-description">${drill.description || 'Practice this drill to improve your technique.'}</div>
+                        <div class="drill-problem">Fixes: ${drill.problem_it_fixes || drill.problem || 'General technique improvement'}</div>
                     `;
                     container.appendChild(card);
                 });
@@ -1381,7 +1544,6 @@
         }
 
         function displayYouTube(videos) {
-            console.log('displayYouTube called with:', videos);
             const container = document.getElementById('youtubeContainer');
             console.log('YouTube container:', container);
             container.innerHTML = '<h3 class="section-title">YouTube Recommendations</h3>';
@@ -1390,11 +1552,26 @@
                 videos.forEach(video => {
                     const card = document.createElement('div');
                     card.className = 'youtube-card';
-                    card.innerHTML = `
-                        <div class="youtube-title-text">${video.title || 'Untitled Video'}</div>
-                        <div class="youtube-problem">${video.problem_solved || 'No problem specified'}</div>
-                        <a href="${video.url || '#'}" target="_blank" class="youtube-link">Watch Video</a>
-                    `;
+                    
+                    // Extract video ID from YouTube URL
+                    const videoId = extractYouTubeId(video.url || video.youtube_url || '');
+                    
+                    if (videoId) {
+                        card.innerHTML = `
+                            <div class="youtube-title-text">${video.title || video.video_title || 'Boxing Technique Video'}</div>
+                            <div class="youtube-problem">${video.problem_it_fixes || video.description || 'Learn boxing techniques'}</div>
+                            <div class="youtube-embed">
+                                <iframe width="100%" height="200" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>
+                            </div>
+                            <a href="${video.url || video.youtube_url || '#'}" target="_blank" class="youtube-link">Watch on YouTube</a>
+                        `;
+                    } else {
+                        card.innerHTML = `
+                            <div class="youtube-title-text">${video.title || video.video_title || 'Boxing Technique Video'}</div>
+                            <div class="youtube-problem">${video.problem_it_fixes || video.description || 'Learn boxing techniques'}</div>
+                            <a href="${video.url || video.youtube_url || 'https://www.youtube.com/results?search_query=boxing+technique'}" target="_blank" class="youtube-link">Watch on YouTube</a>
+                        `;
+                    }
                     container.appendChild(card);
                 });
             } else {
@@ -1404,11 +1581,20 @@
                 card.innerHTML = `
                     <div class="youtube-title-text">Boxing Technique Fundamentals</div>
                     <div class="youtube-problem">Learn the basics of proper boxing stance, guard, and movement</div>
+                    <div class="youtube-embed">
+                        <iframe width="100%" height="200" src="https://www.youtube.com/embed/dQw4w9WgXcQ" frameborder="0" allowfullscreen></iframe>
+                    </div>
                     <a href="https://www.youtube.com/results?search_query=boxing+technique+fundamentals" target="_blank" class="youtube-link">Search YouTube</a>
                 `;
                 container.appendChild(card);
             }
             console.log('YouTube videos displayed, container now has', container.children.length, 'children');
+        }
+
+        function extractYouTubeId(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
         }
 
         function showPage(pageId) {
@@ -1458,18 +1644,55 @@
             currentJobId = null;
         }
 
-        function submitFeedback(type) {
-            const feedbackContent = document.querySelector('.feedback-content p').textContent;
-            const feedbackButtons = document.querySelector('.feedback-buttons');
-            feedbackButtons.style.display = 'none'; // Hide buttons after selection
+        function setFeedbackRating(rating) {
+            selectedFeedbackRating = rating;
+            // Remove active class from all buttons
+            document.querySelectorAll('.feedback-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            // Add active class to selected button
+            document.querySelector(`.feedback-btn.${rating}`).classList.add('active');
+        }
 
-            const feedbackText = document.createElement('p');
-            feedbackText.textContent = `Thank you for your feedback! Your feedback type: ${type}`;
-            document.querySelector('.feedback-content').appendChild(feedbackText);
+        function submitFeedback(event) {
+            event.preventDefault();
+            const feedbackText = document.getElementById('feedbackText').value;
+            
+            if (!selectedFeedbackRating) {
+                alert('Please select a rating before submitting feedback.');
+                return;
+            }
 
-            // Optionally, you could send this feedback to a backend endpoint
-            console.log(`Submitting feedback: type=${type}, content=${feedbackContent}`);
-            alert(`Thank you for your feedback! Your feedback type: ${type}`);
+            const feedbackData = {
+                job_id: currentJobId,
+                feedback_type: selectedFeedbackRating,
+                feedback_text: feedbackText
+            };
+
+            fetch('/submit-feedback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(feedbackData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Thank you for your feedback! Your feedback has been submitted.');
+                    // Disable the form after successful submission
+                    document.getElementById('feedbackForm').style.display = 'none';
+                    const successMessage = document.createElement('div');
+                    successMessage.innerHTML = '<p style="color: #28a745; text-align: center; font-weight: bold;">Thank you for your feedback! 🎉</p>';
+                    document.querySelector('.feedback-content').appendChild(successMessage);
+                } else {
+                    alert('Error submitting feedback: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error submitting feedback:', error);
+                alert('Error submitting feedback. Please try again.');
+            });
         }
     </script>
 </body>

@@ -477,23 +477,48 @@ async def logout(request: Request):
     return JSONResponse(content={"success": True, "message": "Logged out successfully"})
 
 @app.post("/submit-feedback")
-async def submit_feedback(
-    name: str = Form(...),
-    email: str = Form(...),
-    rating: int = Form(...),
-    feedback_text: str = Form(...)
-):
+async def submit_feedback(request: Request):
     """Submit user feedback"""
-    logger.info(f"📝 Feedback submitted: {name} ({email}) - Rating: {rating}")
     try:
+        data = await request.json()
+        job_id = data.get('job_id')
+        feedback_type = data.get('feedback_type')
+        feedback_text = data.get('feedback_text', '')
+        
+        logger.info(f"📝 Received feedback - Job ID: {job_id}, Type: {feedback_type}")
+        
+        # Send email notification
         if user_manager:
-            user_manager.send_feedback_email(name, email, rating, feedback_text)
-            return JSONResponse(content={"success": True, "message": "Feedback submitted successfully!"})
-        else:
-            return JSONResponse(content={"success": True, "message": "Feedback submitted successfully! (demo mode)"})
+            try:
+                subject = f"AI Fight Coach Feedback - {feedback_type}"
+                body = f"""
+                New feedback received:
+                
+                Job ID: {job_id}
+                Feedback Type: {feedback_type}
+                Feedback Text: {feedback_text}
+                
+                Timestamp: {datetime.now().isoformat()}
+                """
+                
+                # Send to admin email
+                admin_email = os.getenv('SMTP_EMAIL', 'admin@ai-boxing.com')
+                user_manager.send_email(admin_email, subject, body)
+                logger.info("✅ Feedback email sent successfully")
+            except Exception as e:
+                logger.error(f"❌ Failed to send feedback email: {e}")
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": "Feedback submitted successfully"
+        })
+        
     except Exception as e:
         logger.error(f"❌ Feedback submission failed: {e}")
-        return JSONResponse(content={"success": False, "message": f"Feedback submission failed: {e}"})
+        return JSONResponse(content={
+            "success": False,
+            "message": f"Failed to submit feedback: {str(e)}"
+        })
 
 @app.post("/upload")
 async def upload_video_redirect(
