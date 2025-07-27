@@ -1,35 +1,100 @@
-# Ultra-minimal Dockerfile for AI Boxing Analysis
-FROM python:3.11-slim
+# Multi-stage Dockerfile for AI Boxing Analysis with Computer Vision
+# Based on MediaPipe official Docker guide and community best practices
+# This approach properly prepares the system environment before installing Python packages
 
-# Set environment variables
+# Stage 1: Builder stage with all dependencies
+FROM python:3.11-slim-bullseye as builder
+
+# Set environment variables for the build stage
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install only the absolute minimum system dependencies
+# Install system dependencies required for OpenCV and MediaPipe
+# Based on MediaPipe official Docker guide and community solutions
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        # Core system libraries
         curl \
+        wget \
+        gnupg \
+        # OpenCV dependencies (headless)
+        libgl1-mesa-glx \
+        libglib2.0-0 \
+        libsm6 \
+        libxrender1 \
+        libxext6 \
+        libgomp1 \
+        # MediaPipe dependencies
+        libgstreamer1.0-0 \
+        libgstreamer-plugins-base1.0-0 \
+        # FFmpeg for video processing
+        ffmpeg \
+        # Additional libraries for stability
+        libgtk-3-0 \
+        libavcodec-dev \
+        libavformat-dev \
+        libswscale-dev \
+        libv4l-dev \
+        libxvidcore-dev \
+        libx264-dev \
+        libjpeg-dev \
+        libpng-dev \
+        libtiff-dev \
+        libatlas-base-dev \
+        gfortran \
         && rm -rf /var/lib/apt/lists/*
 
-# Install Python packages one by one to avoid conflicts
+# Upgrade pip and install Python packages
 RUN pip install --upgrade pip
 
-# Core web framework
-RUN pip install --no-cache-dir fastapi==0.109.2
-RUN pip install --no-cache-dir uvicorn[standard]==0.27.1
-RUN pip install --no-cache-dir python-multipart==0.0.6
+# Install Python packages with proper dependency resolution
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-# AI and API services
-RUN pip install --no-cache-dir google-generativeai==0.3.2
-RUN pip install --no-cache-dir elevenlabs==0.2.27
+# Stage 2: Lean production stage
+FROM python:3.11-slim-bullseye
 
-# Basic utilities
-RUN pip install --no-cache-dir numpy==1.24.3
-RUN pip install --no-cache-dir Pillow==10.0.0
-RUN pip install --no-cache-dir python-dotenv==1.0.0
-RUN pip install --no-cache-dir aiofiles==23.2.1
-RUN pip install --no-cache-dir itsdangerous==2.1.2
+# Set environment variables for production
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Copy only the essential system libraries from builder stage
+# This ensures we have the required libraries without the build tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        # Core runtime libraries
+        curl \
+        # OpenCV runtime dependencies
+        libgl1-mesa-glx \
+        libglib2.0-0 \
+        libsm6 \
+        libxrender1 \
+        libxext6 \
+        libgomp1 \
+        # MediaPipe runtime dependencies
+        libgstreamer1.0-0 \
+        libgstreamer-plugins-base1.0-0 \
+        # FFmpeg runtime
+        ffmpeg \
+        # Additional runtime libraries
+        libgtk-3-0 \
+        libavcodec59 \
+        libavformat59 \
+        libswscale6 \
+        libv4l-0 \
+        libxvidcore4 \
+        libx264-163 \
+        libjpeg62-turbo \
+        libpng16-16 \
+        libtiff5 \
+        libatlas3-base \
+        && rm -rf /var/lib/apt/lists/*
+
+# Copy Python packages from builder stage
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Create app directory
 WORKDIR /app

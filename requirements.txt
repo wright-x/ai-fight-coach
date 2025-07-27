@@ -14,7 +14,8 @@ python-dotenv==1.0.0
 aiofiles==23.2.1
 itsdangerous==2.1.2
 
-# Video processing packages (optional - will be installed separately if needed)
-# opencv-python-headless==4.11.0.86
-# mediapipe==0.10.21
-# moviepy==1.0.3 
+# Video processing packages (properly configured for deployment)
+# Using opencv-python-headless to avoid GUI dependencies on server
+opencv-python-headless==4.11.0.86
+mediapipe==0.10.21
+moviepy==1.0.3 
