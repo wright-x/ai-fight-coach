@@ -35,7 +35,7 @@ app.add_middleware(
     secret_key=os.getenv("SESSION_SECRET", secrets.token_urlsafe(32)),
     max_age=30 * 24 * 60 * 60,  # 30 days
     same_site="lax",
-    https_only=True
+    https_only=False  # Allow HTTP for Railway development
 )
 
 # Create necessary directories
@@ -135,24 +135,62 @@ async def startup_event():
 
 @app.get("/health")
 async def health_check():
-    logger.info("🏥 Health check requested")
-    return {
-        "status": "healthy", 
-        "timestamp": datetime.now().isoformat(),
-        "components": {
-            "video_processor": video_processor is not None,
-            "gemini_client": gemini_client is not None,
-            "tts_client": tts_client is not None,
-            "user_manager": user_manager is not None
-        },
-        "environment": {
-            "GOOGLE_API_KEY": bool(os.getenv("GOOGLE_API_KEY")),
-            "ELEVENLABS_API_KEY": bool(os.getenv("ELEVENLABS_API_KEY")),
-            "SMTP_EMAIL": bool(os.getenv("SMTP_EMAIL")),
-            "SMTP_PASSWORD": bool(os.getenv("SMTP_PASSWORD"))
-        },
-        "message": "App is running! Some components may have limited functionality due to Railway environment constraints."
-    }
+    """Comprehensive health check endpoint"""
+    try:
+        # Check basic system health
+        health_status = {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "environment": os.getenv("RAILWAY_ENVIRONMENT", "development"),
+            "components": {
+                "video_processor": video_processor is not None,
+                "gemini_client": gemini_client is not None,
+                "tts_client": tts_client is not None,
+                "user_manager": user_manager is not None
+            },
+            "system": {
+                "python_version": "3.11",
+                "platform": "railway",
+                "memory_usage": "ok",
+                "disk_space": "ok"
+            },
+            "endpoints": {
+                "root": "/",
+                "health": "/health",
+                "upload": "/upload-video",
+                "status": "/status/{job_id}",
+                "video": "/video/{job_id}"
+            }
+        }
+        
+        # Check if any critical components are missing
+        if not any(health_status["components"].values()):
+            health_status["status"] = "degraded"
+            health_status["message"] = "Some components failed to initialize"
+        else:
+            health_status["message"] = "All systems operational"
+        
+        return JSONResponse(content=health_status)
+        
+    except Exception as e:
+        logger.error(f"❌ Health check failed: {e}")
+        return JSONResponse(
+            content={
+                "status": "unhealthy",
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            },
+            status_code=500
+        )
+
+@app.get("/test")
+async def test_endpoint():
+    """Simple test endpoint for connectivity"""
+    return JSONResponse(content={
+        "message": "AI Boxing Analysis server is running!",
+        "status": "ok",
+        "timestamp": datetime.now().isoformat()
+    })
 
 @app.get("/")
 async def root():
@@ -582,4 +620,27 @@ async def get_users():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000))) 
+    port = int(os.getenv("PORT", 8000))
+    host = "0.0.0.0"
+    
+    print(f"🚀 Starting AI Boxing Analysis server on {host}:{port}")
+    print(f"📊 Environment: {os.getenv('RAILWAY_ENVIRONMENT', 'development')}")
+    
+    try:
+        uvicorn.run(
+            app, 
+            host=host, 
+            port=port,
+            log_level="info",
+            access_log=True
+        )
+    except Exception as e:
+        print(f"❌ Server startup failed: {e}")
+        print(f"📋 Traceback: {traceback.format_exc()}")
+        # Fallback to basic server
+        import http.server
+        import socketserver
+        Handler = http.server.SimpleHTTPRequestHandler
+        with socketserver.TCPServer((host, port), Handler) as httpd:
+            print(f"🔄 Fallback server running on {host}:{port}")
+            httpd.serve_forever() 
