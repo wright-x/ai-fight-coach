@@ -748,20 +748,35 @@
         .video-buttons {
             display: flex;
             justify-content: center;
-            gap: 20px;
-            margin-top: 20px;
+            gap: 30px;
+            margin-top: 25px;
+            margin-bottom: 40px;
         }
 
         .download-btn, .analyze-again-btn {
             background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
             color: white;
             border: none;
-            padding: 12px 25px;
+            padding: 15px 30px;
             border-radius: 25px;
-            font-size: 1rem;
+            font-size: 1.1rem;
+            font-weight: bold;
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
+            min-width: 180px;
+        }
+
+        .video-container {
+            margin-bottom: 40px;
+        }
+
+        .video-container video {
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
         }
 
         .download-btn:hover, .analyze-again-btn:hover {
@@ -1160,6 +1175,7 @@
             <!-- Results Page -->
             <div id="resultsPage" class="page">
                 <div class="result-container">
+                    <!-- Video Section at Top -->
                     <div class="video-container">
                         <video id="resultVideo" controls>
                             Your browser does not support the video tag.
@@ -1170,22 +1186,26 @@
                         </div>
                     </div>
                     
+                    <!-- Analysis Results Section -->
                     <div class="highlights-container" id="highlightsContainer">
                         <h3 class="section-title">Analysis Results</h3>
                         <!-- Highlights will be populated here -->
                     </div>
                 </div>
 
+                <!-- Recommended Drills Section -->
                 <div class="drills-container" id="drillsContainer">
                     <h3 class="section-title">Recommended Drills</h3>
                     <!-- Drills will be populated here -->
                 </div>
 
+                <!-- YouTube Recommendations Section -->
                 <div class="youtube-container" id="youtubeContainer">
                     <h3 class="section-title">YouTube Recommendations</h3>
                     <!-- YouTube videos will be populated here -->
                 </div>
 
+                <!-- Feedback Section -->
                 <div class="feedback-section">
                     <div class="feedback-box">
                         <div class="feedback-icon">💬</div>
@@ -1275,6 +1295,7 @@
             let progress = 0;
             let startTime = Date.now();
             let stage = 0;
+            let isCompleted = false;
             
             const stages = [
                 { start: 0, end: 50, duration: 30000, texts: [
@@ -1313,6 +1334,28 @@
             ];
             
             function updateProgress() {
+                // Check if analysis is actually complete
+                fetch(`/status/${jobId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'completed' && !isCompleted) {
+                        console.log('Analysis completed! Maxing out progress bar...');
+                        isCompleted = true;
+                        const progressFill = document.getElementById('progressFill');
+                        const progressText = document.getElementById('progressText');
+                        progressFill.style.width = '100%';
+                        progressText.textContent = 'Analysis complete!';
+                        markAllStagesCompleted();
+                        setTimeout(() => showResults(jobId), 1000);
+                        return;
+                    }
+                })
+                .catch(error => {
+                    console.log('Status check failed, continuing simulation...');
+                });
+                
+                if (isCompleted) return;
+                
                 const elapsed = Date.now() - startTime;
                 const currentStage = stages[stage];
                 
@@ -1449,17 +1492,15 @@
         }
 
         function showResults(jobId) {
-            console.log('showResults called with jobId:', jobId);
+            console.log('Showing results for job:', jobId);
             showPage('resultsPage');
             
-            // Load video
+            // Load the video first
             const video = document.getElementById('resultVideo');
-            console.log('Video element:', video);
             video.src = `/video/${jobId}`;
-            console.log('Video src set to:', `/video/${jobId}`);
+            video.load();
             
             // Load analysis data
-            console.log('Fetching analysis data...');
             fetch(`/analysis/${jobId}`)
             .then(response => {
                 console.log('Analysis response:', response);
