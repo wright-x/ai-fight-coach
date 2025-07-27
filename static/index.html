@@ -1276,8 +1276,8 @@
             .then(data => {
                 if (data.job_id) {
                     currentJobId = data.job_id;
-                    // Start simulated loading with exact timing
-                    startSimulatedLoading(data.job_id);
+                    // Start simple polling - no simulation
+                    pollStatus(data.job_id);
                 } else {
                     alert('Upload failed: ' + (data.message || 'Unknown error'));
                     showPage('uploadPage');
@@ -1290,117 +1290,12 @@
             });
         }
 
-        // Simulated loading with exact timing
-        function startSimulatedLoading(jobId) {
-            let progress = 0;
-            let startTime = Date.now();
-            let stage = 0;
-            let isCompleted = false;
-            
-            const stages = [
-                { start: 0, end: 50, duration: 30000, texts: [
-                    "📹 Uploading video...",
-                    "🤖 Initializing AI analysis...",
-                    "🔍 Analyzing video frames...",
-                    "📊 Processing movement data...",
-                    "🎯 Detecting key moments...",
-                    "⚡ Parsing technique data...",
-                    "📈 Calculating performance metrics...",
-                    "🎬 Preparing video processing..."
-                ]},
-                { start: 50, end: 75, duration: 90000, texts: [
-                    "🎬 Processing video clips...",
-                    "🎯 Generating highlight segments...",
-                    "🔊 Creating audio narration...",
-                    "📝 Writing detailed feedback...",
-                    "🎨 Adding visual overlays...",
-                    "⚡ Optimizing video quality...",
-                    "📊 Finalizing analysis data...",
-                    "🎯 Almost there..."
-                ]},
-                { start: 75, end: 95, duration: 15000, texts: [
-                    "✨ Finalizing results...",
-                    "🎬 Rendering final video...",
-                    "🔊 Syncing audio tracks...",
-                    "📊 Preparing analysis report...",
-                    "🎯 Almost done..."
-                ]},
-                { start: 95, end: 99, duration: 10000, texts: [
-                    "🎯 Almost there...",
-                    "✨ Final touches...",
-                    "🎬 Rendering complete...",
-                    "📊 Analysis ready..."
-                ]}
-            ];
-            
-            function updateProgress() {
-                // Check if analysis is actually complete
-                fetch(`/status/${jobId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'completed' && !isCompleted) {
-                        console.log('Analysis completed! Maxing out progress bar...');
-                        isCompleted = true;
-                        const progressFill = document.getElementById('progressFill');
-                        const progressText = document.getElementById('progressText');
-                        progressFill.style.width = '100%';
-                        progressText.textContent = 'Analysis complete!';
-                        markAllStagesCompleted();
-                        setTimeout(() => showResults(jobId), 1000);
-                        return;
-                    }
-                })
-                .catch(error => {
-                    console.log('Status check failed, continuing simulation...');
-                });
-                
-                if (isCompleted) return;
-                
-                const elapsed = Date.now() - startTime;
-                const currentStage = stages[stage];
-                
-                if (currentStage) {
-                    const stageProgress = Math.min(elapsed / currentStage.duration, 1);
-                    progress = currentStage.start + (currentStage.end - currentStage.start) * stageProgress;
-                    
-                    // Update progress bar
-                    const progressFill = document.getElementById('progressFill');
-                    progressFill.style.width = `${progress}%`;
-                    
-                    // Update text with cycling messages
-                    const textIndex = Math.floor((elapsed / 3000) % currentStage.texts.length);
-                    const progressText = document.getElementById('progressText');
-                    progressText.textContent = currentStage.texts[textIndex];
-                    
-                    // Update loading stages
-                    updateLoadingStages(progress);
-                    
-                    if (progress >= currentStage.end && stage < stages.length - 1) {
-                        stage++;
-                        startTime = Date.now();
-                    }
-                    
-                    if (progress < 99) {
-                        setTimeout(updateProgress, 100);
-                    } else {
-                        // Wait for actual completion
-                        pollStatus(jobId);
-                    }
-                }
-            }
-            
-            updateProgress();
-        }
-
         function pollStatus(jobId) {
             console.log('Polling status for job:', jobId);
             fetch(`/status/${jobId}`)
-            .then(response => {
-                console.log('Status response status:', response.status);
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                console.log('Status response data:', data);
+                console.log('Status response:', data);
                 const progressFill = document.getElementById('progressFill');
                 const progressText = document.getElementById('progressText');
                 
@@ -1426,8 +1321,8 @@
                     // Mark all stages as completed
                     markAllStagesCompleted();
                     
-                    // Show results after a short delay
-                    setTimeout(() => showResults(jobId), 1000);
+                    // Show results immediately
+                    showResults(jobId);
                 } else if (data.status === 'failed') {
                     console.error('Analysis failed:', data.message);
                     alert('Analysis failed: ' + (data.message || 'Unknown error'));
@@ -1473,12 +1368,21 @@
         }
 
         function getStageText(progress) {
-            if (progress < 15) return '📹 Uploading video...';
-            if (progress < 30) return '🤖 AI analyzing footage...';
-            if (progress < 50) return '🎯 Detecting highlights...';
-            if (progress < 75) return '🎬 Processing video...';
-            if (progress < 90) return '🔊 Generating audio...';
-            return '✨ Finalizing results...';
+            if (progress < 10) {
+                return "📹 Uploading video...";
+            } else if (progress < 30) {
+                return "🤖 Initializing AI analysis...";
+            } else if (progress < 50) {
+                return "🔍 Analyzing video frames...";
+            } else if (progress < 70) {
+                return "🎬 Processing video clips...";
+            } else if (progress < 90) {
+                return "🎨 Adding visual overlays...";
+            } else if (progress < 100) {
+                return "✨ Finalizing results...";
+            } else {
+                return "🎯 Analysis complete!";
+            }
         }
 
         function markAllStagesCompleted() {
