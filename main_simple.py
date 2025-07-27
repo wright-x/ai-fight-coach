@@ -706,6 +706,13 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
                 logger.info(f"📊 Analysis result keys: {list(analysis_result.keys()) if analysis_result else 'None'}")
                 if analysis_result and 'highlights' in analysis_result:
                     logger.info(f"📊 Number of highlights: {len(analysis_result['highlights'])}")
+                
+                # --- ADD THIS BLOCK ---
+                import json
+                logger.info("--- GROUND TRUTH: FINAL ANALYSIS DATA TO BE SENT ---")
+                logger.info(json.dumps(analysis_result, indent=2))
+                logger.info("----------------------------------------------------")
+                # --- END BLOCK ---
             except Exception as e:
                 logger.error(f"❌ Gemini analysis failed: {e}")
                 logger.error(f"📋 Traceback: {traceback.format_exc()}")
