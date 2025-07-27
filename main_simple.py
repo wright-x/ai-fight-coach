@@ -60,8 +60,10 @@ def initialize_components():
     try:
         logger.info("📁 Initializing VideoProcessor...")
         from utils.video_processor import VideoProcessor
+        logger.info("📦 VideoProcessor class imported successfully")
         video_processor = VideoProcessor()
         logger.info("✅ VideoProcessor initialized successfully")
+        logger.info(f"📊 VideoProcessor object: {type(video_processor)}")
     except Exception as e:
         logger.error(f"❌ VideoProcessor failed: {e}")
         logger.error(f"📋 Traceback: {traceback.format_exc()}")
@@ -646,11 +648,22 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
         if gemini_client:
             logger.info(f"🤖 Calling Gemini analysis for job: {job_id}")
             try:
+                logger.info(f"🔍 Analysis type: {analysis_type}")
+                logger.info(f"📁 Temp video path: {temp_video_path}")
+                logger.info(f"📊 Video file exists: {os.path.exists(temp_video_path)}")
+                if os.path.exists(temp_video_path):
+                    file_size = os.path.getsize(temp_video_path)
+                    logger.info(f"📊 Video file size: {file_size} bytes")
+                
                 analysis_result = gemini_client.analyze_video(temp_video_path, analysis_type)
                 logger.info(f"✅ Gemini analysis completed for job: {job_id}")
+                logger.info(f"📊 Analysis result keys: {list(analysis_result.keys()) if analysis_result else 'None'}")
+                if analysis_result and 'highlights' in analysis_result:
+                    logger.info(f"📊 Number of highlights: {len(analysis_result['highlights'])}")
             except Exception as e:
                 logger.error(f"❌ Gemini analysis failed: {e}")
                 logger.error(f"📋 Traceback: {traceback.format_exc()}")
+                logger.warning(f"⚠️ Falling back to mock analysis due to Gemini failure")
                 analysis_result = {
                     "highlights": [
                         {
@@ -669,6 +682,7 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
                 }
         else:
             logger.warning(f"⚠️ Gemini client not available, using mock analysis")
+            logger.error(f"❌ CRITICAL: Gemini client is None - this should not happen!")
             analysis_result = {
                 "highlights": [
                     {
