@@ -652,6 +652,83 @@
         .tab-content.active {
             display: block;
         }
+
+        /* New styles for progress page */
+        .feedback-section {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            border: 1px solid rgba(220, 20, 60, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .feedback-box {
+            display: flex;
+            align-items: center;
+            background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
+            border: 1px solid rgba(220, 20, 60, 0.3);
+            border-radius: 10px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
+        }
+
+        .feedback-icon {
+            font-size: 2rem;
+            margin-right: 15px;
+            color: #ff4444;
+        }
+
+        .feedback-content h4 {
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+            color: #ffffff;
+        }
+
+        .feedback-content p {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            color: #cccccc;
+        }
+
+        .features-showcase {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            border: 1px solid rgba(220, 20, 60, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(220, 20, 60, 0.3);
+        }
+
+        .feature-card .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h4 {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: #ff4444;
+        }
+
+        .feature-card p {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            color: #cccccc;
+        }
     </style>
 </head>
 <body>
@@ -764,11 +841,44 @@
             <!-- Progress Page -->
             <div id="progressPage" class="page">
                 <div class="progress-container">
-                    <h3>Processing Your Video...</h3>
+                    <h3>Uploading your video...</h3>
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressFill"></div>
                     </div>
                     <p id="progressText">Initializing analysis...</p>
+                </div>
+
+                <div class="feedback-section">
+                    <div class="feedback-box">
+                        <div class="feedback-icon">⚠️</div>
+                        <div class="feedback-content">
+                            <h4>After you receive your feedback, could you give us some feedback?</h4>
+                            <p>This will help us make this even better for passionate boxers like YOU. YOU'RE part of the special few that sees this in its early stages.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="features-showcase">
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <h4>AI Highlight Detection</h4>
+                        <p>Automatically finds your best and worst moments</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">👤</div>
+                        <h4>Head Tracking</h4>
+                        <p>Tracks your head movement and positioning</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h4>Professional Feedback</h4>
+                        <p>Get expert coaching advice on your technique</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🎬</div>
+                        <h4>Slow Motion Analysis</h4>
+                        <p>Review your moves in detail with slow-motion</p>
+                    </div>
                 </div>
             </div>
 
