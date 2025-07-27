@@ -20,7 +20,6 @@ import secrets
 from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks, Response, Request
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.sessions import SessionMiddleware
 
 # Set up detailed logging
 logging.basicConfig(level=logging.INFO)
@@ -28,15 +27,6 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(title="AI Fight Coach", version="1.0.0")
-
-# Add session middleware with secure configuration
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=os.getenv("SESSION_SECRET", secrets.token_urlsafe(32)),
-    max_age=30 * 24 * 60 * 60,  # 30 days
-    same_site="lax",
-    https_only=False  # Allow HTTP for Railway development
-)
 
 # Create necessary directories
 for directory in ["uploads", "output", "static", "temp"]:
@@ -246,20 +236,17 @@ async def main_page():
 
 @app.post("/register-user")
 async def register_user(request: Request, name: str = Form(...), email: str = Form(...)):
-    """Register user and set session cookie"""
+    """Register user"""
     try:
         logger.info(f"👤 User registration: {name} ({email})")
         
-        # Create user session data
+        # Create user data
         user_data = {
             "name": name,
             "email": email,
             "registered_at": datetime.now().isoformat(),
             "session_id": str(uuid.uuid4())
         }
-        
-        # Store in session
-        request.session["user"] = user_data
         
         # Try to save to CSV if user manager is available
         if user_manager:
@@ -292,17 +279,14 @@ async def register_user(request: Request, name: str = Form(...), email: str = Fo
 
 @app.get("/session")
 async def get_session(request: Request):
-    """Get current user session"""
-    user = request.session.get("user")
-    if user:
-        return JSONResponse(content={"user": user, "authenticated": True})
-    else:
-        return JSONResponse(content={"user": None, "authenticated": False})
+    """Get current session info"""
+    # Simple session check without middleware
+    return JSONResponse(content={"user": None, "authenticated": False})
 
 @app.post("/logout")
 async def logout(request: Request):
     """Clear user session"""
-    request.session.clear()
+    # Simple logout without session middleware
     return JSONResponse(content={"success": True, "message": "Logged out successfully"})
 
 @app.post("/submit-feedback")
@@ -347,14 +331,6 @@ async def upload_video(
     try:
         logger.info(f"📤 Video upload started: {file.filename}")
         
-        # Get user from session
-        user = request.session.get("user")
-        if not user:
-            return JSONResponse(content={
-                "success": False,
-                "message": "Please register first to upload videos."
-            })
-        
         # Validate file
         if not file.filename or not file.filename.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
             return JSONResponse(content={
@@ -380,7 +356,7 @@ async def upload_video(
             "message": "Video uploaded successfully",
             "fighter_name": fighter_name,
             "analysis_type": analysis_type,
-            "user": user,  # Store user information
+            "user": {"name": "Anonymous", "email": "anonymous@example.com"},  # Default user
             "uploaded_at": datetime.now().isoformat()
         }
         
@@ -397,6 +373,7 @@ async def upload_video(
         
     except Exception as e:
         logger.error(f"❌ Upload failed: {e}")
+        logger.error(f"📋 Traceback: {traceback.format_exc()}")
         return JSONResponse(content={
             "success": False,
             "message": f"Upload failed: {e}"
