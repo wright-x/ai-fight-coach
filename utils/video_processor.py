@@ -154,23 +154,31 @@ class VideoProcessor:
             return ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
     
     def _create_highlight_title(self, text: str, duration: float = 1.0) -> VideoFileClip:
-        """Create highlight title screen"""
+        """Create highlight title screen with proper numbering"""
         try:
             # Create black background
             bg = ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
             
-            # Create highlight text
+            # Create highlight text with proper formatting
             title = TextClip(
                 text,
-                fontsize=100,
+                fontsize=120,
                 color='#FF6B35',
                 font='Arial-Bold',
                 stroke_color='white',
-                stroke_width=3
+                stroke_width=4
             ).set_position('center').set_duration(duration)
             
+            # Create subtitle
+            subtitle = TextClip(
+                "ANALYSIS FRAME",
+                fontsize=60,
+                color='white',
+                font='Arial'
+            ).set_position(('center', 600)).set_duration(duration)
+            
             # Create composite
-            highlight = CompositeVideoClip([bg, title])
+            highlight = CompositeVideoClip([bg, title, subtitle])
             return highlight
             
         except Exception as e:
@@ -222,6 +230,9 @@ class VideoProcessor:
                     landmark_drawing_spec=self.mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=3, circle_radius=4),
                     connection_drawing_spec=self.mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=2)
                 )
+                
+                # Add head pointer
+                annotated_frame = self._add_head_pointer(annotated_frame, results.pose_landmarks)
                 
                 # Add error arrow pointing to specific joint
                 annotated_frame = self._add_error_arrow(annotated_frame, results.pose_landmarks, problem_location)
@@ -284,22 +295,61 @@ class VideoProcessor:
             print(f"⚠️ Error arrow failed: {e}")
             return frame
     
-    def _add_analysis_text(self, frame, feedback: str, problem_location: str):
-        """Add analysis text overlay"""
+    def _add_head_pointer(self, frame, landmarks):
+        """Add a pointer over the fighter's head"""
         try:
-            # Add background rectangle
-            cv2.rectangle(frame, (50, 50), (frame.shape[1]-50, 200), (0, 0, 0, 180), -1)
+            if not landmarks:
+                return frame
             
-            # Add problem location text
-            cv2.putText(frame, f"Problem: {problem_location.upper()}", (70, 90), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
+            # Get head position (nose landmark)
+            head_landmark = landmarks.landmark[0]  # nose
+            
+            # Convert to pixel coordinates
+            h, w, _ = frame.shape
+            x = int(head_landmark.x * w)
+            y = int(head_landmark.y * h)
+            
+            # Draw pointer above head
+            pointer_y = max(50, y - 80)  # 80 pixels above head, minimum 50 from top
+            
+            # Draw arrow pointing down to head
+            cv2.arrowedLine(frame, (x, pointer_y), (x, y-20), (255, 0, 0), 4, tipLength=0.3)
+            
+            # Draw circle around head
+            cv2.circle(frame, (x, y), 25, (255, 0, 0), 3)
+            
+            # Add "FIGHTER" text above pointer
+            cv2.putText(frame, "FIGHTER", (x-40, pointer_y-20), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
+            
+            return frame
+            
+        except Exception as e:
+            print(f"⚠️ Head pointer failed: {e}")
+            return frame
+    
+    def _add_analysis_text(self, frame, feedback: str, problem_location: str):
+        """Add analysis text overlay - centered at bottom with bold Montserrat"""
+        try:
+            h, w, _ = frame.shape
+            
+            # Create semi-transparent background at bottom
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (0, h-150), (w, h), (0, 0, 0, 180), -1)
+            frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
+            
+            # Add problem location text (top of bottom section)
+            cv2.putText(frame, f"PROBLEM: {problem_location.upper()}", 
+                       (w//2, h-120), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
+            cv2.putText(frame, f"PROBLEM: {problem_location.upper()}", 
+                       (w//2, h-120), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 1)
             
             # Wrap feedback text
             words = feedback.split()
             lines = []
             current_line = ""
             for word in words:
-                if len(current_line + word) < 50:
+                if len(current_line + word) < 40:
                     current_line += word + " "
                 else:
                     lines.append(current_line)
@@ -307,10 +357,13 @@ class VideoProcessor:
             if current_line:
                 lines.append(current_line)
             
-            # Add wrapped text
-            for i, line in enumerate(lines[:3]):  # Max 3 lines
-                cv2.putText(frame, line, (70, 130 + i*35), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+            # Add wrapped feedback text (centered)
+            for i, line in enumerate(lines[:2]):  # Max 2 lines
+                y_pos = h - 80 + (i * 30)
+                cv2.putText(frame, line, (w//2, y_pos), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+                cv2.putText(frame, line, (w//2, y_pos), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 1)
             
             return frame
             
@@ -318,7 +371,7 @@ class VideoProcessor:
             print(f"⚠️ Analysis text failed: {e}")
             return frame
     
-    def _create_slow_motion_clip(self, video: VideoFileClip, highlight: Dict, slow_factor: float = 0.7) -> VideoFileClip:
+    def _create_slow_motion_clip(self, video: VideoFileClip, highlight: Dict, slow_factor: float = 0.5) -> VideoFileClip:
         """Create slow-motion clip with captions and TTS"""
         try:
             timestamp = highlight.get('timestamp', '00:00')
@@ -338,10 +391,10 @@ class VideoProcessor:
             # Extract video clip
             video_clip = video.subclip(start_time, end_time)
             
-            # Apply slow motion
+            # Apply slow motion (0.5x speed)
             slow_clip = video_clip.speedx(slow_factor)
             
-            # Create caption overlay
+            # Create caption overlay with TTS text
             caption_clip = self._create_caption_overlay(feedback, action, slow_clip.duration)
             
             # Combine video and captions
@@ -358,30 +411,42 @@ class VideoProcessor:
             return video.subclip(start_time, end_time)
     
     def _create_caption_overlay(self, feedback: str, action: str, duration: float) -> VideoFileClip:
-        """Create burn-in caption overlay"""
+        """Create burn-in caption overlay - centered at bottom"""
         try:
-            # Create background banner
-            banner = ColorClip(size=(1920, 120), color=(0, 0, 0, 180), duration=duration)
+            # Create background banner at bottom
+            banner = ColorClip(size=(1920, 200), color=(0, 0, 0, 200), duration=duration)
             banner = banner.set_position(('center', 'bottom'))
             
-            # Create feedback text
+            # Create feedback text (main caption)
             feedback_text = TextClip(
-                feedback[:80] + "..." if len(feedback) > 80 else feedback,
-                fontsize=35,
+                feedback[:100] + "..." if len(feedback) > 100 else feedback,
+                fontsize=45,
                 color='white',
-                font='Arial-Bold'
-            ).set_position(('center', 1080-100)).set_duration(duration)
+                font='Arial-Bold',
+                stroke_color='black',
+                stroke_width=2
+            ).set_position(('center', 1080-150)).set_duration(duration)
             
-            # Create action text
+            # Create action text (subtitle)
             action_text = TextClip(
-                f"Action: {action}",
-                fontsize=25,
+                f"ACTION: {action}",
+                fontsize=35,
                 color='#FF6B35',
-                font='Arial'
+                font='Arial-Bold',
+                stroke_color='black',
+                stroke_width=1
+            ).set_position(('center', 1080-80)).set_duration(duration)
+            
+            # Create TTS indicator
+            tts_indicator = TextClip(
+                "🎤 TTS NARRATION",
+                fontsize=25,
+                color='#00FF00',
+                font='Arial-Bold'
             ).set_position(('center', 1080-50)).set_duration(duration)
             
-            # Combine
-            captions = CompositeVideoClip([banner, feedback_text, action_text])
+            # Combine all elements
+            captions = CompositeVideoClip([banner, feedback_text, action_text, tts_indicator])
             return captions
             
         except Exception as e:
