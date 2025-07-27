@@ -89,44 +89,67 @@ class VideoProcessor:
                 )
                 final_clips.append(highlight_clip)
                 print(f"✅ Highlight clip {i+1} added to final_clips")
+                
+                # Add 1.5 second gap between highlights (except after the last one)
+                if i < len(highlights) - 1:
+                    print(f"⏸️ Adding 1.5s gap after highlight {i+1}...")
+                    gap_clip = self._create_gap_clip(source_width, source_height, source_fps, duration=1.5)
+                    final_clips.append(gap_clip)
+                    print(f"✅ Gap clip added after highlight {i+1}")
             
+            # --- START OF NEW, CRITICAL FIX ---
+            print(f"🛡️ Starting Resolution Safety Check for {len(final_clips)} clips...")
+            enforced_clips = []
+            target_size = (source_width, source_height) # The one true resolution
+
+            for i, clip in enumerate(final_clips):
+                # Check if the clip's size matches the target size
+                if clip.size != [target_size[0], target_size[1]]:
+                    print(f"⚠️ Clip {i} has mismatched size {clip.size}. Enforcing target size {target_size}.")
+                    # Explicitly resize the clip to the correct dimensions
+                    resized_clip = clip.resize(newsize=target_size)
+                    enforced_clips.append(resized_clip)
+                    # It's good practice to close the old, un-resized clip to free memory
+                    clip.close()
+                else:
+                    # The clip is already the correct size, just add it to the new list
+                    print(f"✅ Clip {i} has correct size {clip.size}.")
+                    enforced_clips.append(clip)
+
+            print("✅ Resolution Safety Check complete. All clips are now the correct size.")
+            # --- END OF NEW, CRITICAL FIX ---
+
             # CRITICAL: Concatenate all clips in correct order
-            if final_clips:
-                print(f"🎬 Concatenating {len(final_clips)} clips...")
-                final_video = concatenate_videoclips(final_clips)
+            if enforced_clips:
+                print(f"🎬 Concatenating {len(enforced_clips)} resolution-enforced clips...")
+                final_video = concatenate_videoclips(enforced_clips)
                 
                 # Write final video with proper codec
                 final_video.write_videofile(
                     output_path,
                     codec="libx264",
                     audio_codec="aac",
-                    fps=source_fps,
+                    temp_audiofile="temp-audio.m4a",
+                    remove_temp=True,
                     verbose=False,
                     logger=None
                 )
                 
                 # Cleanup
                 final_video.close()
-                for clip in final_clips:
-                    clip.close()
+                source_clip.close()
                 
-                print(f"✅ Surgical video processing complete: {output_path}")
+                print(f"✅ Final video created: {output_path}")
                 return output_path
             else:
-                raise ValueError("No valid clips were processed")
+                print("❌ No clips to concatenate")
+                return None
                 
         except Exception as e:
-            print(f"❌ Surgical video processing failed: {e}")
+            print(f"❌ Video processing failed: {e}")
             import traceback
             traceback.print_exc()
-            # Fallback: copy original video
-            import shutil
-            shutil.copy2(video_path, output_path)
-            return output_path
-        finally:
-            # Cleanup source clip
-            if 'source_clip' in locals():
-                source_clip.close()
+            return None
 
     def _create_single_highlight_clip(self, source_clip, highlight, user_name, source_fps):
         """
@@ -586,3 +609,15 @@ class VideoProcessor:
             import shutil
             shutil.copy2(video_path, output_path)
             return output_path 
+
+    def _create_gap_clip(self, width: int, height: int, fps: float, duration: float = 1.5):
+        """Create a silent gap clip between highlights"""
+        try:
+            # Create a black background clip
+            gap_clip = ColorClip(size=(width, height), color=(0, 0, 0), duration=duration)
+            print(f"✅ Gap clip created: {width}x{height} for {duration}s")
+            return gap_clip
+        except Exception as e:
+            print(f"⚠️ Gap clip creation failed: {e}")
+            # Fallback: simple black clip
+            return ColorClip(size=(width, height), color=(0, 0, 0), duration=duration) 

@@ -6,17 +6,29 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <meta name="color-scheme" content="dark">
     <title>AI Fight Coach - Professional Boxing Analysis</title>
-    <link rel="stylesheet" href="style.css?v=2.0">
+    <link rel="stylesheet" href="style.css?v=2.1">
     <style>
-        /* Cache-busting version: 2.0 - Black, Red, Grey Theme */
+        /* Cache-busting version: 2.1 - Black, Red, Grey Theme (Dark Mode Optimized) */
+        
+        /* Force dark mode regardless of system preference */
+        :root {
+            color-scheme: dark;
+        }
+        
+        * {
+            color-scheme: dark;
+        }
+        
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 25%, #404040 50%, #2d2d2d 75%, #1a1a1a 100%);
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 25%, #404040 50%, #2d2d2d 75%, #1a1a1a 100%) !important;
             min-height: 100vh;
             padding: 20px;
             position: relative;
             overflow-x: hidden;
+            color: #ffffff !important;
         }
 
         /* Cool geometric background elements */
@@ -90,7 +102,7 @@
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.8) !important;
             backdrop-filter: blur(10px);
             border-radius: 20px;
             box-shadow: 
@@ -158,7 +170,7 @@
         }
 
         .upload-section {
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.8) !important;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 15px;
@@ -187,21 +199,21 @@
 
         .upload-text {
             font-size: 1.3rem;
-            color: #ffffff;
+            color: #ffffff !important;
             margin-bottom: 30px;
             position: relative;
             z-index: 1;
         }
 
         .file-info {
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.8) !important;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 10px;
             padding: 15px;
             margin: 20px 0;
             display: none;
-            color: white;
+            color: white !important;
         }
 
         .upload-btn {
@@ -258,7 +270,7 @@
         }
 
         .analysis-option {
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.8) !important;
             backdrop-filter: blur(10px);
             border: 2px solid rgba(220, 20, 60, 0.3);
             border-radius: 15px;
@@ -269,7 +281,7 @@
             position: relative;
             overflow: hidden;
             flex: 1;
-            color: white;
+            color: white !important;
         }
 
         .analysis-option::before {
@@ -296,7 +308,7 @@
         .analysis-option.selected {
             border-color: #dc143c;
             background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
-            color: white;
+            color: white !important;
         }
 
         .analysis-option-icon {
@@ -309,24 +321,24 @@
             font-size: 1.2rem;
             margin-bottom: 10px;
             font-weight: 600;
-            color: white;
+            color: white !important;
         }
 
         .analysis-option p {
             font-size: 0.9rem;
             opacity: 0.8;
-            color: white;
+            color: white !important;
         }
 
         .guidelines-section {
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.8) !important;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 10px;
             padding: 20px;
             margin: 20px 0;
             text-align: left;
-            color: white;
+            color: white !important;
         }
 
         .guidelines-title {
@@ -353,7 +365,7 @@
         }
 
         .guideline-text {
-            color: #ffffff;
+            color: #ffffff !important;
             font-size: 0.95rem;
         }
 
@@ -1169,52 +1181,103 @@
                 font-size: 1.1rem;
             }
 
-            /* Mobile Slideshow for Analysis Options */
+            /* Survey-Style Mobile Analysis Options */
             .analysis-options {
                 display: flex;
-                flex-direction: row;
-                gap: 0;
+                flex-direction: column;
+                gap: 12px;
                 margin: 30px 0;
-                overflow-x: auto;
-                scroll-snap-type: x mandatory;
-                scrollbar-width: none; /* Firefox */
-                -ms-overflow-style: none; /* IE and Edge */
                 padding: 0 10px;
             }
 
-            .analysis-options::-webkit-scrollbar {
-                display: none; /* Chrome, Safari, Opera */
-            }
-
             .analysis-option {
-                flex: 0 0 85%;
-                scroll-snap-align: center;
-                margin-right: 15px;
-                padding: 30px 20px;
-                min-height: 200px;
+                flex: none;
+                padding: 20px;
+                border-radius: 12px;
+                border: 2px solid rgba(220, 20, 60, 0.3);
+                background: rgba(0, 0, 0, 0.8) !important;
+                position: relative;
+                transition: all 0.3s ease;
                 display: flex;
-                flex-direction: column;
-                justify-content: center;
                 align-items: center;
+                gap: 15px;
+                min-height: auto;
             }
 
-            .analysis-option:last-child {
-                margin-right: 0;
+            .analysis-option::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 4px;
+                height: 100%;
+                background: linear-gradient(180deg, #dc143c, #8b0000);
+                border-radius: 2px 0 0 2px;
+                opacity: 0;
+                transition: opacity 0.3s ease;
             }
 
-            .analysis-option h3 {
-                font-size: 1.3rem;
-                margin-bottom: 15px;
+            .analysis-option:hover {
+                transform: translateX(5px);
+                border-color: #dc143c;
+                box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
             }
 
-            .analysis-option p {
-                font-size: 1rem;
-                text-align: center;
+            .analysis-option:hover::before {
+                opacity: 1;
+            }
+
+            .analysis-option.selected {
+                border-color: #dc143c;
+                background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%) !important;
+                transform: translateX(5px);
+                box-shadow: 0 6px 20px rgba(220, 20, 60, 0.4);
+            }
+
+            .analysis-option.selected::before {
+                opacity: 1;
             }
 
             .analysis-option-icon {
-                font-size: 3rem;
-                margin-bottom: 20px;
+                font-size: 2rem;
+                margin-bottom: 0;
+                flex-shrink: 0;
+            }
+
+            .analysis-option-content {
+                flex: 1;
+                text-align: left;
+            }
+
+            .analysis-option h3 {
+                font-size: 1.1rem;
+                margin-bottom: 5px;
+                color: white !important;
+            }
+
+            .analysis-option p {
+                font-size: 0.85rem;
+                opacity: 0.8;
+                color: white !important;
+                margin: 0;
+            }
+
+            /* Selection indicator */
+            .analysis-option::after {
+                content: '✓';
+                position: absolute;
+                right: 15px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 1.2rem;
+                color: #dc143c;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            }
+
+            .analysis-option.selected::after {
+                opacity: 1;
+                color: white;
             }
 
             /* Fix the "What This Tool Does" Feature Grid */
@@ -1338,21 +1401,20 @@
             }
 
             .analysis-option {
-                flex: 0 0 90%;
-                padding: 25px 15px;
-                min-height: 180px;
+                padding: 15px;
+                gap: 12px;
             }
 
             .analysis-option h3 {
-                font-size: 1.2rem;
+                font-size: 1rem;
             }
 
             .analysis-option p {
-                font-size: 0.9rem;
+                font-size: 0.8rem;
             }
 
             .analysis-option-icon {
-                font-size: 2.5rem;
+                font-size: 1.8rem;
             }
 
             .feature-list {
@@ -1392,23 +1454,31 @@
                     <div class="analysis-options">
                         <div class="analysis-option" data-type="everything">
                             <span class="analysis-option-icon">🥊</span>
-                            <h3>Complete Analysis</h3>
-                            <p>Everything - Defense, Punches, Footwork</p>
+                            <div class="analysis-option-content">
+                                <h3>Complete Analysis</h3>
+                                <p>Everything - Defense, Punches, Footwork</p>
+                            </div>
                         </div>
                         <div class="analysis-option" data-type="head_movement">
                             <span class="analysis-option-icon">🛡️</span>
-                            <h3>Defense</h3>
-                            <p>Guard, Blocks, Slips, Rolls</p>
+                            <div class="analysis-option-content">
+                                <h3>Defense</h3>
+                                <p>Guard, Blocks, Slips, Rolls</p>
+                            </div>
                         </div>
                         <div class="analysis-option" data-type="punch_techniques">
                             <span class="analysis-option-icon">👊</span>
-                            <h3>Punch Techniques</h3>
-                            <p>Power & Mechanics</p>
+                            <div class="analysis-option-content">
+                                <h3>Punch Techniques</h3>
+                                <p>Power & Mechanics</p>
+                            </div>
                         </div>
                         <div class="analysis-option" data-type="footwork">
                             <span class="analysis-option-icon">👟</span>
-                            <h3>Footwork</h3>
-                            <p>Movement & Angles</p>
+                            <div class="analysis-option-content">
+                                <h3>Footwork</h3>
+                                <p>Movement & Angles</p>
+                            </div>
                         </div>
                     </div>
 
