@@ -415,6 +415,47 @@
         #submit-feedback:hover {
             transform: translateY(-2px);
         }
+
+        /* New styles for Best Practices */
+        .best-practices {
+            background: #f0f0f0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: left;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .best-practices h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+
+        .guidelines {
+            list-style: none;
+            padding: 0;
+        }
+
+        .guideline {
+            background: #e0e0e0;
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            font-size: 1rem;
+            color: #333;
+            line-height: 1.4;
+            position: relative;
+            padding-left: 30px;
+        }
+
+        .guideline::before {
+            content: "•";
+            position: absolute;
+            left: 10px;
+            color: #667eea;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -427,39 +468,62 @@
 
         <div class="main-content">
             <div class="upload-section" id="upload-section">
-                <div class="upload-icon">📹</div>
-                <div class="upload-text">Upload your boxing video for AI analysis</div>
+                <h2>Upload Your Boxing Video</h2>
                 
-                <div class="prompt-selection" style="margin: 20px 0;">
-                    <label style="display: block; margin-bottom: 25px; font-weight: 700; color: #333; text-align: center; font-size: 2.2rem; text-transform: uppercase; letter-spacing: 1px; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Choose Your Analysis Focus</label>
-                    <div class="prompt-options" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div class="prompt-option" data-value="everything" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 15px; cursor: pointer; text-align: center; border: 3px solid #667eea; transition: all 0.3s ease;">
-                            <div style="font-size: 2rem; margin-bottom: 10px;">🥊</div>
-                            <div style="font-weight: 600; margin-bottom: 5px;">Complete Analysis</div>
-                            <div style="font-size: 0.9rem; opacity: 0.9;">Everything - Defense, Punches, Footwork</div>
+                <!-- Best Practices Section -->
+                <div class="best-practices">
+                    <h3>🎬 How to Film for the Best Results</h3>
+                    <div class="guidelines">
+                        <div class="guideline">
+                            <strong>📐 Angle:</strong> Position the camera at chest height, directly in front of you. Avoid high or low angles.
                         </div>
-                        <div class="prompt-option" data-value="head_movement" style="background: white; color: #333; padding: 20px; border-radius: 15px; cursor: pointer; text-align: center; border: 3px solid #e1e5e9; transition: all 0.3s ease;">
-                            <div style="font-size: 2rem; margin-bottom: 10px;">🛡️</div>
-                            <div style="font-weight: 600; margin-bottom: 5px;">Defense</div>
-                            <div style="font-size: 0.9rem; opacity: 0.7;">Guard, Blocks, Slips, Rolls</div>
+                        <div class="guideline">
+                            <strong>💡 Lighting:</strong> Ensure you are well-lit from the front. Avoid backlighting (e.g., standing in front of a bright window).
                         </div>
-                        <div class="prompt-option" data-value="punch_techniques" style="background: white; color: #333; padding: 20px; border-radius: 15px; cursor: pointer; text-align: center; border: 3px solid #e1e5e9; transition: all 0.3s ease;">
-                            <div style="font-size: 2rem; margin-bottom: 10px;">💪</div>
-                            <div style="font-weight: 600; margin-bottom: 5px;">Punch Techniques</div>
-                            <div style="font-size: 0.9rem; opacity: 0.7;">Power & Mechanics</div>
+                        <div class="guideline">
+                            <strong>📱 Framing:</strong> Keep your entire body, from head to toe, within the frame throughout the entire video.
                         </div>
-                        <div class="prompt-option" data-value="footwork" style="background: white; color: #333; padding: 20px; border-radius: 15px; cursor: pointer; text-align: center; border: 3px solid #e1e5e9; transition: all 0.3s ease;">
-                            <div style="font-size: 2rem; margin-bottom: 10px;">👟</div>
-                            <div style="font-weight: 600; margin-bottom: 5px;">Footwork</div>
-                            <div style="font-size: 0.9rem; opacity: 0.7;">Movement & Angles</div>
+                        <div class="guideline">
+                            <strong>👤 Focus:</strong> The AI performs best with only one person in the video. Please ensure you are alone in the shot.
+                        </div>
+                        <div class="guideline">
+                            <strong>⏱️ Duration:</strong> Keep your video concise. The maximum upload duration is <strong>30 seconds</strong>.
                         </div>
                     </div>
                 </div>
                 
-                <input type="file" id="fileInput" accept="video/*">
-                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Choose Video File</button>
-                <button class="upload-btn" id="startBtn" onclick="startAnalysis()" disabled style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">Start Analysis</button>
-                <div class="file-info" id="fileInfo"></div>
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="prompt-selection" style="margin: 20px 0;">
+                        <label style="display: block; margin-bottom: 25px; font-weight: 700; color: #333; text-align: center; font-size: 2.2rem; text-transform: uppercase; letter-spacing: 1px; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Choose Your Analysis Focus</label>
+                        <div class="prompt-options" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                            <div class="prompt-option" data-value="everything" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 15px; cursor: pointer; text-align: center; border: 3px solid #667eea; transition: all 0.3s ease;">
+                                <div style="font-size: 2rem; margin-bottom: 10px;">🥊</div>
+                                <div style="font-weight: 600; margin-bottom: 5px;">Complete Analysis</div>
+                                <div style="font-size: 0.9rem; opacity: 0.9;">Everything - Defense, Punches, Footwork</div>
+                            </div>
+                            <div class="prompt-option" data-value="head_movement" style="background: white; color: #333; padding: 20px; border-radius: 15px; cursor: pointer; text-align: center; border: 3px solid #e1e5e9; transition: all 0.3s ease;">
+                                <div style="font-size: 2rem; margin-bottom: 10px;">🛡️</div>
+                                <div style="font-weight: 600; margin-bottom: 5px;">Defense</div>
+                                <div style="font-size: 0.9rem; opacity: 0.7;">Guard, Blocks, Slips, Rolls</div>
+                            </div>
+                            <div class="prompt-option" data-value="punch_techniques" style="background: white; color: #333; padding: 20px; border-radius: 15px; cursor: pointer; text-align: center; border: 3px solid #e1e5e9; transition: all 0.3s ease;">
+                                <div style="font-size: 2rem; margin-bottom: 10px;">💪</div>
+                                <div style="font-weight: 600; margin-bottom: 5px;">Punch Techniques</div>
+                                <div style="font-size: 0.9rem; opacity: 0.7;">Power & Mechanics</div>
+                            </div>
+                            <div class="prompt-option" data-value="footwork" style="background: white; color: #333; padding: 20px; border-radius: 15px; cursor: pointer; text-align: center; border: 3px solid #e1e5e9; transition: all 0.3s ease;">
+                                <div style="font-size: 2rem; margin-bottom: 10px;">👟</div>
+                                <div style="font-weight: 600; margin-bottom: 5px;">Footwork</div>
+                                <div style="font-size: 0.9rem; opacity: 0.7;">Movement & Angles</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <input type="file" id="fileInput" accept="video/*">
+                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Choose Video File</button>
+                    <button class="upload-btn" id="startBtn" onclick="startAnalysis()" disabled style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">Start Analysis</button>
+                    <div class="file-info" id="fileInfo"></div>
+                </form>
             </div>
 
             <div class="progress-section" id="progress-section">

@@ -1,121 +1,142 @@
 """
-Video Processor - Professional Boxing Analysis System
-Creates cinematic highlight reels with MediaPipe pose analysis
+AI Boxing Analysis Video Processor
+Complete rewrite from scratch using OpenCV, MediaPipe, and Pillow
+Professional video analysis with dynamic scaling and sentiment-based coloring
 """
 
 import os
-import shutil
 import cv2
 import mediapipe as mp
 import numpy as np
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import tempfile
 import time
 import traceback
-from moviepy.editor import VideoFileClip, CompositeVideoClip, ColorClip, TextClip, concatenate_videoclips, AudioFileClip
+from PIL import Image, ImageDraw, ImageFont
+import json
+import shutil
 
 class VideoProcessor:
-    """Professional video processor for boxing analysis"""
+    """Professional video processor for boxing analysis with dynamic scaling"""
     
     def __init__(self):
         self.supported_formats = ['.mp4', '.avi', '.mov', '.mkv']
         
-        # Try to initialize MediaPipe with fallback
+        # Initialize MediaPipe Pose
         try:
-            import cv2
-            import mediapipe as mp
-            import numpy as np
-            
             self.mp_pose = mp.solutions.pose
             self.mp_drawing = mp.solutions.drawing_utils
-            self.cv2 = cv2
-            self.np = np
             self.mediapipe_available = True
-            print("✅ VideoProcessor initialized (Professional Boxing Analysis with MediaPipe)")
-            
-        except ImportError as e:
-            print(f"⚠️ MediaPipe import failed: {e}")
-            self.mediapipe_available = False
-            print("✅ VideoProcessor initialized (Professional Boxing Analysis - MediaPipe fallback mode)")
+            print("✅ VideoProcessor initialized with MediaPipe support")
         except Exception as e:
             print(f"⚠️ MediaPipe initialization failed: {e}")
             self.mediapipe_available = False
-            print("✅ VideoProcessor initialized (Professional Boxing Analysis - MediaPipe fallback mode)")
+        
+        # Color scheme for sentiment-based coloring
+        self.colors = {
+            'problem': (255, 65, 54),      # RED #FF4136
+            'action': (46, 204, 64),       # GREEN #2ECC40
+            'neutral': (255, 255, 255),    # WHITE #FFFFFF
+            'outline': (0, 0, 0),          # BLACK for text outlines
+            'skeleton_connection': (173, 216, 230),  # Light blue
+            'skeleton_node': (255, 255, 255),        # White
+            'arrow': (255, 0, 0),          # Red arrow
+            'head_pointer': (0, 123, 255)  # Blue head pointer
+        }
+        
+        # Font configuration
+        self.font_path = None
+        self.font_size = 48
+        self.try_load_fonts()
     
-    def create_highlight_video(self, video_path: str, highlights: List[Dict], output_path: str) -> str:
-        """Create professional boxing analysis video with proper structure"""
+    def try_load_fonts(self):
+        """Try to load Montserrat font, fallback to system fonts"""
+        font_paths = [
+            "/usr/share/fonts/truetype/msttcorefonts/Montserrat-SemiBold.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+            "C:/Windows/Fonts/arial.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        ]
+        
+        for path in font_paths:
+            if os.path.exists(path):
+                self.font_path = path
+                print(f"✅ Font loaded: {path}")
+                break
+        
+        if not self.font_path:
+            print("⚠️ Using system default font")
+    
+    def create_highlight_video(self, video_path: str, highlights: List[Dict], output_path: str, user_name: str = "FIGHTER") -> str:
+        """Create professional boxing analysis video with complete structure"""
         try:
             print(f"🎬 Creating professional boxing analysis: {video_path}")
             print(f"📊 Number of highlights: {len(highlights)}")
+            print(f"👤 User: {user_name}")
             
-            # Load original video
-            video = VideoFileClip(video_path)
-            duration = video.duration
-            fps = video.fps
-            print(f"📊 Video: {duration}s at {fps}fps")
+            # Load and analyze video
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                raise Exception("Could not open video file")
             
-            # Create clips list
-            all_clips = []
+            # Get video properties
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            duration = total_frames / fps
             
-            # 1. OPENING CARD (1.5 seconds)
+            print(f"📊 Video: {width}x{height}, {fps}fps, {duration:.2f}s")
+            
+            # Calculate aspect ratio and scaling factors
+            aspect_ratio = width / height
+            is_vertical = height > width
+            
+            # Create output video writer
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            
+            # Generate video segments
+            all_segments = []
+            
+            # 1. Opening Card (1.5 seconds)
             print("🎬 Creating opening card...")
-            opening_clip = self._create_opening_card(duration=1.5)
-            all_clips.append(opening_clip)
+            opening_frames = self._create_opening_card(width, height, fps, 1.5)
+            all_segments.extend(opening_frames)
             
-            # 2. FOR EACH HIGHLIGHT - USE DIFFERENT CLIPS
+            # 2. Process each highlight
             for i, highlight in enumerate(highlights):
                 print(f"🎯 Processing highlight {i+1}/{len(highlights)}")
                 
-                # a. Title Card: "HIGHLIGHT <n>" (1 second)
-                print(f"📝 Creating title card for highlight {i+1}...")
-                highlight_title = self._create_highlight_title(f"HIGHLIGHT {i+1}", duration=1.0)
-                all_clips.append(highlight_title)
+                # Title card (1 second)
+                title_frames = self._create_title_card(f"HIGHLIGHT {i+1}", width, height, fps, 1.0)
+                all_segments.extend(title_frames)
                 
-                # b. Analysis Frame: Freeze-frame with MediaPipe (3 seconds)
-                print(f"🔍 Creating analysis frame for highlight {i+1}...")
-                freeze_frame = self._create_mediapipe_analysis_frame(
-                    video_path=video_path,
-                    highlight=highlight,
-                    duration=3.0
+                # Analysis frame (3 seconds freeze-frame)
+                analysis_frames = self._create_analysis_frame(
+                    cap, highlight, width, height, fps, 3.0, user_name
                 )
-                all_clips.append(freeze_frame)
+                all_segments.extend(analysis_frames)
                 
-                # c. Slow Motion Clip: Different clip for each highlight (6 seconds at 0.5x)
-                print(f"🎬 Creating slow motion clip for highlight {i+1}...")
-                slow_motion_clip = self._create_slow_motion_clip(
-                    video=video,
-                    highlight=highlight,
-                    slow_factor=0.5,
-                    clip_duration=6.0  # 6 seconds total
+                # Slow motion clip (6 seconds at 0.5x speed)
+                slow_motion_frames = self._create_slow_motion_clip(
+                    cap, highlight, width, height, fps, 6.0, user_name
                 )
-                all_clips.append(slow_motion_clip)
+                all_segments.extend(slow_motion_frames)
             
-            # 3. END CARD (1.5 seconds)
+            # 3. End Card (1.5 seconds)
             print("🎬 Creating end card...")
-            end_clip = self._create_end_card(duration=1.5)
-            all_clips.append(end_clip)
+            end_frames = self._create_end_card(width, height, fps, 1.5)
+            all_segments.extend(end_frames)
             
-            # Concatenate all clips
-            print(f"🎬 Concatenating {len(all_clips)} clips...")
-            final_video = concatenate_videoclips(all_clips, method="compose")
+            # Write all frames to video
+            print(f"💾 Writing {len(all_segments)} frames to video...")
+            for frame in all_segments:
+                out.write(frame)
             
-            # Write final video
-            print(f"💾 Writing final analysis video...")
-            final_video.write_videofile(
-                output_path,
-                codec='libx264',
-                audio_codec='aac',
-                temp_audiofile='temp-audio.m4a',
-                remove_temp=True,
-                verbose=False,
-                logger=None
-            )
-            
-            # Clean up
-            video.close()
-            final_video.close()
-            for clip in all_clips:
-                clip.close()
+            # Cleanup
+            cap.release()
+            out.release()
             
             print(f"✅ Professional boxing analysis created: {output_path}")
             return output_path
@@ -125,163 +146,174 @@ class VideoProcessor:
             print(f"📋 Traceback: {traceback.format_exc()}")
             # Fallback to simple copy
             shutil.copy2(video_path, output_path)
-            return video_path
+            return output_path
     
-    def _create_opening_card(self, duration: float = 1.5) -> VideoFileClip:
-        """Create opening card with "AI Boxing Analysis" text"""
-        try:
+    def _create_opening_card(self, width: int, height: int, fps: float, duration: float) -> List[np.ndarray]:
+        """Create opening card with title and subtitle"""
+        frames = []
+        num_frames = int(fps * duration)
+        
+        for _ in range(num_frames):
             # Create black background
-            bg = ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
+            frame = np.zeros((height, width, 3), dtype=np.uint8)
             
-            # Create title text with nice design
-            title = TextClip(
-                "AI Boxing Analysis",
-                fontsize=120,
-                color='white',
-                font='Arial-Bold',
-                stroke_color='#FF6B35',
-                stroke_width=4
-            ).set_position('center').set_duration(duration)
+            # Add title text
+            title = "AI Boxing Analysis"
+            subtitle = "Professional Fight Analysis"
             
-            # Create subtitle
-            subtitle = TextClip(
-                "Professional Fight Analysis",
-                fontsize=60,
-                color='#FF6B35',
-                font='Arial'
-            ).set_position(('center', 600)).set_duration(duration)
+            # Calculate text positions (centered)
+            title_y = height // 2 - 50
+            subtitle_y = height // 2 + 50
             
-            # Create composite
-            opening = CompositeVideoClip([bg, title, subtitle])
-            return opening
+            # Draw text with outline
+            self._draw_text_with_outline(frame, title, width//2, title_y, 
+                                       self.colors['neutral'], 2.0, 4)
+            self._draw_text_with_outline(frame, subtitle, width//2, subtitle_y, 
+                                       self.colors['action'], 1.0, 2)
             
-        except Exception as e:
-            print(f"⚠️ Opening card failed: {e}")
-            return ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
+            frames.append(frame)
+        
+        return frames
     
-    def _create_highlight_title(self, text: str, duration: float = 1.0) -> VideoFileClip:
-        """Create highlight title screen with proper numbering"""
-        try:
+    def _create_title_card(self, title: str, width: int, height: int, fps: float, duration: float) -> List[np.ndarray]:
+        """Create title card for each highlight"""
+        frames = []
+        num_frames = int(fps * duration)
+        
+        for _ in range(num_frames):
             # Create black background
-            bg = ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
+            frame = np.zeros((height, width, 3), dtype=np.uint8)
             
-            # Create highlight text with proper formatting
-            title = TextClip(
-                text,
-                fontsize=120,
-                color='#FF6B35',
-                font='Arial-Bold',
-                stroke_color='white',
-                stroke_width=4
-            ).set_position('center').set_duration(duration)
+            # Draw title text
+            self._draw_text_with_outline(frame, title, width//2, height//2, 
+                                       self.colors['action'], 2.5, 6)
             
-            # Create subtitle
-            subtitle = TextClip(
-                "ANALYSIS FRAME",
-                fontsize=60,
-                color='white',
-                font='Arial'
-            ).set_position(('center', 600)).set_duration(duration)
-            
-            # Create composite
-            highlight = CompositeVideoClip([bg, title, subtitle])
-            return highlight
-            
-        except Exception as e:
-            print(f"⚠️ Highlight title failed: {e}")
-            return ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
+            frames.append(frame)
+        
+        return frames
     
-    def _create_mediapipe_analysis_frame(self, video_path: str, highlight: Dict, duration: float = 3.0) -> VideoFileClip:
-        """Create MediaPipe analysis frame with pose skeleton and arrow - DIFFERENT FRAME FOR EACH HIGHLIGHT"""
-        try:
-            timestamp = highlight.get('timestamp', '00:00')
-            problem_location = highlight.get('problem_location', 'general')
-            feedback = highlight.get('detailed_feedback', 'No feedback')
+    def _create_analysis_frame(self, cap: cv2.VideoCapture, highlight: Dict, 
+                             width: int, height: int, fps: float, duration: float, 
+                             user_name: str) -> List[np.ndarray]:
+        """Create analysis frame with MediaPipe pose skeleton and overlays"""
+        frames = []
+        num_frames = int(fps * duration)
+        
+        # Get timestamp and extract frame
+        timestamp = self._parse_timestamp(highlight.get('timestamp', '00:00'))
+        cap.set(cv2.CAP_PROP_POS_MSEC, timestamp * 1000)
+        ret, frame = cap.read()
+        
+        if not ret:
+            print(f"⚠️ Could not read frame at {timestamp}s")
+            # Create fallback frame
+            for _ in range(num_frames):
+                fallback_frame = self._create_fallback_frame(width, height, highlight)
+                frames.append(fallback_frame)
+            return frames
+        
+        # Process frame with MediaPipe if available
+        if self.mediapipe_available:
+            try:
+                processed_frame = self._process_frame_with_mediapipe(frame, highlight, user_name)
+            except Exception as e:
+                print(f"⚠️ MediaPipe processing failed: {e}")
+                processed_frame = frame
+        else:
+            processed_frame = frame
+        
+        # Add text overlays
+        processed_frame = self._add_analysis_text_overlay(processed_frame, highlight)
+        
+        # Repeat frame for duration
+        for _ in range(num_frames):
+            frames.append(processed_frame.copy())
+        
+        return frames
+    
+    def _process_frame_with_mediapipe(self, frame: np.ndarray, highlight: Dict, user_name: str) -> np.ndarray:
+        """Process frame with MediaPipe pose detection"""
+        # Initialize MediaPipe Pose
+        with self.mp_pose.Pose(
+            static_image_mode=True,
+            model_complexity=2,
+            enable_segmentation=True,
+            min_detection_confidence=0.5
+        ) as pose:
+            # Convert BGR to RGB
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = pose.process(rgb_frame)
             
-            # Parse timestamp and clamp to video length
-            highlight_time = self._parse_timestamp(timestamp)
+            # Create annotated frame
+            annotated_frame = frame.copy()
             
-            # Check if MediaPipe is available
-            if not self.mediapipe_available:
-                print(f"⚠️ MediaPipe not available, using fallback frame")
-                return self._create_fallback_frame(feedback, duration)
-            
-            # Extract frame at timestamp
-            cap = self.cv2.VideoCapture(video_path)
-            cap.set(self.cv2.CAP_PROP_POS_MSEC, highlight_time * 1000)
-            ret, frame = cap.read()
-            cap.release()
-            
-            if not ret:
-                print(f"⚠️ Could not read frame at {highlight_time}s")
-                return self._create_fallback_frame(feedback, duration)
-            
-            # Initialize MediaPipe Pose
-            with self.mp_pose.Pose(
-                static_image_mode=True,
-                model_complexity=2,
-                enable_segmentation=True,
-                min_detection_confidence=0.5
-            ) as pose:
-                # Convert BGR to RGB
-                rgb_frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
-                results = pose.process(rgb_frame)
-                
-                # Draw pose landmarks
-                annotated_frame = frame.copy()
+            if results.pose_landmarks:
+                # Draw pose skeleton
                 self.mp_drawing.draw_landmarks(
                     annotated_frame,
                     results.pose_landmarks,
                     self.mp_pose.POSE_CONNECTIONS,
-                    landmark_drawing_spec=self.mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=3, circle_radius=4),
-                    connection_drawing_spec=self.mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=2)
+                    landmark_drawing_spec=self.mp_drawing.DrawingSpec(
+                        color=self.colors['skeleton_node'], thickness=3, circle_radius=4
+                    ),
+                    connection_drawing_spec=self.mp_drawing.DrawingSpec(
+                        color=self.colors['skeleton_connection'], thickness=2
+                    )
                 )
                 
                 # Add head pointer
-                annotated_frame = self._add_head_pointer(annotated_frame, results.pose_landmarks)
+                annotated_frame = self._add_head_pointer(annotated_frame, results.pose_landmarks, user_name)
                 
-                # Add error arrow pointing to specific joint
+                # Add error arrow
+                problem_location = highlight.get('problem_location', 'general')
                 annotated_frame = self._add_error_arrow(annotated_frame, results.pose_landmarks, problem_location)
-                
-                # Add text overlay
-                annotated_frame = self._add_analysis_text(annotated_frame, feedback, problem_location)
-                
-                # Save frame
-                temp_frame_path = f"temp/analysis_frame_{int(highlight_time)}.jpg"
-                self.cv2.imwrite(temp_frame_path, annotated_frame)
-                
-                # Create video clip from frame
-                frame_clip = VideoFileClip(temp_frame_path).set_duration(duration)
-                return frame_clip
-                
-        except Exception as e:
-            print(f"⚠️ MediaPipe analysis failed: {e}")
-            return self._create_fallback_frame(feedback, duration)
-    
-    def _add_error_arrow(self, frame, landmarks, problem_location: str):
-        """Add red arrow pointing to specific body part"""
-        try:
-            if not landmarks:
-                return frame
             
+            return annotated_frame
+    
+    def _add_head_pointer(self, frame: np.ndarray, landmarks, user_name: str) -> np.ndarray:
+        """Add head pointer with user name"""
+        try:
+            # Get head position (nose landmark)
+            head_landmark = landmarks.landmark[0]  # nose
+            
+            # Convert to pixel coordinates
+            h, w, _ = frame.shape
+            x = int(head_landmark.x * w)
+            y = int(head_landmark.y * h)
+            
+            # Draw pointer above head
+            pointer_y = max(50, y - 80)
+            
+            # Draw arrow pointing down to head
+            cv2.arrowedLine(frame, (x, pointer_y), (x, y-20), 
+                           self.colors['head_pointer'], 4, tipLength=0.3)
+            
+            # Draw circle around head
+            cv2.circle(frame, (x, y), 25, self.colors['head_pointer'], 3)
+            
+            # Add user name above pointer
+            self._draw_text_with_outline(frame, user_name, x, pointer_y-20, 
+                                       self.colors['head_pointer'], 0.8, 2)
+            
+            return frame
+            
+        except Exception as e:
+            print(f"⚠️ Head pointer failed: {e}")
+            return frame
+    
+    def _add_error_arrow(self, frame: np.ndarray, landmarks, problem_location: str) -> np.ndarray:
+        """Add red arrow pointing to problem area"""
+        try:
             # Define landmark indices for different body parts
             body_parts = {
-                'head': 0,  # nose
-                'left_hand': 19,  # left wrist
-                'right_hand': 20,  # right wrist
-                'left_shoulder': 11,
-                'right_shoulder': 12,
-                'left_elbow': 13,
-                'right_elbow': 14,
-                'left_hip': 23,
-                'right_hip': 24,
-                'left_knee': 25,
-                'right_knee': 26,
-                'left_foot': 31,
-                'right_foot': 32
+                'head': 0, 'left_hand': 19, 'right_hand': 20,
+                'left_shoulder': 11, 'right_shoulder': 12,
+                'left_elbow': 13, 'right_elbow': 14,
+                'left_hip': 23, 'right_hip': 24,
+                'left_knee': 25, 'right_knee': 26,
+                'left_foot': 31, 'right_foot': 32
             }
             
-            # Get landmark position
             if problem_location in body_parts:
                 landmark_idx = body_parts[problem_location]
                 landmark = landmarks.landmark[landmark_idx]
@@ -292,244 +324,203 @@ class VideoProcessor:
                 y = int(landmark.y * h)
                 
                 # Draw red arrow pointing to the problem area
-                cv2.arrowedLine(frame, (x-80, y-80), (x, y), (0, 0, 255), 8, tipLength=0.4)
-                cv2.circle(frame, (x, y), 15, (0, 0, 255), -1)
-                
+                cv2.arrowedLine(frame, (x-80, y-80), (x, y), 
+                               self.colors['arrow'], 8, tipLength=0.4)
+                cv2.circle(frame, (x, y), 15, self.colors['arrow'], -1)
+            
             return frame
             
         except Exception as e:
             print(f"⚠️ Error arrow failed: {e}")
             return frame
     
-    def _add_head_pointer(self, frame, landmarks):
-        """Add a pointer over the fighter's head"""
-        try:
-            if not landmarks:
-                return frame
-            
-            # Get head position (nose landmark)
-            head_landmark = landmarks.landmark[0]  # nose
-            
-            # Convert to pixel coordinates
-            h, w, _ = frame.shape
-            x = int(head_landmark.x * w)
-            y = int(head_landmark.y * h)
-            
-            # Draw pointer above head
-            pointer_y = max(50, y - 80)  # 80 pixels above head, minimum 50 from top
-            
-            # Draw arrow pointing down to head
-            cv2.arrowedLine(frame, (x, pointer_y), (x, y-20), (255, 0, 0), 4, tipLength=0.3)
-            
-            # Draw circle around head
-            cv2.circle(frame, (x, y), 25, (255, 0, 0), 3)
-            
-            # Add "FIGHTER" text above pointer
-            cv2.putText(frame, "FIGHTER", (x-40, pointer_y-20), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
-            
-            return frame
-            
-        except Exception as e:
-            print(f"⚠️ Head pointer failed: {e}")
-            return frame
-    
-    def _add_analysis_text(self, frame, feedback: str, problem_location: str):
-        """Add analysis text overlay - centered at bottom with bold Montserrat"""
+    def _add_analysis_text_overlay(self, frame: np.ndarray, highlight: Dict) -> np.ndarray:
+        """Add analysis text overlay with sentiment-based coloring"""
         try:
             h, w, _ = frame.shape
             
-            # Create semi-transparent background at bottom (larger area)
+            # Create semi-transparent background at bottom
             overlay = frame.copy()
             cv2.rectangle(overlay, (0, h-200), (w, h), (0, 0, 0, 180), -1)
             frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
             
-            # Add problem location text (top of bottom section)
-            problem_text = f"PROBLEM: {problem_location.upper()}"
-            cv2.putText(frame, problem_text, 
-                       (w//2, h-160), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
-            cv2.putText(frame, problem_text, 
-                       (w//2, h-160), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 1)
-            
-            # Wrap feedback text (shorter lines to prevent cutoff)
-            words = feedback.split()
-            lines = []
-            current_line = ""
-            for word in words:
-                if len(current_line + word) < 35:  # Shorter lines
-                    current_line += word + " "
-                else:
-                    lines.append(current_line)
-                    current_line = word + " "
-            if current_line:
-                lines.append(current_line)
-            
-            # Add wrapped feedback text (centered, max 3 lines)
-            for i, line in enumerate(lines[:3]):  # Max 3 lines
-                y_pos = h - 120 + (i * 25)  # Closer spacing
-                cv2.putText(frame, line, (w//2, y_pos), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-                cv2.putText(frame, line, (w//2, y_pos), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 1)
-            
-            return frame
-            
-        except Exception as e:
-            print(f"⚠️ Analysis text failed: {e}")
-            return frame
-    
-    def _create_slow_motion_clip(self, video: VideoFileClip, highlight: Dict, slow_factor: float = 0.5, clip_duration: float = 6.0) -> VideoFileClip:
-        """Create slow-motion clip with captions and TTS - DIFFERENT CLIP FOR EACH HIGHLIGHT"""
-        try:
-            timestamp = highlight.get('timestamp', '00:00')
+            # Get text content
+            problem_location = highlight.get('problem_location', 'general')
             feedback = highlight.get('detailed_feedback', 'No feedback')
-            action = highlight.get('action_required', 'No action')
             
-            # Parse timestamp and clamp to video length
-            highlight_time = self._parse_timestamp(timestamp)
-            video_duration = video.duration
+            # Add problem location text
+            problem_text = f"PROBLEM: {problem_location.upper()}"
+            self._draw_text_with_outline(frame, problem_text, w//2, h-160, 
+                                       self.colors['neutral'], 1.2, 3)
             
-            # Calculate clip timing [t-3s, t+3s] with clamping
-            start_time = max(0, highlight_time - 3)
-            end_time = min(video_duration, highlight_time + 3)
+            # Add feedback text with sentiment coloring
+            self._draw_sentiment_text(frame, feedback, w//2, h-120, w)
             
-            # Ensure we get a 6-second clip (3 seconds before and after highlight)
-            actual_clip_duration = end_time - start_time
-            if actual_clip_duration < 6.0:
-                # Extend the clip if possible
-                extra_time = (6.0 - actual_clip_duration) / 2
-                start_time = max(0, start_time - extra_time)
-                end_time = min(video_duration, end_time + extra_time)
-            
-            print(f"🎯 Slow motion: {start_time}s - {end_time}s (original: {highlight_time}s)")
-            
-            # Extract video clip
-            video_clip = video.subclip(start_time, end_time)
-            
-            # Apply slow motion (0.5x speed)
-            slow_clip = video_clip.speedx(slow_factor)
-            
-            # Ensure the final clip is exactly 6 seconds
-            if slow_clip.duration > clip_duration:
-                slow_clip = slow_clip.subclip(0, clip_duration)
-            elif slow_clip.duration < clip_duration:
-                # Pad with black frames if needed
-                padding_duration = clip_duration - slow_clip.duration
-                padding = ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=padding_duration)
-                slow_clip = concatenate_videoclips([slow_clip, padding])
-            
-            # Create caption overlay with TTS text
-            caption_clip = self._create_caption_overlay(feedback, action, slow_clip.duration)
-            
-            # Combine video and captions
-            final_clip = CompositeVideoClip([slow_clip, caption_clip])
-            
-            return final_clip
+            return frame
             
         except Exception as e:
-            print(f"⚠️ Slow motion clip failed: {e}")
-            # Fallback to simple subclip
-            highlight_time = self._parse_timestamp(highlight.get('timestamp', '00:00'))
-            start_time = max(0, highlight_time - 3)
-            end_time = min(video.duration, highlight_time + 3)
-            return video.subclip(start_time, end_time)
+            print(f"⚠️ Analysis text overlay failed: {e}")
+            return frame
     
-    def _create_caption_overlay(self, feedback: str, action: str, duration: float) -> VideoFileClip:
-        """Create burn-in caption overlay - centered at bottom"""
-        try:
-            # Create background banner at bottom
-            banner = ColorClip(size=(1920, 200), color=(0, 0, 0, 200), duration=duration)
-            banner = banner.set_position(('center', 'bottom'))
+    def _draw_sentiment_text(self, frame: np.ndarray, text: str, x: int, y: int, width: int):
+        """Draw text with sentiment-based coloring"""
+        # Simple sentiment analysis
+        problem_keywords = ['problem', 'error', 'wrong', 'bad', 'poor', 'weak', 'flat', 'linear']
+        action_keywords = ['should', 'must', 'need', 'improve', 'better', 'correct', 'fix', 'maintain']
+        
+        words = text.split()
+        current_line = ""
+        line_y = y
+        max_width = width - 100  # Leave margins
+        
+        for word in words:
+            test_line = current_line + " " + word if current_line else word
             
-            # Create feedback text (main caption)
-            feedback_text = TextClip(
-                feedback[:100] + "..." if len(feedback) > 100 else feedback,
-                fontsize=45,
-                color='white',
-                font='Arial-Bold',
-                stroke_color='black',
-                stroke_width=2
-            ).set_position(('center', 1080-150)).set_duration(duration)
-            
-            # Create action text (subtitle)
-            action_text = TextClip(
-                f"ACTION: {action}",
-                fontsize=35,
-                color='#FF6B35',
-                font='Arial-Bold',
-                stroke_color='black',
-                stroke_width=1
-            ).set_position(('center', 1080-80)).set_duration(duration)
-            
-            # Create TTS indicator
-            tts_indicator = TextClip(
-                "🎤 TTS NARRATION",
-                fontsize=25,
-                color='#00FF00',
-                font='Arial-Bold'
-            ).set_position(('center', 1080-50)).set_duration(duration)
-            
-            # Combine all elements
-            captions = CompositeVideoClip([banner, feedback_text, action_text, tts_indicator])
-            return captions
-            
-        except Exception as e:
-            print(f"⚠️ Caption overlay failed: {e}")
-            return ColorClip(size=(1, 1), color=(0, 0, 0), duration=duration)
-    
-    def _create_end_card(self, duration: float = 1.5) -> VideoFileClip:
-        """Create end card with copyright"""
-        try:
-            # Create black background
-            bg = ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
-            
-            # Create copyright text
-            copyright_text = TextClip(
-                "© AI Boxing Analysis 2025",
-                fontsize=40,
-                color='#666666',
-                font='Arial'
-            ).set_position(('center', 'bottom')).set_duration(duration)
-            
-            # Create composite
-            end = CompositeVideoClip([bg, copyright_text])
-            return end
-            
-        except Exception as e:
-            print(f"⚠️ End card failed: {e}")
-            return ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
-    
-    def _create_fallback_frame(self, feedback: str, duration: float) -> VideoFileClip:
-        """Create fallback frame when MediaPipe fails"""
-        try:
-            if self.mediapipe_available:
-                # Create simple black frame with text
-                frame = self.np.zeros((1080, 1920, 3), dtype=self.np.uint8)
-                
-                # Add text
-                self.cv2.putText(frame, "ANALYSIS FRAME", (800, 400), 
-                               self.cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 3)
-                self.cv2.putText(frame, feedback[:50] + "...", (600, 500), 
-                               self.cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                
-                temp_frame_path = "temp/fallback_frame.jpg"
-                self.cv2.imwrite(temp_frame_path, frame)
-                
-                frame_clip = VideoFileClip(temp_frame_path).set_duration(duration)
-                return frame_clip
+            # Determine color based on sentiment
+            if any(keyword in word.lower() for keyword in problem_keywords):
+                color = self.colors['problem']
+            elif any(keyword in word.lower() for keyword in action_keywords):
+                color = self.colors['action']
             else:
-                # Create simple text overlay without OpenCV
-                bg = ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
-                title = TextClip("ANALYSIS FRAME", fontsize=80, color='white', font='Arial-Bold').set_position('center').set_duration(duration)
-                subtitle = TextClip(feedback[:50] + "...", fontsize=40, color='white', font='Arial').set_position(('center', 600)).set_duration(duration)
-                return CompositeVideoClip([bg, title, subtitle])
+                color = self.colors['neutral']
+            
+            # Check if line would be too long
+            if len(test_line) * 20 > max_width:  # Rough estimate
+                if current_line:
+                    self._draw_text_with_outline(frame, current_line, x, line_y, 
+                                               self.colors['neutral'], 0.8, 2)
+                    line_y += 25
+                    current_line = word
+                else:
+                    # Word is too long, break it
+                    self._draw_text_with_outline(frame, word, x, line_y, color, 0.8, 2)
+                    line_y += 25
+            else:
+                current_line = test_line
+        
+        # Draw remaining text
+        if current_line:
+            self._draw_text_with_outline(frame, current_line, x, line_y, 
+                                       self.colors['neutral'], 0.8, 2)
+    
+    def _create_slow_motion_clip(self, cap: cv2.VideoCapture, highlight: Dict, 
+                               width: int, height: int, fps: float, duration: float, 
+                               user_name: str) -> List[np.ndarray]:
+        """Create slow motion clip with captions"""
+        frames = []
+        
+        # Calculate timing
+        timestamp = self._parse_timestamp(highlight.get('timestamp', '00:00'))
+        start_time = max(0, timestamp - 3)
+        end_time = timestamp + 3
+        
+        # Extract frames at 0.5x speed
+        cap.set(cv2.CAP_PROP_POS_MSEC, start_time * 1000)
+        
+        frame_count = 0
+        target_frames = int(fps * duration)
+        
+        while frame_count < target_frames:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            # Add head pointer if MediaPipe is available
+            if self.mediapipe_available:
+                try:
+                    with self.mp_pose.Pose(
+                        static_image_mode=True,
+                        model_complexity=1,
+                        min_detection_confidence=0.5
+                    ) as pose:
+                        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        results = pose.process(rgb_frame)
+                        
+                        if results.pose_landmarks:
+                            frame = self._add_head_pointer(frame, results.pose_landmarks, user_name)
+                except Exception as e:
+                    print(f"⚠️ Slow motion MediaPipe failed: {e}")
+            
+            # Add captions
+            frame = self._add_slow_motion_captions(frame, highlight)
+            
+            frames.append(frame)
+            frame_count += 1
+            
+            # Skip every other frame for 0.5x speed effect
+            cap.read()  # Skip frame
+        
+        return frames
+    
+    def _add_slow_motion_captions(self, frame: np.ndarray, highlight: Dict) -> np.ndarray:
+        """Add captions during slow motion"""
+        try:
+            h, w, _ = frame.shape
+            
+            # Create semi-transparent background at bottom
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (0, h-150), (w, h), (0, 0, 0, 180), -1)
+            frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
+            
+            # Add action text
+            action = highlight.get('action_required', 'No action specified')
+            self._draw_text_with_outline(frame, f"ACTION: {action}", w//2, h-100, 
+                                       self.colors['action'], 1.0, 3)
+            
+            # Add TTS indicator
+            self._draw_text_with_outline(frame, "🎤 TTS NARRATION", w//2, h-50, 
+                                       self.colors['action'], 0.8, 2)
+            
+            return frame
             
         except Exception as e:
-            print(f"⚠️ Fallback frame failed: {e}")
-            return ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=duration)
+            print(f"⚠️ Slow motion captions failed: {e}")
+            return frame
+    
+    def _create_end_card(self, width: int, height: int, fps: float, duration: float) -> List[np.ndarray]:
+        """Create end card with copyright"""
+        frames = []
+        num_frames = int(fps * duration)
+        
+        for _ in range(num_frames):
+            # Create black background
+            frame = np.zeros((height, width, 3), dtype=np.uint8)
+            
+            # Add copyright text
+            copyright_text = "© AI Boxing Analysis 2025"
+            self._draw_text_with_outline(frame, copyright_text, width//2, height//2, 
+                                       self.colors['neutral'], 1.0, 2)
+            
+            frames.append(frame)
+        
+        return frames
+    
+    def _create_fallback_frame(self, width: int, height: int, highlight: Dict) -> np.ndarray:
+        """Create fallback frame when MediaPipe fails"""
+        frame = np.zeros((height, width, 3), dtype=np.uint8)
+        
+        # Add simple text
+        feedback = highlight.get('detailed_feedback', 'Analysis frame')
+        self._draw_text_with_outline(frame, "ANALYSIS FRAME", width//2, height//2-50, 
+                                   self.colors['neutral'], 1.5, 3)
+        self._draw_text_with_outline(frame, feedback[:50] + "...", width//2, height//2+50, 
+                                   self.colors['neutral'], 1.0, 2)
+        
+        return frame
+    
+    def _draw_text_with_outline(self, frame: np.ndarray, text: str, x: int, y: int, 
+                               color: Tuple[int, int, int], scale: float, thickness: int):
+        """Draw text with black outline for readability"""
+        # Draw black outline
+        cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, scale, 
+                   self.colors['outline'], thickness + 2)
+        
+        # Draw colored text
+        cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, scale, 
+                   color, thickness)
     
     def _parse_timestamp(self, timestamp: str) -> float:
-        """Parse timestamp string to seconds with clamping"""
+        """Parse timestamp string to seconds"""
         try:
             if ':' in timestamp:
                 parts = timestamp.split(':')
@@ -546,23 +537,18 @@ class VideoProcessor:
         """Add TTS audio to video with proper sync"""
         try:
             if os.path.exists(audio_path):
-                video = VideoFileClip(video_path)
-                audio = AudioFileClip(audio_path)
-                
-                # Combine video and audio (TTS will duck original audio)
-                final_video = video.set_audio(audio)
-                final_video.write_videofile(
-                    output_path, 
-                    codec='libx264', 
-                    audio_codec='aac',
-                    verbose=False,
-                    logger=None
-                )
-                
-                video.close()
-                audio.close()
-                final_video.close()
-                
+                # Use ffmpeg to combine video and audio
+                import subprocess
+                cmd = [
+                    'ffmpeg', '-y',
+                    '-i', video_path,
+                    '-i', audio_path,
+                    '-c:v', 'copy',
+                    '-c:a', 'aac',
+                    '-shortest',
+                    output_path
+                ]
+                subprocess.run(cmd, check=True, capture_output=True)
                 print(f"✅ Audio added to video: {output_path}")
                 return output_path
             else:
@@ -571,6 +557,6 @@ class VideoProcessor:
                 return output_path
                 
         except Exception as e:
-            print(f"Error adding audio to video: {e}")
+            print(f"❌ Error adding audio to video: {e}")
             shutil.copy2(video_path, output_path)
             return output_path 

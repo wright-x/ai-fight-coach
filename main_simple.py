@@ -15,10 +15,12 @@ from pathlib import Path
 import json
 import logging
 import traceback
+import secrets
 
-from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks, Response
+from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks, Response, Request
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.sessions import SessionMiddleware
 
 # Set up detailed logging
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +28,15 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(title="AI Fight Coach", version="1.0.0")
+
+# Add session middleware with secure configuration
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SESSION_SECRET", secrets.token_urlsafe(32)),
+    max_age=30 * 24 * 60 * 60,  # 30 days
+    same_site="lax",
+    https_only=True
+)
 
 # Create necessary directories
 for directory in ["uploads", "output", "static", "temp"]:
@@ -181,18 +192,65 @@ async def main_page():
         return HTMLResponse(content="<h1>Main page not found</h1>")
 
 @app.post("/register-user")
-async def register_user(name: str = Form(...), email: str = Form(...)):
-    """Register a new user"""
-    logger.info(f"👤 User registration: {name} ({email})")
+async def register_user(request: Request, name: str = Form(...), email: str = Form(...)):
+    """Register user and set session cookie"""
     try:
+        logger.info(f"👤 User registration: {name} ({email})")
+        
+        # Create user session data
+        user_data = {
+            "name": name,
+            "email": email,
+            "registered_at": datetime.now().isoformat(),
+            "session_id": str(uuid.uuid4())
+        }
+        
+        # Store in session
+        request.session["user"] = user_data
+        
+        # Try to save to CSV if user manager is available
         if user_manager:
-            user_manager.register_user(name, email)
-            return JSONResponse(content={"success": True, "message": "Registration successful!"})
-        else:
-            return JSONResponse(content={"success": True, "message": "Registration successful! (demo mode)"})
+            try:
+                user_manager.register_user(name, email)
+                logger.info(f"✅ User saved to CSV: {email}")
+            except Exception as e:
+                logger.error(f"⚠️ Failed to save to CSV: {e}")
+        
+        # Send welcome email if available
+        if user_manager:
+            try:
+                user_manager.send_welcome_email(name, email)
+                logger.info(f"✅ Welcome email sent: {email}")
+            except Exception as e:
+                logger.error(f"⚠️ Failed to send welcome email: {e}")
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": "Registration successful! You can now upload videos.",
+            "user": user_data
+        })
+        
     except Exception as e:
         logger.error(f"❌ Registration failed: {e}")
-        return JSONResponse(content={"success": False, "message": f"Registration failed: {e}"})
+        return JSONResponse(content={
+            "success": False,
+            "message": f"Registration failed: {e}"
+        })
+
+@app.get("/session")
+async def get_session(request: Request):
+    """Get current user session"""
+    user = request.session.get("user")
+    if user:
+        return JSONResponse(content={"user": user, "authenticated": True})
+    else:
+        return JSONResponse(content={"user": None, "authenticated": False})
+
+@app.post("/logout")
+async def logout(request: Request):
+    """Clear user session"""
+    request.session.clear()
+    return JSONResponse(content={"success": True, "message": "Logged out successfully"})
 
 @app.post("/submit-feedback")
 async def submit_feedback(
@@ -226,86 +284,70 @@ async def upload_video_redirect(
 
 @app.post("/upload-video")
 async def upload_video(
+    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     fighter_name: Optional[str] = Form("FIGHTER"),
     analysis_type: Optional[str] = Form("everything")
 ):
-    logger.info(f"📤 Video upload started: {file.filename} ({file.content_type})")
+    """Upload video for AI analysis"""
     try:
-        # Generate unique job ID
-        job_id = str(uuid.uuid4())
-        logger.info(f"🆔 Generated job ID: {job_id}")
+        logger.info(f"📤 Video upload started: {file.filename}")
         
-        # Read file content into memory (Railway-compatible)
-        file_content = await file.read()
+        # Get user from session
+        user = request.session.get("user")
+        if not user:
+            return JSONResponse(content={
+                "success": False,
+                "message": "Please register first to upload videos."
+            })
+        
+        # Validate file
+        if not file.filename or not file.filename.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
+            return JSONResponse(content={
+                "success": False,
+                "message": "Please upload a valid video file (.mp4, .avi, .mov, .mkv)"
+            })
+        
+        # Generate job ID
+        job_id = str(uuid.uuid4())
+        
+        # Store video in memory
+        video_content = await file.read()
         in_memory_files[job_id] = {
-            "content": file_content,
+            "content": video_content,
             "filename": file.filename,
             "content_type": file.content_type
         }
         
-        # Schedule in-memory file deletion
-        schedule_file_deletion(job_id, 15)
+        # Initialize job
+        active_jobs[job_id] = {
+            "status": "uploaded",
+            "progress": 0,
+            "message": "Video uploaded successfully",
+            "fighter_name": fighter_name,
+            "analysis_type": analysis_type,
+            "user": user,  # Store user information
+            "uploaded_at": datetime.now().isoformat()
+        }
         
-        logger.info(f"✅ Video uploaded to memory: {file.filename} ({len(file_content)} bytes)")
+        logger.info(f"✅ Video uploaded: {job_id} ({len(video_content)} bytes)")
         
-        # Check if components are available
-        logger.info(f"🔍 Checking component availability:")
-        logger.info(f"   - VideoProcessor: {'✅' if video_processor else '❌'}")
-        logger.info(f"   - GeminiClient: {'✅' if gemini_client else '❌'}")
-        
-        if not gemini_client:
-            # Demo mode - accept upload but show limited functionality
-            logger.info(f"🎭 Demo mode activated for job {job_id}")
-            active_jobs[job_id] = {
-                "status": "demo_mode",
-                "progress": 100,
-                "message": "Demo mode: Video uploaded successfully! Full analysis is currently unavailable in this environment.",
-                "video_url": f"/video/{job_id}",  # Use our custom endpoint
-                "analysis_result": {
-                    "highlights": [
-                        {
-                            "timestamp": 15,
-                            "detailed_feedback": "Demo mode: This is a sample highlight",
-                            "action_required": "Demo mode: Sample action required"
-                        }
-                    ],
-                    "recommended_drills": [
-                        {
-                            "drill_name": "Demo Drill",
-                            "description": "This is a sample drill for demonstration purposes",
-                            "problem_it_fixes": "Demo mode: Sample problem fix"
-                        }
-                    ]
-                }
-            }
-            
-            return JSONResponse(content={
-                "success": True,
-                "job_id": job_id,
-                "message": "Video uploaded successfully (demo mode)"
-            })
-        
-        # Start processing in background (even if video_processor is not available)
-        logger.info(f"🚀 Starting background processing for job {job_id}")
-        background_tasks.add_task(
-            process_video_analysis, job_id, fighter_name, analysis_type
-        )
+        # Start background processing
+        background_tasks.add_task(process_video_analysis, job_id, fighter_name, analysis_type)
         
         return JSONResponse(content={
             "success": True,
             "job_id": job_id,
-            "message": "Video uploaded and processing started"
+            "message": "Video uploaded successfully! Analysis in progress..."
         })
         
     except Exception as e:
-        logger.error(f"❌ Upload error: {e}")
-        logger.error(f"📋 Traceback: {traceback.format_exc()}")
-        return JSONResponse(
-            content={"success": False, "message": f"Upload failed: {str(e)}"},
-            status_code=500
-        )
+        logger.error(f"❌ Upload failed: {e}")
+        return JSONResponse(content={
+            "success": False,
+            "message": f"Upload failed: {e}"
+        })
 
 @app.get("/status/{job_id}")
 async def get_status(job_id: str):
@@ -429,10 +471,18 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
         try:
             if video_processor:
                 logger.info(f"🎬 VideoProcessor available, creating highlight video...")
-                processed_video_path = video_processor.create_highlight_video(
-                    temp_video_path, 
-                    analysis_result.get("highlights", []), 
-                    highlight_video_path
+                processed_video_path = f"output/highlight_{job_id}.mp4"
+                
+                # Get user name from session or use default
+                user_name = "FIGHTER"  # Default
+                if 'user' in active_jobs[job_id]:
+                    user_name = active_jobs[job_id]['user'].get('name', 'FIGHTER')
+                
+                video_processor.create_highlight_video(
+                    video_path=temp_video_path,
+                    highlights=analysis_result["highlights"],
+                    output_path=processed_video_path,
+                    user_name=user_name
                 )
                 logger.info(f"✅ Highlight video created: {processed_video_path}")
                 
