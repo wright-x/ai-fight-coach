@@ -55,6 +55,20 @@ class VideoProcessor:
             
             # Load source video
             source_clip = VideoFileClip(video_path)
+            
+            # --- START OF NEW, CRITICAL MEMORY FIX ---
+            MAX_HEIGHT = 720 # Define a reasonable maximum resolution (720p) for web videos
+            w, h = source_clip.size
+
+            if h > MAX_HEIGHT:
+                print(f"🔥 High-resolution video detected ({h}p). Downscaling to {MAX_HEIGHT}p to prevent OOM errors.")
+                # Resize the entire source clip once at the beginning
+                source_clip = source_clip.resize(height=MAX_HEIGHT)
+                print(f"✅ Video downscaled successfully. New size: {source_clip.size}")
+
+            # --- END OF MEMORY FIX ---
+
+            # The rest of the function will now use the smaller, memory-safe source_clip
             source_fps = source_clip.fps
             source_duration = source_clip.duration
             source_width, source_height = source_clip.size
@@ -264,7 +278,7 @@ class VideoProcessor:
             final_audio = CompositeAudioClip(audio_clips)
             
             # Save final composite audio
-            final_audio.write_audiofile(audio_path, verbose=False, logger=None)
+            final_audio.write_audiofile(audio_path, fps=44100, verbose=False, logger=None)
             
             # Clean up audio clips
             for clip in audio_clips:
