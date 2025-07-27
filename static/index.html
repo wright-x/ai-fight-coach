@@ -362,6 +362,20 @@
             display: block;
         }
 
+        .progress-container h3 {
+            color: white;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .progress-container p {
+            color: #cccccc;
+            font-size: 1.1rem;
+            text-align: center;
+            margin-top: 15px;
+        }
+
         .progress-bar {
             width: 100%;
             height: 20px;
@@ -1289,6 +1303,12 @@
                     "🔊 Syncing audio tracks...",
                     "📊 Preparing analysis report...",
                     "🎯 Almost done..."
+                ]},
+                { start: 95, end: 99, duration: 10000, texts: [
+                    "🎯 Almost there...",
+                    "✨ Final touches...",
+                    "🎬 Rendering complete...",
+                    "📊 Analysis ready..."
                 ]}
             ];
             
@@ -1332,14 +1352,18 @@
         function pollStatus(jobId) {
             console.log('Polling status for job:', jobId);
             fetch(`/status/${jobId}`)
-            .then(response => response.json())
+            .then(response => {
+                console.log('Status response status:', response.status);
+                return response.json();
+            })
             .then(data => {
-                console.log('Status response:', data);
+                console.log('Status response data:', data);
                 const progressFill = document.getElementById('progressFill');
                 const progressText = document.getElementById('progressText');
                 
                 if (data.status === 'processing') {
                     const progress = data.progress || 0;
+                    console.log('Processing progress:', progress);
                     progressFill.style.width = `${progress}%`;
                     
                     // Update loading stages based on progress
@@ -1352,6 +1376,7 @@
                     // Continue polling
                     setTimeout(() => pollStatus(jobId), 2000);
                 } else if (data.status === 'completed') {
+                    console.log('Analysis completed! Showing results...');
                     progressFill.style.width = '100%';
                     progressText.textContent = 'Analysis complete!';
                     
@@ -1361,10 +1386,11 @@
                     // Show results after a short delay
                     setTimeout(() => showResults(jobId), 1000);
                 } else if (data.status === 'failed') {
+                    console.error('Analysis failed:', data.message);
                     alert('Analysis failed: ' + (data.message || 'Unknown error'));
                     showPage('uploadPage');
                 } else {
-                    console.log('Unknown status:', data.status);
+                    console.log('Unknown status:', data.status, 'Data:', data);
                     // Continue polling for unknown status
                     setTimeout(() => pollStatus(jobId), 2000);
                 }
