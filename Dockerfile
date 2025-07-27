@@ -1,4 +1,4 @@
-# Minimal Dockerfile for AI Boxing Analysis
+# Ultra-minimal Dockerfile for AI Boxing Analysis
 FROM python:3.11-slim
 
 # Set environment variables
@@ -6,38 +6,30 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install only essential system dependencies
+# Install only the absolute minimum system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        libgl1-mesa-glx \
-        libglib2.0-0 \
-        libsm6 \
-        libxrender1 \
-        libxext6 \
-        ffmpeg \
         curl \
         && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip and install Python packages
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir \
-        fastapi==0.109.2 \
-        uvicorn[standard]==0.27.1 \
-        python-multipart==0.0.6 \
-        google-generativeai==0.3.2 \
-        elevenlabs==0.2.27 \
-        numpy==1.24.3 \
-        Pillow==10.0.0 \
-        python-dotenv==1.0.0 \
-        aiofiles==23.2.1 \
-        itsdangerous==2.1.2
+# Install Python packages one by one to avoid conflicts
+RUN pip install --upgrade pip
 
-# Install OpenCV and MediaPipe separately to avoid conflicts
-RUN pip install --no-cache-dir opencv-python-headless==4.11.0.86
-RUN pip install --no-cache-dir mediapipe==0.10.21
+# Core web framework
+RUN pip install --no-cache-dir fastapi==0.109.2
+RUN pip install --no-cache-dir uvicorn[standard]==0.27.1
+RUN pip install --no-cache-dir python-multipart==0.0.6
 
-# Install MoviePy last
-RUN pip install --no-cache-dir moviepy==1.0.3
+# AI and API services
+RUN pip install --no-cache-dir google-generativeai==0.3.2
+RUN pip install --no-cache-dir elevenlabs==0.2.27
+
+# Basic utilities
+RUN pip install --no-cache-dir numpy==1.24.3
+RUN pip install --no-cache-dir Pillow==10.0.0
+RUN pip install --no-cache-dir python-dotenv==1.0.0
+RUN pip install --no-cache-dir aiofiles==23.2.1
+RUN pip install --no-cache-dir itsdangerous==2.1.2
 
 # Create app directory
 WORKDIR /app

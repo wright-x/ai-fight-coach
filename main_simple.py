@@ -77,8 +77,15 @@ def initialize_components():
             logger.info("✅ VideoProcessorFallback initialized successfully")
         except Exception as e2:
             logger.error(f"❌ VideoProcessorFallback also failed: {e2}")
-            video_processor = None
-            logger.info("📋 Video processing will be limited")
+            logger.info("📋 Trying basic video processor...")
+            try:
+                from utils.video_processor_basic import VideoProcessorBasic
+                video_processor = VideoProcessorBasic()
+                logger.info("✅ VideoProcessorBasic initialized successfully")
+            except Exception as e3:
+                logger.error(f"❌ VideoProcessorBasic also failed: {e3}")
+                video_processor = None
+                logger.info("📋 Video processing will be disabled")
 
     try:
         logger.info("🤖 Testing utils.gemini_client import...")
