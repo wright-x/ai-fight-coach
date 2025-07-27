@@ -70,7 +70,15 @@ def initialize_components():
     except Exception as e:
         logger.error(f"❌ VideoProcessor failed: {e}")
         logger.error(f"📋 Traceback: {traceback.format_exc()}")
-        logger.info("📋 This is expected in Railway environment - video processing will be limited")
+        logger.info("📋 Trying fallback video processor...")
+        try:
+            from utils.video_processor_fallback import VideoProcessorFallback
+            video_processor = VideoProcessorFallback()
+            logger.info("✅ VideoProcessorFallback initialized successfully")
+        except Exception as e2:
+            logger.error(f"❌ VideoProcessorFallback also failed: {e2}")
+            video_processor = None
+            logger.info("📋 Video processing will be limited")
 
     try:
         logger.info("🤖 Testing utils.gemini_client import...")
