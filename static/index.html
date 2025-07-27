@@ -256,7 +256,7 @@
         }
 
         .analysis-option {
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
             border: 2px solid rgba(220, 20, 60, 0.3);
             border-radius: 15px;
             padding: 25px;
@@ -266,6 +266,7 @@
             position: relative;
             overflow: hidden;
             flex: 1;
+            color: white;
         }
 
         .analysis-option::before {
@@ -305,11 +306,51 @@
             font-size: 1.2rem;
             margin-bottom: 10px;
             font-weight: 600;
+            color: white;
         }
 
         .analysis-option p {
             font-size: 0.9rem;
             opacity: 0.8;
+            color: white;
+        }
+
+        .guidelines-section {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            border: 1px solid rgba(220, 20, 60, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+            color: white;
+        }
+
+        .guidelines-title {
+            color: #dc143c;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .guidelines-grid {
+            display: grid;
+            gap: 15px;
+        }
+
+        .guideline-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .guideline-icon {
+            color: #dc143c;
+            font-size: 1.2rem;
+        }
+
+        .guideline-text {
+            color: #ffffff;
+            font-size: 0.95rem;
         }
 
         .progress-container {
@@ -536,8 +577,8 @@
         }
 
         .feature-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            display: flex;
+            justify-content: space-between;
             gap: 20px;
             margin-top: 20px;
         }
@@ -548,6 +589,7 @@
             border-radius: 10px;
             padding: 20px;
             text-align: center;
+            flex: 1;
         }
 
         .feature-icon {
@@ -651,6 +693,32 @@
                             <span class="analysis-option-icon">👟</span>
                             <h3>Footwork</h3>
                             <p>Movement & Angles</p>
+                        </div>
+                    </div>
+
+                    <div class="guidelines-section">
+                        <h3 class="guidelines-title">How to Film for the Best Results</h3>
+                        <div class="guidelines-grid">
+                            <div class="guideline-item">
+                                <span class="guideline-icon">📷</span>
+                                <span class="guideline-text"><strong>Angle:</strong> Position the camera at chest height, directly in front of you. Avoid high or low angles.</span>
+                            </div>
+                            <div class="guideline-item">
+                                <span class="guideline-icon">💡</span>
+                                <span class="guideline-text"><strong>Lighting:</strong> Ensure you are well-lit from the front. Avoid backlighting (e.g., standing in front of a bright window).</span>
+                            </div>
+                            <div class="guideline-item">
+                                <span class="guideline-icon">🖼️</span>
+                                <span class="guideline-text"><strong>Framing:</strong> Keep your entire body, from head to toe, within the frame throughout the entire video.</span>
+                            </div>
+                            <div class="guideline-item">
+                                <span class="guideline-icon">👤</span>
+                                <span class="guideline-text"><strong>Focus:</strong> The AI performs best with only one person in the video. Please ensure you are alone in the shot.</span>
+                            </div>
+                            <div class="guideline-item">
+                                <span class="guideline-icon">⏱️</span>
+                                <span class="guideline-text"><strong>Duration:</strong> Keep your video concise. The maximum upload duration is <strong>30 seconds</strong>.</span>
+                            </div>
                         </div>
                     </div>
 
@@ -782,10 +850,10 @@
             showPage('progressPage');
             
             const formData = new FormData();
-            formData.append('video', file);
+            formData.append('file', file);
             formData.append('analysis_type', selectedAnalysisType);
 
-            fetch('/upload', {
+            fetch('/upload-video', {
                 method: 'POST',
                 body: formData
             })
@@ -795,7 +863,7 @@
                     currentJobId = data.job_id;
                     pollStatus(data.job_id);
                 } else {
-                    alert('Upload failed: ' + data.error);
+                    alert('Upload failed: ' + (data.message || 'Unknown error'));
                     showPage('uploadPage');
                 }
             })
@@ -823,7 +891,7 @@
                     progressText.textContent = 'Analysis complete!';
                     setTimeout(() => showResults(jobId), 1000);
                 } else {
-                    alert('Analysis failed: ' + data.error);
+                    alert('Analysis failed: ' + (data.error || 'Unknown error'));
                     showPage('uploadPage');
                 }
             })
