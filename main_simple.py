@@ -612,6 +612,27 @@ async def serve_video(job_id: str):
         logger.error(f"📋 Traceback: {traceback.format_exc()}")
         return JSONResponse(content={"error": f"Error serving video: {e}"}, status_code=500)
 
+@app.get("/analysis/{job_id}")
+async def get_analysis(job_id: str):
+    """Get analysis results for a job"""
+    logger.info(f"📊 Analysis request for job: {job_id}")
+    
+    try:
+        if job_id in active_jobs:
+            job_info = active_jobs[job_id]
+            if job_info.get("status") == "completed" and "analysis_result" in job_info:
+                logger.info(f"✅ Serving analysis for job: {job_id}")
+                return JSONResponse(content=job_info["analysis_result"])
+            else:
+                logger.warning(f"⚠️ Analysis not ready for job: {job_id}, status: {job_info.get('status')}")
+                return JSONResponse(content={"error": "Analysis not ready"}, status_code=404)
+        else:
+            logger.error(f"❌ Job not found: {job_id}")
+            return JSONResponse(content={"error": "Job not found"}, status_code=404)
+    except Exception as e:
+        logger.error(f"❌ Error serving analysis for job {job_id}: {e}")
+        return JSONResponse(content={"error": f"Error serving analysis: {e}"}, status_code=500)
+
 def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
     """Process video analysis in background"""
     logger.info(f"🔍 Starting video analysis for job: {job_id}")
