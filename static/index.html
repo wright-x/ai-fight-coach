@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Fight Coach</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>AI Fight Coach - Professional Boxing Analysis</title>
+    <link rel="stylesheet" href="style.css?v=2.0">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        /* Cache-busting version: 2.0 - Black, Red, Grey Theme */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 25%, #404040 50%, #2d2d2d 75%, #1a1a1a 100%);
@@ -1170,23 +1169,52 @@
                 font-size: 1.1rem;
             }
 
-            /* Fix the "Choose Your Analysis Focus" Section */
+            /* Mobile Slideshow for Analysis Options */
             .analysis-options {
-                flex-direction: column;
-                gap: 15px;
+                display: flex;
+                flex-direction: row;
+                gap: 0;
+                margin: 30px 0;
+                overflow-x: auto;
+                scroll-snap-type: x mandatory;
+                scrollbar-width: none; /* Firefox */
+                -ms-overflow-style: none; /* IE and Edge */
+                padding: 0 10px;
+            }
+
+            .analysis-options::-webkit-scrollbar {
+                display: none; /* Chrome, Safari, Opera */
             }
 
             .analysis-option {
-                flex: none;
-                padding: 20px;
+                flex: 0 0 85%;
+                scroll-snap-align: center;
+                margin-right: 15px;
+                padding: 30px 20px;
+                min-height: 200px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+            }
+
+            .analysis-option:last-child {
+                margin-right: 0;
             }
 
             .analysis-option h3 {
-                font-size: 1.1rem;
+                font-size: 1.3rem;
+                margin-bottom: 15px;
             }
 
             .analysis-option p {
-                font-size: 0.85rem;
+                font-size: 1rem;
+                text-align: center;
+            }
+
+            .analysis-option-icon {
+                font-size: 3rem;
+                margin-bottom: 20px;
             }
 
             /* Fix the "What This Tool Does" Feature Grid */
@@ -1310,7 +1338,21 @@
             }
 
             .analysis-option {
-                padding: 15px;
+                flex: 0 0 90%;
+                padding: 25px 15px;
+                min-height: 180px;
+            }
+
+            .analysis-option h3 {
+                font-size: 1.2rem;
+            }
+
+            .analysis-option p {
+                font-size: 0.9rem;
+            }
+
+            .analysis-option-icon {
+                font-size: 2.5rem;
             }
 
             .feature-list {
@@ -1374,24 +1416,8 @@
                         <h3 class="guidelines-title">How to Film for the Best Results</h3>
                         <div class="guidelines-grid">
                             <div class="guideline-item">
-                                <span class="guideline-icon">📷</span>
-                                <span class="guideline-text"><strong>Angle:</strong> Position the camera at chest height, directly in front of you. Avoid high or low angles.</span>
-                            </div>
-                            <div class="guideline-item">
-                                <span class="guideline-icon">💡</span>
-                                <span class="guideline-text"><strong>Lighting:</strong> Ensure you are well-lit from the front. Avoid backlighting (e.g., standing in front of a bright window).</span>
-                            </div>
-                            <div class="guideline-item">
-                                <span class="guideline-icon">🖼️</span>
-                                <span class="guideline-text"><strong>Framing:</strong> Keep your entire body, from head to toe, within the frame throughout the entire video.</span>
-                            </div>
-                            <div class="guideline-item">
-                                <span class="guideline-icon">👤</span>
-                                <span class="guideline-text"><strong>Focus:</strong> The AI performs best with only one person in the video. Please ensure you are alone in the shot.</span>
-                            </div>
-                            <div class="guideline-item">
                                 <span class="guideline-icon">⏱️</span>
-                                <span class="guideline-text"><strong>Duration:</strong> Keep your video concise. The maximum upload duration is <strong>30 seconds</strong>.</span>
+                                <span class="guideline-text"><strong>Duration:</strong> The maximum upload duration is <strong>30 seconds</strong>.</span>
                             </div>
                         </div>
                     </div>
