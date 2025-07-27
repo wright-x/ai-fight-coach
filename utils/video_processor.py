@@ -352,9 +352,60 @@ class VideoProcessor:
             return ColorClip(size=(640, 480), color=(0, 0, 0), duration=2.0)
 
     def _create_text_card(self, text: str, width: int, height: int, fps: float, duration: float = 2.0):
-        """Create a text card with neon aesthetic - FIXED to return proper CompositeVideoClip"""
+        """Create a text card using actual image files instead of generated text"""
         try:
-            print(f"🎬 Creating text card: '{text}' for {duration}s at {width}x{height}")
+            print(f"🎬 Creating image card for: '{text}' for {duration}s")
+            
+            # Map text to image files
+            image_mapping = {
+                "HIGHLIGHTS": "static/images/highlights.png",
+                "HIGHLIGHT 1": "static/images/highlight1.png", 
+                "HIGHLIGHT 2": "static/images/highlight2.png",
+                "HIGHLIGHT 3": "static/images/highlight3.png",
+                "HIGHLIGHT 4": "static/images/highlight4.png",
+                "HIGHLIGHT 5": "static/images/highlight5.png"
+            }
+            
+            image_path = image_mapping.get(text)
+            if not image_path:
+                print(f"⚠️ No image found for text: {text}, using fallback")
+                return self._create_fallback_text_card(text, width, height, fps, duration)
+            
+            # Check if image file exists
+            if not os.path.exists(image_path):
+                print(f"⚠️ Image file not found: {image_path}, using fallback")
+                return self._create_fallback_text_card(text, width, height, fps, duration)
+            
+            # Load the image and create video clip
+            try:
+                from PIL import Image
+                import numpy as np
+                
+                # Open and resize image to match video dimensions
+                img = Image.open(image_path)
+                img = img.resize((width, height), Image.Resampling.LANCZOS)
+                
+                # Convert to numpy array
+                img_array = np.array(img)
+                
+                # Create video clip from image
+                image_clip = ImageSequenceClip([img_array], fps=fps, duration=duration)
+                
+                print(f"✅ Image card '{text}' created successfully from {image_path}")
+                return image_clip
+                
+            except Exception as img_error:
+                print(f"⚠️ Image processing failed: {img_error}, using fallback")
+                return self._create_fallback_text_card(text, width, height, fps, duration)
+            
+        except Exception as e:
+            print(f"❌ Image card creation failed: {e}")
+            return self._create_fallback_text_card(text, width, height, fps, duration)
+
+    def _create_fallback_text_card(self, text: str, width: int, height: int, fps: float, duration: float = 2.0):
+        """Fallback method to create text card if image loading fails"""
+        try:
+            print(f"🎬 Creating fallback text card: '{text}' for {duration}s at {width}x{height}")
             
             # Create a black background
             bg_color = (0, 0, 0)  # Black
@@ -371,7 +422,7 @@ class VideoProcessor:
                     text,
                     fontsize=font_size,
                     color='white',
-                    stroke_color='purple',
+                    stroke_color='red',
                     stroke_width=3,
                     font='Montserrat-SemiBold.ttf'
                 ).set_position('center').set_duration(duration)
@@ -383,14 +434,14 @@ class VideoProcessor:
                     text,
                     fontsize=font_size,
                     color='white',
-                    stroke_color='purple',
+                    stroke_color='red',
                     stroke_width=3
                 ).set_position('center').set_duration(duration)
                 print(f"✅ Text clip created with fallback font: {text_clip.size}")
             
             # CRITICAL: Return proper CompositeVideoClip
             final_card = CompositeVideoClip([card, text_clip])
-            print(f"✅ Text card '{text}' created successfully - Final size: {final_card.size}")
+            print(f"✅ Fallback text card '{text}' created successfully - Final size: {final_card.size}")
             
             # Verify the card has content by checking a frame
             try:
@@ -405,20 +456,11 @@ class VideoProcessor:
             return final_card
             
         except Exception as e:
-            print(f"❌ Text card creation failed: {e}")
+            print(f"❌ Fallback text card creation failed: {e}")
             import traceback
             traceback.print_exc()
-            # Fallback: simple color clip with text
-            try:
-                fallback_card = ColorClip(size=(width, height), color=(0, 0, 0), duration=duration)
-                fallback_text = TextClip(
-                    text,
-                    fontsize=30,
-                    color='white'
-                ).set_position('center').set_duration(duration)
-                return CompositeVideoClip([fallback_card, fallback_text])
-            except:
-                return ColorClip(size=(width, height), color=(0, 0, 0), duration=duration)
+            # Final fallback: simple color clip
+            return ColorClip(size=(width, height), color=(0, 0, 0), duration=duration)
 
     def _add_overlays(self, frame, action_text, user_name, pose):
         """
