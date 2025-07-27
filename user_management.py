@@ -133,7 +133,7 @@ class UserManager:
                     highlights_html += f"""
                     <div style="margin-bottom: 25px; padding: 20px; background: white; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
                         <h4 style="font-size: 1.3rem; margin-bottom: 15px; color: #667eea; font-weight: 600;">⏰ Highlight {i} ({highlight.get('timestamp', 0)}s)</h4>
-                        <div style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 15px; color: #333;">📝 <b>Analysis:</b> <i>{highlight.get('detailed_feedback', '')}</i></div>
+                        <div style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 15px; color: #333;">📝 <b>Analysis:</b> <i>{highlight.get('long_text', '')}</i></div>
                         <div style="font-size: 1.1rem; color: #e74c3c; font-weight: 600;">⚡ <b>Action Required:</b> {highlight.get('action_required', '')}</div>
                     </div>
                     """

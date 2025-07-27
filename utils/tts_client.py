@@ -55,14 +55,13 @@ class TTSClient:
                 print("⚠️ No ElevenLabs API key or import failed, skipping highlight audio")
                 return output_path
             
-            # Combine all highlights into one text using short_text
+            # Combine all highlights into one text using ONLY action_required
             combined_text = "Here are your boxing highlights. "
             
             for i, highlight in enumerate(highlights, 1):
-                short_text = highlight.get('short_text', '')
                 action = highlight.get('action_required', '')
                 
-                combined_text += f"Highlight {i}: {short_text}. Action required: {action}. "
+                combined_text += f"Highlight {i}: {action}. "
             
             return self.generate_speech(combined_text, output_path)
             

@@ -11,16 +11,16 @@ class VideoProcessor:
     """Surgical VideoProcessor that follows exact specifications"""
     
     def __init__(self):
-        # Colors for overlays
+        # Colors for overlays - FIXED RGB VALUES
         self.colors = {
             'white': (255, 255, 255),
             'black': (0, 0, 0),
-            'red': (0, 0, 255),
-            'blue': (255, 0, 0),
+            'red': (255, 0, 0),      # FIXED: Proper red
+            'blue': (0, 0, 255),     # FIXED: Proper blue
             'green': (0, 255, 0),
-            'yellow': (0, 255, 255),
-            'magenta': (255, 0, 255),  # For head pointer
-            'purple': (128, 0, 128)    # For neon aesthetic
+            'yellow': (255, 255, 0),  # FIXED: Proper yellow
+            'magenta': (255, 0, 255), # For head pointer
+            'purple': (128, 0, 128)   # For neon aesthetic
         }
         
         print("✅ VideoProcessor initialized (surgical mode)")
@@ -73,8 +73,8 @@ class VideoProcessor:
                     # Extract the highlight clip
                     highlight_clip = source_clip.subclip(start_time, end_time)
                     
-                    # CRITICAL: Slow down to 0.4x speed
-                    slowed_clip = highlight_clip.speedx(0.4)
+                    # CRITICAL: Slow down to 0.25x speed
+                    slowed_clip = highlight_clip.speedx(0.25)
                     
                     # Process frames with overlays
                     processed_frames = []
@@ -83,7 +83,7 @@ class VideoProcessor:
                         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         processed_frame = self._add_overlays(
                             frame_rgb, 
-                            highlight.get('short_text', ''),
+                            '',  # No short_text needed
                             highlight.get('action_required', ''),
                             user_name,
                             pose  # Pass the pose object to the overlay method
@@ -219,32 +219,36 @@ class VideoProcessor:
                     width=3
                 )
             
-            # CRITICAL: Static captions at bottom center using short_text
-            if short_text:
-                # Calculate font size (3% of frame width)
-                font_size = max(20, int(w * 0.03))
+            # CRITICAL: Static captions at bottom center using action_required
+            if action_text:
+                # Calculate font size (3.9% of frame width - 30% bigger)
+                font_size = max(26, int(w * 0.039))
                 
                 try:
-                    # Try to use a clean, sharp font
-                    font = ImageFont.truetype("arial.ttf", font_size)
+                    # Try to use Montserrat Semi-Bold font
+                    font = ImageFont.truetype("Montserrat-SemiBold.ttf", font_size)
                 except:
-                    font = ImageFont.load_default()
+                    try:
+                        # Fallback to Arial Bold
+                        font = ImageFont.truetype("arial.ttf", font_size)
+                    except:
+                        font = ImageFont.load_default()
                 
                 # CRITICAL: Position at bottom center with 5% margin
-                text_bbox = draw.textbbox((0, 0), short_text, font=font)
+                text_bbox = draw.textbbox((0, 0), action_text, font=font)
                 text_width = text_bbox[2] - text_bbox[0]
                 text_height = text_bbox[3] - text_bbox[1]
                 
                 text_x = (w - text_width) // 2
                 text_y = h - text_height - int(h * 0.05)  # 5% margin from bottom
                 
-                # CRITICAL: Draw text with thick black outline (no background)
+                # CRITICAL: Draw text with THICK black outline (no background)
                 draw.text(
                     (text_x, text_y),
-                    short_text,
+                    action_text,
                     font=font,
                     fill=self.colors['white'],
-                    stroke_width=3,  # Thick outline
+                    stroke_width=5,  # THICK outline
                     stroke_fill=self.colors['black']
                 )
             
