@@ -1396,170 +1396,130 @@
         }
 
         function showResults(jobId) {
-            console.log('Showing results for job:', jobId);
+            console.log(`--- ENTERING showResults for job: ${jobId} ---`);
+            
+            // 1. Make the entire results page visible first
             showPage('resultsPage');
             
-            // Load the video first
-            const video = document.getElementById('resultVideo');
-            video.src = `/video/${jobId}`;
-            video.load();
+            // 2. Explicitly find and reference all critical elements
+            const videoElement = document.getElementById('resultVideo');
+            const highlightsContainer = document.getElementById('highlightsContainer');
+            const drillsContainer = document.getElementById('drillsContainer');
+            const youtubeContainer = document.getElementById('youtubeContainer');
+
+            if (!videoElement || !highlightsContainer || !drillsContainer || !youtubeContainer) {
+                console.error("CRITICAL FAILURE: One or more result containers are missing from the DOM.");
+                alert("A critical front-end error occurred. Could not find result containers.");
+                return;
+            }
+
+            // 3. Set the video source and make it visible
+            const videoSrc = `/video/${jobId}`;
+            videoElement.src = videoSrc;
+            videoElement.load();
+            videoElement.style.display = 'block'; // Ensure it's not hidden
+            console.log(`✅ Video source set to: ${videoSrc}`);
             
-            // Load analysis data
+            // 4. Fetch the analysis data
+            console.log(`Fetching analysis data from: /analysis/${jobId}`);
             fetch(`/analysis/${jobId}`)
-            .then(response => {
-                console.log('Analysis response:', response);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('Analysis data received:', data);
-                if (data.error) {
-                    console.error('Analysis error:', data.error);
-                    // Show fallback content
-                    displayHighlights([{
-                        timestamp: "00:00",
-                        short_text: "Analysis completed",
-                        long_text: "Your video has been processed successfully. The analysis data is being prepared.",
-                        action_required: "Review your technique"
-                    }]);
-                    displayDrills([{
-                        drill_name: "Basic Technique Review",
-                        description: "Review your uploaded video to identify areas for improvement.",
-                        problem_it_fixes: "General technique improvement"
-                    }]);
-                    displayYouTube([]);
-                } else {
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Server responded with status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("✅ Analysis data received:", data);
+                    
+                    // 5. Populate the page sections with the received data
+                    // Use the new, robust display functions
                     displayHighlights(data.highlights || []);
                     displayDrills(data.recommended_drills || []);
                     displayYouTube(data.youtube_recommendations || []);
-                }
-            })
-            .catch(error => {
-                console.error('Error loading analysis:', error);
-                // Show fallback content on error
-                displayHighlights([{
-                    timestamp: "00:00",
-                    short_text: "Analysis completed",
-                    long_text: "Your video has been processed successfully. Please review the video above.",
-                    action_required: "Review your technique"
-                }]);
-                displayDrills([{
-                    drill_name: "Basic Technique Review",
-                    description: "Review your uploaded video to identify areas for improvement.",
-                    problem_it_fixes: "General technique improvement"
-                }]);
-                displayYouTube([]);
-            });
+                })
+                .catch(error => {
+                    console.error("--- CATASTROPHIC ERROR fetching or parsing analysis data ---", error);
+                    alert("Failed to load analysis data. Please check the console for errors.");
+                    
+                    // Even on failure, display fallback content so the page isn't blank
+                    displayHighlights([]);
+                    displayDrills([]);
+                    displayYouTube([]);
+                });
         }
 
         function displayHighlights(highlights) {
             const container = document.getElementById('highlightsContainer');
-            console.log('Highlights container:', container);
-            container.innerHTML = '<h3 class="section-title">Analysis Results</h3>';
-            
+            if (!container) return; // Prevent errors if container is missing
+
+            // Clear previous content but keep the title
+            container.innerHTML = '<h3 class="section-title">Key Highlights</h3>';
+
             if (highlights && highlights.length > 0) {
-                highlights.forEach((highlight, index) => {
+                highlights.forEach((h, index) => {
                     const card = document.createElement('div');
                     card.className = 'highlight-card';
                     card.innerHTML = `
-                        <div class="highlight-title">Highlight ${index + 1} - ${highlight.timestamp || '00:00'}</div>
-                        <div class="highlight-description">${highlight.long_text || highlight.description || 'Analysis completed'}</div>
-                        <div class="highlight-action">Action Required: ${highlight.action_required || 'Review your technique'}</div>
+                        <div class="highlight-title">Highlight ${index + 1} (${h.timestamp || 'N/A'})</div>
+                        <p class="highlight-description"><strong>Analysis:</strong> ${h.long_text || h.analysis || 'No analysis text available.'}</p>
+                        <p class="highlight-action"><strong>Action Required:</strong> ${h.action_required || 'No action text available.'}</p>
                     `;
                     container.appendChild(card);
                 });
             } else {
-                // Show default message if no highlights
-                const card = document.createElement('div');
-                card.className = 'highlight-card';
-                card.innerHTML = `
-                    <div class="highlight-title">Analysis Complete</div>
-                    <div class="highlight-description">Your video has been processed successfully. Review the video above to see your technique.</div>
-                    <div class="highlight-action">Action Required: Continue practicing and improving your technique</div>
-                `;
-                container.appendChild(card);
+                // Provide a clear fallback if no highlights are found
+                container.innerHTML += '<p style="color: white; text-align: center;">No specific highlights were generated, but you can review the full video above.</p>';
             }
-            console.log('Highlights displayed, container now has', container.children.length, 'children');
         }
 
         function displayDrills(drills) {
             const container = document.getElementById('drillsContainer');
-            console.log('Drills container:', container);
+            if (!container) return;
+
             container.innerHTML = '<h3 class="section-title">Recommended Drills</h3>';
-            
+
             if (drills && drills.length > 0) {
                 drills.forEach(drill => {
                     const card = document.createElement('div');
                     card.className = 'drill-card';
                     card.innerHTML = `
-                        <div class="drill-name">${drill.drill_name || drill.name || 'Technique Drill'}</div>
-                        <div class="drill-description">${drill.description || 'Practice this drill to improve your technique.'}</div>
-                        <div class="drill-problem">Fixes: ${drill.problem_it_fixes || drill.problem || 'General technique improvement'}</div>
+                        <div class="drill-name">${drill.drill_name || 'Recommended Drill'}</div>
+                        <p class="drill-description">${drill.description || ''}</p>
+                        <p class="drill-problem"><strong>Fixes:</strong> ${drill.problem_it_fixes || 'General technique'}</p>
                     `;
                     container.appendChild(card);
                 });
             } else {
-                // Show default drill if none provided
-                const card = document.createElement('div');
-                card.className = 'drill-card';
-                card.innerHTML = `
-                    <div class="drill-name">Basic Technique Review</div>
-                    <div class="drill-description">Review your uploaded video to identify areas for improvement. Focus on your stance, guard position, and movement.</div>
-                    <div class="drill-problem">Fixes: General technique improvement and awareness</div>
-                `;
-                container.appendChild(card);
+                container.style.display = 'none'; // Hide the section if there are no drills
             }
-            console.log('Drills displayed, container now has', container.children.length, 'children');
         }
 
         function displayYouTube(videos) {
             const container = document.getElementById('youtubeContainer');
-            console.log('YouTube container:', container);
+            if (!container) return;
+
             container.innerHTML = '<h3 class="section-title">YouTube Recommendations</h3>';
-            
+
             if (videos && videos.length > 0) {
                 videos.forEach(video => {
+                    const videoId = extractYouTubeId(video.url || video.youtube_url || '');
+                    if (!videoId) return; // Skip if no valid ID
+
                     const card = document.createElement('div');
                     card.className = 'youtube-card';
-                    
-                    // Extract video ID from YouTube URL
-                    const videoId = extractYouTubeId(video.url || video.youtube_url || '');
-                    
-                    if (videoId) {
-                        card.innerHTML = `
-                            <div class="youtube-title-text">${video.title || video.video_title || 'Boxing Technique Video'}</div>
-                            <div class="youtube-problem">${video.problem_it_fixes || video.description || 'Learn boxing techniques'}</div>
-                            <div class="youtube-embed">
-                                <iframe width="100%" height="200" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>
-                            </div>
-                            <a href="${video.url || video.youtube_url || '#'}" target="_blank" class="youtube-link">Watch on YouTube</a>
-                        `;
-                    } else {
-                        card.innerHTML = `
-                            <div class="youtube-title-text">${video.title || video.video_title || 'Boxing Technique Video'}</div>
-                            <div class="youtube-problem">${video.problem_it_fixes || video.description || 'Learn boxing techniques'}</div>
-                            <a href="${video.url || video.youtube_url || 'https://www.youtube.com/results?search_query=boxing+technique'}" target="_blank" class="youtube-link">Watch on YouTube</a>
-                        `;
-                    }
+                    card.innerHTML = `
+                        <div class="youtube-title-text">${video.title || 'Boxing Tutorial'}</div>
+                        <p class="youtube-problem">${video.problem_it_fixes || ''}</p>
+                        <div class="youtube-embed">
+                            <iframe width="100%" height="200" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                        </div>
+                    `;
                     container.appendChild(card);
                 });
             } else {
-                // Show default YouTube recommendation if none provided
-                const card = document.createElement('div');
-                card.className = 'youtube-card';
-                card.innerHTML = `
-                    <div class="youtube-title-text">Boxing Technique Fundamentals</div>
-                    <div class="youtube-problem">Learn the basics of proper boxing stance, guard, and movement</div>
-                    <div class="youtube-embed">
-                        <iframe width="100%" height="200" src="https://www.youtube.com/embed/dQw4w9WgXcQ" frameborder="0" allowfullscreen></iframe>
-                    </div>
-                    <a href="https://www.youtube.com/results?search_query=boxing+technique+fundamentals" target="_blank" class="youtube-link">Search YouTube</a>
-                `;
-                container.appendChild(card);
+                container.style.display = 'none'; // Hide the section if there are no videos
             }
-            console.log('YouTube videos displayed, container now has', container.children.length, 'children');
         }
 
         function extractYouTubeId(url) {
@@ -1616,18 +1576,29 @@
         }
 
         function setFeedbackRating(rating) {
+            console.log('Setting feedback rating:', rating);
             selectedFeedbackRating = rating;
             // Remove active class from all buttons
             document.querySelectorAll('.feedback-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
             // Add active class to selected button
-            document.querySelector(`.feedback-btn.${rating}`).classList.add('active');
+            const selectedButton = document.querySelector(`.feedback-btn.${rating}`);
+            if (selectedButton) {
+                selectedButton.classList.add('active');
+                console.log('Added active class to button:', rating);
+            } else {
+                console.error('Button not found for rating:', rating);
+            }
         }
 
         function submitFeedback(event) {
             event.preventDefault();
+            console.log('Submitting feedback...');
+            
             const feedbackText = document.getElementById('feedbackText').value;
+            console.log('Feedback text:', feedbackText);
+            console.log('Selected rating:', selectedFeedbackRating);
             
             if (!selectedFeedbackRating) {
                 alert('Please select a rating before submitting feedback.');
@@ -1640,6 +1611,8 @@
                 feedback_text: feedbackText
             };
 
+            console.log('Sending feedback data:', feedbackData);
+
             fetch('/submit-feedback', {
                 method: 'POST',
                 headers: {
@@ -1649,6 +1622,7 @@
             })
             .then(response => response.json())
             .then(data => {
+                console.log('Feedback response:', data);
                 if (data.success) {
                     alert('Thank you for your feedback! Your feedback has been submitted.');
                     // Disable the form after successful submission
