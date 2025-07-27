@@ -40,9 +40,14 @@ class GeminiClient:
             video_b64 = base64.b64encode(video_data).decode('utf-8')
             
             # Read prompt from file based on analysis type
-            prompt_file = f"prompts/{analysis_type}_prompt.txt"
-            if analysis_type == "everything":
-                prompt_file = "prompts/default_prompt.txt"
+            prompt_file_map = {
+                "everything": "prompts/everything_prompt.txt",
+                "head_movement": "prompts/head_movement_prompt.txt",
+                "punch_techniques": "prompts/punch_techniques_prompt.txt",
+                "footwork": "prompts/footwork_prompt.txt"
+            }
+            
+            prompt_file = prompt_file_map.get(analysis_type, "prompts/default_prompt.txt")
             
             try:
                 with open(prompt_file, 'r', encoding='utf-8') as f:
