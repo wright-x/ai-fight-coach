@@ -197,6 +197,47 @@ async def test_endpoint():
         "timestamp": datetime.now().isoformat()
     })
 
+@app.get("/test-video")
+async def test_video():
+    """Test endpoint to verify video serving works"""
+    logger.info("🎥 Test video endpoint requested")
+    try:
+        # Create a simple test video (1 second black video)
+        import numpy as np
+        import cv2
+        
+        # Create a simple test video
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter('test_video.mp4', fourcc, 1.0, (640,480))
+        
+        # Create a black frame
+        frame = np.zeros((480,640,3), dtype=np.uint8)
+        
+        # Write 30 frames (1 second at 30fps)
+        for _ in range(30):
+            out.write(frame)
+        
+        out.release()
+        
+        # Read the test video
+        with open('test_video.mp4', 'rb') as f:
+            video_content = f.read()
+        
+        # Clean up
+        os.remove('test_video.mp4')
+        
+        logger.info(f"✅ Test video created: {len(video_content)} bytes")
+        
+        return Response(
+            content=video_content,
+            media_type="video/mp4",
+            headers={"Content-Disposition": "inline; filename=test_video.mp4"}
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Test video creation failed: {e}")
+        return JSONResponse(content={"error": f"Test video failed: {e}"}, status_code=500)
+
 @app.get("/")
 async def root():
     """Check if user is registered and redirect appropriately"""
@@ -676,6 +717,22 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
         active_jobs[job_id]["progress"] = 100
         active_jobs[job_id]["status"] = "completed"
         active_jobs[job_id]["message"] = "Analysis completed successfully"
+        
+        # Ensure we have a video to serve
+        if job_id not in in_memory_files:
+            logger.warning(f"⚠️ No processed video found, storing original video for job: {job_id}")
+            try:
+                with open(temp_video_path, 'rb') as f:
+                    original_video_content = f.read()
+                in_memory_files[job_id] = {
+                    "content": original_video_content,
+                    "filename": f"original_{job_id}.mp4",
+                    "content_type": "video/mp4"
+                }
+                logger.info(f"✅ Original video stored in memory: {len(original_video_content)} bytes")
+            except Exception as e:
+                logger.error(f"❌ Error storing original video: {e}")
+        
         active_jobs[job_id]["video_url"] = f"/video/{job_id}"  # Use our custom endpoint
         active_jobs[job_id]["analysis_result"] = analysis_result
         
