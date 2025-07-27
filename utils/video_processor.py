@@ -8,7 +8,7 @@ import base64
 import tempfile
 
 class VideoProcessor:
-    """Surgical VideoProcessor that follows exact specifications"""
+    """Surgical VideoProcessor with correct audio sync pipeline"""
     
     def __init__(self):
         # Colors for overlays - FIXED RGB VALUES
@@ -23,115 +23,242 @@ class VideoProcessor:
             'purple': (128, 0, 128)   # For neon aesthetic
         }
         
-        print("✅ VideoProcessor initialized (surgical mode)")
+        # Initialize TTS client for individual highlight audio
+        self.tts_client = self._init_tts_client()
+        
+        print("✅ VideoProcessor initialized (surgical mode with audio sync)")
+
+    def _init_tts_client(self):
+        """Initialize TTS client for individual highlight audio generation"""
+        try:
+            import os
+            from elevenlabs import generate, save, set_api_key
+            
+            api_key = os.getenv("ELEVENLABS_API_KEY")
+            if api_key:
+                set_api_key(api_key)
+                return {"generate": generate, "save": save}
+            else:
+                print("⚠️ No ElevenLabs API key found, TTS will be disabled")
+                return None
+        except ImportError:
+            print("⚠️ ElevenLabs not available, TTS will be disabled")
+            return None
 
     def create_highlight_video(self, video_path: str, highlights: list, output_path: str, user_name: str = "FIGHTER") -> str:
         """
-        Main entry point - creates final video with intro card, title cards, and t-1 to t+1 highlights at 0.4x speed
+        Main entry point - creates final video with intro card, title cards, and individual highlight clips with audio
         """
-        # CRITICAL: Proper MediaPipe resource management with with statement
-        with mp.solutions.pose.Pose(
-            static_image_mode=False, 
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-        ) as pose:
+        try:
+            print(f"🎬 Starting surgical video processing for {len(highlights)} highlights")
             
-            try:
-                print(f"🎬 Starting surgical video processing for {len(highlights)} highlights")
+            # Load source video
+            source_clip = VideoFileClip(video_path)
+            source_fps = source_clip.fps
+            source_duration = source_clip.duration
+            source_width, source_height = source_clip.size
+            
+            print(f"📹 Source video: {source_duration:.2f}s at {source_fps}fps, {source_width}x{source_height}")
+            
+            # CRITICAL: Create empty list for final clips
+            final_clips = []
+            
+            # CRITICAL: Generate 2-second Intro Title Card ("HIGHLIGHTS")
+            intro_card = self._create_text_card("HIGHLIGHTS", source_width, source_height, source_fps, duration=2.0)
+            final_clips.append(intro_card)
+            
+            # CRITICAL: Process each highlight with individual TTS
+            for i, highlight in enumerate(highlights):
+                print(f"🎯 Processing highlight {i+1}/{len(highlights)}")
                 
-                # Load source video
-                source_clip = VideoFileClip(video_path)
-                source_fps = source_clip.fps
-                source_duration = source_clip.duration
-                source_width, source_height = source_clip.size
+                # CRITICAL: Generate 1.5-second Highlight Title Card
+                title_card = self._create_text_card(f"HIGHLIGHT {i+1}", source_width, source_height, source_fps, duration=1.5)
+                final_clips.append(title_card)
                 
-                print(f"📹 Source video: {source_duration:.2f}s at {source_fps}fps, {source_width}x{source_height}")
+                # CRITICAL: Generate individual highlight clip with its own audio
+                highlight_clip = self._create_single_highlight_clip(
+                    source_clip, 
+                    highlight, 
+                    user_name, 
+                    source_fps
+                )
+                final_clips.append(highlight_clip)
+            
+            # CRITICAL: Concatenate all clips in correct order
+            if final_clips:
+                print(f"🎬 Concatenating {len(final_clips)} clips...")
+                final_video = concatenate_videoclips(final_clips)
                 
-                all_clips = []
+                # Write final video with proper codec
+                final_video.write_videofile(
+                    output_path,
+                    codec="libx264",
+                    audio_codec="aac",
+                    fps=source_fps,
+                    verbose=False,
+                    logger=None
+                )
                 
-                # CRITICAL: Generate Intro Card ("HIGHLIGHTS")
-                intro_card = self._create_text_card("HIGHLIGHTS", source_width, source_height, source_fps, duration=2.0)
-                all_clips.append(intro_card)
+                # Cleanup
+                final_video.close()
+                for clip in final_clips:
+                    clip.close()
                 
-                # Process each highlight with surgical precision
-                for i, highlight in enumerate(highlights):
-                    print(f"🎯 Processing highlight {i+1}/{len(highlights)}")
-                    
-                    # CRITICAL: Generate Title Card ("HIGHLIGHT i+1")
-                    title_card = self._create_text_card(f"HIGHLIGHT {i+1}", source_width, source_height, source_fps, duration=1.5)
-                    all_clips.append(title_card)
-                    
-                    # Extract timestamp and convert to seconds
-                    timestamp = self._parse_timestamp(highlight.get('timestamp', '00:00'))
-                    
-                    # CRITICAL: t-1 to t+1 window (2-second total duration)
-                    start_time = max(0, timestamp - 1)
-                    end_time = min(source_duration, timestamp + 1)
-                    
-                    print(f"⏰ Highlight window: {start_time:.2f}s to {end_time:.2f}s")
-                    
-                    # Extract the highlight clip
-                    highlight_clip = source_clip.subclip(start_time, end_time)
-                    
-                    # CRITICAL: Slow down to 0.25x speed
-                    slowed_clip = highlight_clip.speedx(0.25)
-                    
-                    # Process frames with overlays
-                    processed_frames = []
-                    for frame in slowed_clip.iter_frames():
-                        # CRITICAL: Convert BGR to RGB before processing
-                        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        processed_frame = self._add_overlays(
-                            frame_rgb, 
-                            '',  # No short_text needed
-                            highlight.get('action_required', ''),
-                            user_name,
-                            pose  # Pass the pose object to the overlay method
-                        )
-                        processed_frames.append(processed_frame)
-                    
-                    # Create new clip from processed frames
-                    processed_clip = ImageSequenceClip(processed_frames, fps=slowed_clip.fps)
-                    all_clips.append(processed_clip)
-                    
-                    # Cleanup
-                    highlight_clip.close()
-                    slowed_clip.close()
-                
-                # CRITICAL: Concatenate all clips (Intro -> Title -> Clip sequence)
-                if all_clips:
-                    final_video = concatenate_videoclips(all_clips)
-                    
-                    # Write final video with proper codec
-                    final_video.write_videofile(
-                        output_path,
-                        codec="libx264",
-                        audio_codec="aac",
-                        fps=source_fps,
-                        verbose=False,
-                        logger=None
-                    )
-                    
-                    # Cleanup
-                    final_video.close()
-                    for clip in all_clips:
-                        clip.close()
-                    
-                    print(f"✅ Surgical video processing complete: {output_path}")
-                    return output_path
-                else:
-                    raise ValueError("No valid clips were processed")
-                    
-            except Exception as e:
-                print(f"❌ Surgical video processing failed: {e}")
-                # Fallback: copy original video
-                import shutil
-                shutil.copy2(video_path, output_path)
+                print(f"✅ Surgical video processing complete: {output_path}")
                 return output_path
-            finally:
-                # Cleanup source clip
-                if 'source_clip' in locals():
-                    source_clip.close()
+            else:
+                raise ValueError("No valid clips were processed")
+                
+        except Exception as e:
+            print(f"❌ Surgical video processing failed: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback: copy original video
+            import shutil
+            shutil.copy2(video_path, output_path)
+            return output_path
+        finally:
+            # Cleanup source clip
+            if 'source_clip' in locals():
+                source_clip.close()
+
+    def _create_single_highlight_clip(self, source_clip, highlight, user_name, source_fps):
+        """
+        CRITICAL: Create a single highlight clip with its own TTS audio attached
+        This is the core fix for audio sync issues
+        """
+        try:
+            # Step 1: Generate TTS for this specific highlight
+            audio_path = None
+            if self.tts_client:
+                audio_path = self._generate_highlight_tts(highlight, f"highlight_{hash(str(highlight))}")
+            
+            # Step 2: Generate video with overlays (silent)
+            video_clip = self._generate_highlight_video(source_clip, highlight, user_name, source_fps)
+            
+            # Step 3: Attach audio to video if available
+            if audio_path and os.path.exists(audio_path):
+                try:
+                    audio_clip = AudioFileClip(audio_path)
+                    final_clip = video_clip.set_audio(audio_clip)
+                    print(f"✅ Audio attached to highlight clip")
+                    return final_clip
+                except Exception as e:
+                    print(f"⚠️ Audio attachment failed: {e}, returning silent clip")
+                    return video_clip
+            else:
+                print(f"⚠️ No audio available for highlight, returning silent clip")
+                return video_clip
+                
+        except Exception as e:
+            print(f"❌ Highlight clip creation failed: {e}")
+            # Return a simple fallback clip
+            return self._create_fallback_clip(source_clip, highlight, source_fps)
+
+    def _generate_highlight_tts(self, highlight, clip_id):
+        """Generate TTS audio for a single highlight"""
+        try:
+            if not self.tts_client:
+                return None
+            
+            # Use only action_required text for TTS
+            action_text = highlight.get('action_required', '')
+            if not action_text:
+                return None
+            
+            # Create audio directory if it doesn't exist
+            os.makedirs("output/audio", exist_ok=True)
+            audio_path = f"output/audio/{clip_id}.mp3"
+            
+            # Generate TTS
+            audio = self.tts_client["generate"](
+                text=action_text,
+                voice="21m00Tcm4TlvDq8ikWAM",
+                model="eleven_monolingual_v1"
+            )
+            
+            # Save audio
+            self.tts_client["save"](audio, audio_path)
+            print(f"✅ TTS generated: {audio_path}")
+            return audio_path
+            
+        except Exception as e:
+            print(f"⚠️ TTS generation failed: {e}")
+            return None
+
+    def _generate_highlight_video(self, source_clip, highlight, user_name, source_fps):
+        """Generate video clip with overlays for a single highlight"""
+        try:
+            # Extract timestamp and convert to seconds
+            timestamp = self._parse_timestamp(highlight.get('timestamp', '00:00'))
+            
+            # CRITICAL: t-1 to t+1 window (2-second total duration)
+            start_time = max(0, timestamp - 1)
+            end_time = min(source_clip.duration, timestamp + 1)
+            
+            print(f"⏰ Highlight window: {start_time:.2f}s to {end_time:.2f}s")
+            
+            # Extract the highlight clip
+            highlight_clip = source_clip.subclip(start_time, end_time)
+            
+            # CRITICAL: Slow down to 0.25x speed
+            slowed_clip = highlight_clip.speedx(0.25)
+            
+            # CRITICAL: Process frames with overlays using MediaPipe
+            processed_frames = []
+            with mp.solutions.pose.Pose(
+                static_image_mode=False, 
+                min_detection_confidence=0.5,
+                min_tracking_confidence=0.5
+            ) as pose:
+                
+                for frame in slowed_clip.iter_frames():
+                    # CRITICAL: Convert BGR to RGB before processing
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    processed_frame = self._add_overlays(
+                        frame_rgb, 
+                        highlight.get('action_required', ''),
+                        user_name,
+                        pose
+                    )
+                    processed_frames.append(processed_frame)
+            
+            # Create new clip from processed frames
+            processed_clip = ImageSequenceClip(processed_frames, fps=slowed_clip.fps)
+            
+            # Cleanup
+            highlight_clip.close()
+            slowed_clip.close()
+            
+            return processed_clip
+            
+        except Exception as e:
+            print(f"❌ Highlight video generation failed: {e}")
+            return self._create_fallback_clip(source_clip, highlight, source_fps)
+
+    def _create_fallback_clip(self, source_clip, highlight, source_fps):
+        """Create a simple fallback clip if processing fails"""
+        try:
+            # Create a simple 2-second black clip with text
+            width, height = source_clip.size
+            fallback_clip = ColorClip(size=(width, height), color=(0, 0, 0), duration=2.0)
+            
+            # Add text overlay
+            action_text = highlight.get('action_required', 'Analysis failed')
+            text_clip = TextClip(
+                action_text,
+                fontsize=int(width * 0.03),
+                color='white',
+                font='Arial-Bold'
+            ).set_position('center').set_duration(2.0)
+            
+            final_clip = fallback_clip.set_make_frame(lambda t: np.array(fallback_clip.get_frame(t)))
+            return final_clip
+            
+        except Exception as e:
+            print(f"❌ Fallback clip creation failed: {e}")
+            # Return a simple black clip
+            return ColorClip(size=(640, 480), color=(0, 0, 0), duration=2.0)
 
     def _create_text_card(self, text: str, width: int, height: int, fps: float, duration: float = 2.0):
         """Create a text card with neon aesthetic"""
@@ -161,12 +288,12 @@ class VideoProcessor:
             # Fallback: simple color clip
             return ColorClip(size=(width, height), color=(0, 0, 0), duration=duration)
 
-    def _add_overlays(self, frame, short_text, action_text, user_name, pose):
+    def _add_overlays(self, frame, action_text, user_name, pose):
         """
-        Add head pointer and static captions with thick black outline
+        CRITICAL: Add head pointer and static captions with proper color conversion and dynamic sizing
         """
         try:
-            # Convert frame to PIL for text rendering
+            # CRITICAL: Convert frame to PIL for text rendering (already RGB from cv2.cvtColor)
             pil_frame = Image.fromarray(frame)
             draw = ImageDraw.Draw(pil_frame)
             
@@ -219,10 +346,10 @@ class VideoProcessor:
                     width=3
                 )
             
-            # CRITICAL: Static captions at bottom center using action_required
+            # CRITICAL: Static captions with Montserrat Semi-Bold, 30% bigger, THICK outline
             if action_text:
-                # Calculate font size (3.9% of frame width - 30% bigger)
-                font_size = max(26, int(w * 0.039))
+                # Calculate font size (5.5% of frame width - 30% bigger than before)
+                font_size = max(26, int(w * 0.055))
                 
                 try:
                     # Try to use Montserrat Semi-Bold font
@@ -248,7 +375,7 @@ class VideoProcessor:
                     action_text,
                     font=font,
                     fill=self.colors['white'],
-                    stroke_width=5,  # THICK outline
+                    stroke_width=4,  # THICK outline
                     stroke_fill=self.colors['black']
                 )
             
@@ -299,7 +426,7 @@ class VideoProcessor:
 
     def add_audio_to_video(self, video_path: str, audio_path: str, output_path: str) -> str:
         """
-        Combine video with TTS audio using MoviePy
+        Combine video with TTS audio using MoviePy (legacy method for compatibility)
         """
         try:
             print(f"🔊 Adding audio to video: {audio_path}")
