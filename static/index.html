@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 25%, #404040 50%, #2d2d2d 75%, #1a1a1a 100%);
             min-height: 100vh;
             padding: 20px;
             position: relative;
@@ -29,9 +29,9 @@
             width: 100%;
             height: 100%;
             background: 
-                radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(118, 75, 162, 0.1) 0%, transparent 50%),
-                linear-gradient(45deg, transparent 48%, rgba(102, 126, 234, 0.05) 50%, transparent 52%);
+                radial-gradient(circle at 20% 80%, rgba(220, 20, 60, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(139, 0, 0, 0.1) 0%, transparent 50%),
+                linear-gradient(45deg, transparent 48%, rgba(220, 20, 60, 0.05) 50%, transparent 52%);
             pointer-events: none;
             z-index: -1;
         }
@@ -58,7 +58,7 @@
             left: 10%;
             width: 50px;
             height: 50px;
-            background: linear-gradient(45deg, #667eea, #764ba2);
+            background: linear-gradient(45deg, #dc143c, #8b0000);
             clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
             animation-delay: 0s;
         }
@@ -68,7 +68,7 @@
             right: 15%;
             width: 30px;
             height: 30px;
-            background: linear-gradient(45deg, #667eea, #764ba2);
+            background: linear-gradient(45deg, #dc143c, #ff4444);
             border-radius: 50%;
             animation-delay: 2s;
         }
@@ -78,7 +78,7 @@
             left: 20%;
             width: 40px;
             height: 40px;
-            background: linear-gradient(45deg, #764ba2, #667eea);
+            background: linear-gradient(45deg, #8b0000, #dc143c);
             clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
             animation-delay: 4s;
         }
@@ -91,14 +91,14 @@
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
             border-radius: 20px;
             box-shadow: 
-                0 20px 40px rgba(0,0,0,0.1),
-                inset 0 1px 0 rgba(255,255,255,0.2);
+                0 20px 40px rgba(0,0,0,0.5),
+                inset 0 1px 0 rgba(255,255,255,0.1);
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
         }
 
         .container::before {
@@ -108,7 +108,7 @@
             left: 0;
             right: 0;
             height: 2px;
-            background: linear-gradient(90deg, transparent, #667eea, transparent);
+            background: linear-gradient(90deg, transparent, #dc143c, transparent);
             animation: shimmer 3s ease-in-out infinite;
         }
 
@@ -118,7 +118,7 @@
         }
 
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
             color: white;
             text-align: center;
             padding: 30px;
@@ -141,7 +141,7 @@
             font-size: 2.5rem;
             margin-bottom: 10px;
             font-weight: 700;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
             position: relative;
             z-index: 1;
         }
@@ -159,9 +159,9 @@
         }
 
         .upload-section {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 15px;
             padding: 30px;
             text-align: center;
@@ -177,7 +177,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: conic-gradient(from 0deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+            background: conic-gradient(from 0deg, transparent, rgba(220, 20, 60, 0.1), transparent);
             animation: rotate 4s linear infinite;
         }
 
@@ -195,9 +195,9 @@
         }
 
         .file-info {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 10px;
             padding: 15px;
             margin: 20px 0;
@@ -206,7 +206,7 @@
         }
 
         .upload-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
             color: white;
             border: none;
             padding: 15px 30px;
@@ -217,12 +217,12 @@
             margin: 0 10px;
             position: relative;
             z-index: 1;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
         }
 
         .upload-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 8px 25px rgba(220, 20, 60, 0.5);
         }
 
         .upload-btn:disabled {
@@ -259,9 +259,9 @@
         }
 
         .analysis-option {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(220, 20, 60, 0.3);
             border-radius: 15px;
             padding: 25px;
             text-align: center;
@@ -280,7 +280,7 @@
             left: -100%;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.2), transparent);
+            background: linear-gradient(90deg, transparent, rgba(220, 20, 60, 0.2), transparent);
             transition: left 0.5s ease;
         }
 
@@ -290,13 +290,13 @@
 
         .analysis-option:hover {
             transform: translateY(-5px);
-            border-color: #667eea;
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            border-color: #dc143c;
+            box-shadow: 0 10px 30px rgba(220, 20, 60, 0.3);
         }
 
         .analysis-option.selected {
-            border-color: #667eea;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: #dc143c;
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
             color: white;
         }
 
@@ -320,9 +320,9 @@
         }
 
         .guidelines-section {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 10px;
             padding: 20px;
             margin: 20px 0;
@@ -331,7 +331,7 @@
         }
 
         .guidelines-title {
-            color: #667eea;
+            color: #dc143c;
             font-size: 1.2rem;
             margin-bottom: 15px;
             font-weight: 600;
@@ -349,7 +349,7 @@
         }
 
         .guideline-icon {
-            color: #667eea;
+            color: #dc143c;
             font-size: 1.2rem;
         }
 
@@ -359,9 +359,9 @@
         }
 
         .progress-container {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 10px;
             padding: 20px;
             margin: 20px 0;
@@ -385,7 +385,7 @@
         .progress-bar {
             width: 100%;
             height: 20px;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             border-radius: 10px;
             overflow: hidden;
             position: relative;
@@ -393,7 +393,7 @@
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #667eea, #764ba2, #667eea);
+            background: linear-gradient(90deg, #dc143c, #8b0000, #dc143c);
             border-radius: 10px;
             transition: width 0.3s ease;
             position: relative;
@@ -424,9 +424,9 @@
 
         .stage {
             padding: 10px 15px;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 8px;
             color: #cccccc;
             font-size: 0.9rem;
@@ -435,11 +435,11 @@
         }
 
         .stage.active {
-            border-color: #667eea;
+            border-color: #dc143c;
             color: #ffffff;
             opacity: 1;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
+            box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
         }
 
         .stage.completed {
@@ -450,9 +450,9 @@
         }
 
         .result-container {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 15px;
             padding: 30px;
             margin: 20px 0;
@@ -477,9 +477,9 @@
         }
 
         .highlight-card {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 10px;
             padding: 20px;
             position: relative;
@@ -493,11 +493,11 @@
             left: 0;
             width: 4px;
             height: 100%;
-            background: linear-gradient(180deg, #667eea, #764ba2);
+            background: linear-gradient(180deg, #dc143c, #8b0000);
         }
 
         .highlight-title {
-            color: #667eea;
+            color: #dc143c;
             font-size: 1.1rem;
             font-weight: 600;
             margin-bottom: 10px;
@@ -518,15 +518,15 @@
         }
 
         .highlight-action {
-            color: #667eea;
+            color: #dc143c;
             font-weight: 600;
             font-style: italic;
         }
 
         .drills-container {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 15px;
             padding: 30px;
             margin: 20px 0;
@@ -534,23 +534,23 @@
         }
 
         .drills-title {
-            color: #667eea;
+            color: #dc143c;
             font-size: 1.5rem;
             margin-bottom: 20px;
             text-align: center;
         }
 
         .drill-card {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 10px;
             padding: 20px;
             margin-bottom: 15px;
         }
 
         .drill-name {
-            color: #667eea;
+            color: #dc143c;
             font-size: 1.1rem;
             font-weight: 600;
             margin-bottom: 10px;
@@ -567,9 +567,9 @@
         }
 
         .youtube-container {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 15px;
             padding: 30px;
             margin: 20px 0;
@@ -577,23 +577,23 @@
         }
 
         .youtube-title {
-            color: #667eea;
+            color: #dc143c;
             font-size: 1.5rem;
             margin-bottom: 20px;
             text-align: center;
         }
 
         .youtube-card {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 10px;
             padding: 20px;
             margin-bottom: 15px;
         }
 
         .youtube-title-text {
-            color: #667eea;
+            color: #dc143c;
             font-size: 1.1rem;
             font-weight: 600;
             margin-bottom: 10px;
@@ -615,16 +615,16 @@
         }
 
         .description-section {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 15px;
             padding: 30px;
             margin: 20px 0;
         }
 
         .description-title {
-            color: #667eea;
+            color: #dc143c;
             font-size: 1.5rem;
             margin-bottom: 20px;
             text-align: center;
@@ -645,9 +645,9 @@
         }
 
         .feature-item {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 10px;
             padding: 20px;
             text-align: center;
@@ -661,7 +661,7 @@
         }
 
         .feature-title {
-            color: #667eea;
+            color: #dc143c;
             font-size: 1.1rem;
             font-weight: 600;
             margin-bottom: 10px;
@@ -682,9 +682,9 @@
 
         /* New styles for progress page */
         .feedback-section {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 15px;
             padding: 30px;
             margin: 20px 0;
@@ -694,19 +694,19 @@
         .feedback-box {
             display: flex;
             align-items: center;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 10px;
             padding: 15px 20px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
         }
 
         .feedback-icon {
             font-size: 2rem;
             margin-right: 15px;
-            color: #667eea;
+            color: #dc143c;
         }
 
         .feedback-content h4 {
@@ -728,30 +728,28 @@
 
         .feedback-input, .feedback-textarea {
             width: 100%;
-            max-width: 400px;
             padding: 12px;
             margin: 10px 0;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 8px;
             background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
             color: white;
-            font-size: 0.9rem;
-            resize: vertical;
+            font-size: 1rem;
+            transition: all 0.3s ease;
         }
 
         .feedback-input::placeholder, .feedback-textarea::placeholder {
             color: #cccccc;
-            opacity: 0.7;
         }
 
         .feedback-input:focus, .feedback-textarea:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+            border-color: #dc143c;
+            box-shadow: 0 0 10px rgba(220, 20, 60, 0.3);
         }
 
         .submit-feedback-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
             color: white;
             border: none;
             padding: 12px 30px;
@@ -760,14 +758,14 @@
             cursor: pointer;
             transition: all 0.3s ease;
             margin-top: 15px;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
             display: block;
             margin: 0 auto;
         }
 
         .submit-feedback-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 8px 25px rgba(220, 20, 60, 0.5);
         }
 
         .features-showcase {
@@ -778,9 +776,9 @@
         }
 
         .feature-card {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 15px;
             padding: 25px;
             text-align: center;
@@ -789,7 +787,7 @@
 
         .feature-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 10px 30px rgba(220, 20, 60, 0.3);
         }
 
         .feature-card .feature-icon {
@@ -800,7 +798,7 @@
         .feature-card h4 {
             font-size: 1.2rem;
             margin-bottom: 10px;
-            color: #667eea;
+            color: #dc143c;
         }
 
         .feature-card p {
@@ -818,7 +816,7 @@
         }
 
         .download-btn, .analyze-again-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
             color: white;
             border: none;
             padding: 12px 25px;
@@ -826,7 +824,7 @@
             font-size: 1rem;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
         }
 
         .video-container {
@@ -843,7 +841,7 @@
 
         .download-btn:hover, .analyze-again-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 8px 25px rgba(220, 20, 60, 0.5);
         }
 
         .download-btn:disabled, .analyze-again-btn:disabled {
@@ -883,12 +881,12 @@
         }
 
         .feedback-btn.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.5);
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
+            box-shadow: 0 4px 15px rgba(220, 20, 60, 0.5);
         }
 
         .section-title {
-            color: #667eea;
+            color: #dc143c;
             font-size: 1.5rem;
             margin-bottom: 20px;
             text-align: center;
@@ -902,7 +900,7 @@
         }
 
         .download-btn, .analyze-again-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
             color: white;
             border: none;
             padding: 12px 25px;
@@ -910,12 +908,12 @@
             font-size: 1rem;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
         }
 
         .download-btn:hover, .analyze-again-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 8px 25px rgba(220, 20, 60, 0.5);
         }
 
         .feedback-buttons {
@@ -949,15 +947,15 @@
         }
 
         .feedback-btn.selected {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%) !important;
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 8px 20px rgba(220, 20, 60, 0.5);
         }
 
         .highlight-card, .drill-card, .youtube-card {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 10px;
             padding: 20px;
             margin-bottom: 15px;
@@ -966,11 +964,11 @@
 
         .highlight-card:hover, .drill-card:hover, .youtube-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 8px 25px rgba(220, 20, 60, 0.3);
         }
 
         .highlight-title, .drill-name, .youtube-title-text {
-            color: #667eea;
+            color: #dc143c;
             font-size: 1.2rem;
             font-weight: bold;
             margin-bottom: 10px;
@@ -990,7 +988,7 @@
 
         .youtube-link {
             display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
             color: white;
             text-decoration: none;
             padding: 8px 16px;
@@ -1002,7 +1000,7 @@
 
         .youtube-link:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
         }
 
         .feedback-section {
@@ -1012,14 +1010,14 @@
         }
 
         .feedback-box {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 15px;
             padding: 30px;
             max-width: 600px;
             width: 100%;
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
+            box-shadow: 0 8px 25px rgba(220, 20, 60, 0.2);
         }
 
         .feedback-icon {
@@ -1029,7 +1027,7 @@
         }
 
         .feedback-content h4 {
-            color: #667eea;
+            color: #dc143c;
             font-size: 1.3rem;
             margin-bottom: 10px;
             text-align: center;
@@ -1055,12 +1053,12 @@
 
         #feedbackText:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+            border-color: #dc143c;
+            box-shadow: 0 0 10px rgba(220, 20, 60, 0.3);
         }
 
         .submit-feedback-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
             color: white;
             border: none;
             padding: 12px 30px;
@@ -1068,14 +1066,14 @@
             font-size: 1rem;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
             display: block;
             margin: 0 auto;
         }
 
         .submit-feedback-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 8px 25px rgba(220, 20, 60, 0.5);
         }
 
         .youtube-embed {
@@ -1096,7 +1094,7 @@
         }
 
         .results-header h1 {
-            color: #667eea;
+            color: #dc143c;
             font-size: 2.5rem;
             margin-bottom: 10px;
             font-weight: 700;
@@ -1109,9 +1107,9 @@
         }
 
         .video-player-section {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 15px;
             padding: 30px;
             margin: 20px 0;
@@ -1124,16 +1122,16 @@
         }
 
         .highlights-section, .drills-section, .youtube-section {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             border-radius: 15px;
             padding: 30px;
             margin: 20px 0;
         }
 
         .section-title {
-            color: #667eea;
+            color: #dc143c;
             font-size: 1.8rem;
             margin-bottom: 25px;
             text-align: center;
