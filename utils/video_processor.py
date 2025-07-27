@@ -350,7 +350,7 @@ class VideoProcessor:
                     color='white',
                     stroke_color='purple',
                     stroke_width=3,
-                    font='Arial-Bold'
+                    font='Montserrat-SemiBold.ttf'
                 ).set_position('center').set_duration(duration)
                 print(f"✅ Text clip created: {text_clip.size}")
             except Exception as text_error:
@@ -498,7 +498,7 @@ class VideoProcessor:
                         line,
                         font=font,
                         fill=self.colors['white'],
-                        stroke_width=6,  # THICKER outline for better readability
+                        stroke_width=8,  # THICK outline for perfect readability
                         stroke_fill=self.colors['black']
                     )
                     
