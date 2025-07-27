@@ -11,13 +11,6 @@ class VideoProcessor:
     """Surgical VideoProcessor that follows exact specifications"""
     
     def __init__(self):
-        # Initialize MediaPipe for head tracking
-        self.mp_pose = mp.solutions.pose.Pose(
-            static_image_mode=False, 
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-        )
-        
         # Colors for overlays
         self.colors = {
             'white': (255, 255, 255),
@@ -35,103 +28,109 @@ class VideoProcessor:
         """
         Main entry point - creates final video with t-3 to t+3 highlights at 0.7x speed
         """
-        try:
-            print(f"🎬 Starting surgical video processing for {len(highlights)} highlights")
+        # CRITICAL: Proper MediaPipe resource management with with statement
+        with mp.solutions.pose.Pose(
+            static_image_mode=False, 
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        ) as pose:
             
-            # Load source video
-            source_clip = VideoFileClip(video_path)
-            source_fps = source_clip.fps
-            source_duration = source_clip.duration
-            
-            print(f"📹 Source video: {source_duration:.2f}s at {source_fps}fps")
-            
-            processed_clips = []
-            
-            # Process each highlight with surgical precision
-            for i, highlight in enumerate(highlights):
-                print(f"🎯 Processing highlight {i+1}/{len(highlights)}")
+            try:
+                print(f"🎬 Starting surgical video processing for {len(highlights)} highlights")
                 
-                # Extract timestamp and convert to seconds
-                timestamp = self._parse_timestamp(highlight.get('timestamp', '00:00'))
+                # Load source video
+                source_clip = VideoFileClip(video_path)
+                source_fps = source_clip.fps
+                source_duration = source_clip.duration
                 
-                # CRITICAL: t-3 to t+3 window
-                start_time = max(0, timestamp - 3)
-                end_time = min(source_duration, timestamp + 3)
+                print(f"📹 Source video: {source_duration:.2f}s at {source_fps}fps")
                 
-                print(f"⏰ Highlight window: {start_time:.2f}s to {end_time:.2f}s")
+                processed_clips = []
                 
-                # Extract the highlight clip
-                highlight_clip = source_clip.subclip(start_time, end_time)
+                # Process each highlight with surgical precision
+                for i, highlight in enumerate(highlights):
+                    print(f"🎯 Processing highlight {i+1}/{len(highlights)}")
+                    
+                    # Extract timestamp and convert to seconds
+                    timestamp = self._parse_timestamp(highlight.get('timestamp', '00:00'))
+                    
+                    # CRITICAL: t-3 to t+3 window
+                    start_time = max(0, timestamp - 3)
+                    end_time = min(source_duration, timestamp + 3)
+                    
+                    print(f"⏰ Highlight window: {start_time:.2f}s to {end_time:.2f}s")
+                    
+                    # Extract the highlight clip
+                    highlight_clip = source_clip.subclip(start_time, end_time)
+                    
+                    # CRITICAL: Slow down to 0.7x speed
+                    slowed_clip = highlight_clip.speedx(0.7)
+                    
+                    # Process frames with overlays
+                    processed_frames = []
+                    for frame in slowed_clip.iter_frames():
+                        processed_frame = self._add_overlays(
+                            frame, 
+                            highlight.get('detailed_feedback', ''),
+                            highlight.get('action_required', ''),
+                            user_name,
+                            pose  # Pass the pose object to the overlay method
+                        )
+                        processed_frames.append(processed_frame)
+                    
+                    # Create new clip from processed frames
+                    processed_clip = ImageSequenceClip(processed_frames, fps=slowed_clip.fps)
+                    
+                    # Add TTS audio if available
+                    if 'tts_audio' in highlight:
+                        try:
+                            audio_clip = AudioFileClip(highlight['tts_audio'])
+                            processed_clip = processed_clip.set_audio(audio_clip)
+                        except Exception as e:
+                            print(f"⚠️ TTS audio failed for highlight {i+1}: {e}")
+                    
+                    processed_clips.append(processed_clip)
+                    
+                    # Cleanup
+                    highlight_clip.close()
+                    slowed_clip.close()
                 
-                # CRITICAL: Slow down to 0.7x speed
-                slowed_clip = highlight_clip.speedx(0.7)
-                
-                # Process frames with overlays
-                processed_frames = []
-                for frame in slowed_clip.iter_frames():
-                    processed_frame = self._add_overlays(
-                        frame, 
-                        highlight.get('detailed_feedback', ''),
-                        highlight.get('action_required', ''),
-                        user_name
+                # CRITICAL: Concatenate all clips
+                if processed_clips:
+                    final_video = concatenate_videoclips(processed_clips)
+                    
+                    # Write final video with proper codec
+                    final_video.write_videofile(
+                        output_path,
+                        codec="libx264",
+                        audio_codec="aac",
+                        fps=source_fps,
+                        verbose=False,
+                        logger=None
                     )
-                    processed_frames.append(processed_frame)
-                
-                # Create new clip from processed frames
-                processed_clip = ImageSequenceClip(processed_frames, fps=slowed_clip.fps)
-                
-                # Add TTS audio if available
-                if 'tts_audio' in highlight:
-                    try:
-                        audio_clip = AudioFileClip(highlight['tts_audio'])
-                        processed_clip = processed_clip.set_audio(audio_clip)
-                    except Exception as e:
-                        print(f"⚠️ TTS audio failed for highlight {i+1}: {e}")
-                
-                processed_clips.append(processed_clip)
-                
-                # Cleanup
-                highlight_clip.close()
-                slowed_clip.close()
-            
-            # CRITICAL: Concatenate all clips
-            if processed_clips:
-                final_video = concatenate_videoclips(processed_clips)
-                
-                # Write final video with proper codec
-                final_video.write_videofile(
-                    output_path,
-                    codec="libx264",
-                    audio_codec="aac",
-                    fps=source_fps,
-                    verbose=False,
-                    logger=None
-                )
-                
-                # Cleanup
-                final_video.close()
-                for clip in processed_clips:
-                    clip.close()
-                
-                print(f"✅ Surgical video processing complete: {output_path}")
+                    
+                    # Cleanup
+                    final_video.close()
+                    for clip in processed_clips:
+                        clip.close()
+                    
+                    print(f"✅ Surgical video processing complete: {output_path}")
+                    return output_path
+                else:
+                    raise ValueError("No valid clips were processed")
+                    
+            except Exception as e:
+                print(f"❌ Surgical video processing failed: {e}")
+                # Fallback: copy original video
+                import shutil
+                shutil.copy2(video_path, output_path)
                 return output_path
-            else:
-                raise ValueError("No valid clips were processed")
-                
-        except Exception as e:
-            print(f"❌ Surgical video processing failed: {e}")
-            # Fallback: copy original video
-            import shutil
-            shutil.copy2(video_path, output_path)
-            return output_path
-        finally:
-            # Cleanup MediaPipe
-            if hasattr(self, 'mp_pose'):
-                self.mp_pose.close()
-            if 'source_clip' in locals():
-                source_clip.close()
+            finally:
+                # Cleanup source clip
+                if 'source_clip' in locals():
+                    source_clip.close()
 
-    def _add_overlays(self, frame, feedback_text, action_text, user_name):
+    def _add_overlays(self, frame, feedback_text, action_text, user_name, pose):
         """
         Add head pointer and static captions with thick black outline
         """
@@ -144,7 +143,7 @@ class VideoProcessor:
             h, w, _ = frame.shape
             
             # CRITICAL: Head pointer using MediaPipe
-            head_pos = self._detect_head_position(frame)
+            head_pos = self._detect_head_position(frame, pose)
             if head_pos:
                 x, y = head_pos
                 # Draw magenta circle pointer
@@ -218,13 +217,13 @@ class VideoProcessor:
             print(f"⚠️ Overlay rendering failed: {e}")
             return frame
 
-    def _detect_head_position(self, frame):
+    def _detect_head_position(self, frame, pose):
         """
         Detect head position using MediaPipe pose landmarks
         """
         try:
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = self.mp_pose.process(frame_rgb)
+            results = pose.process(frame_rgb)
             
             if results.pose_landmarks:
                 # Use nose landmark for head position
