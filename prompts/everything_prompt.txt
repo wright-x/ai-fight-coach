@@ -20,7 +20,8 @@ IMPORTANT: Return ONLY a valid JSON object with this exact structure:
   "highlights": [
     {
       "timestamp": "00:15",
-      "detailed_feedback": "Description of what was observed",
+      "short_text": "Tuck your chin and keep your guard up",
+      "long_text": "At 15 seconds, I observed that your guard was slightly lowered and your chin was exposed. This creates a vulnerability that an opponent could exploit. You should maintain a tight guard position with your hands protecting your face at all times, and keep your chin tucked down to minimize exposure to head shots.",
       "action_required": "What the fighter should do to improve",
       "problem_location": "specific_body_part_or_general"
     }
@@ -41,6 +42,10 @@ IMPORTANT: Return ONLY a valid JSON object with this exact structure:
     }
   ]
 }
+
+CRITICAL: For each highlight, provide both:
+- "short_text": A concise, punchy summary for TTS and on-screen captions (max 50 characters)
+- "long_text": A detailed, paragraph-form explanation for the web results page
 
 Choose 2-3 videos from this curated database that specifically address the fighter's main problems:
 
