@@ -29,7 +29,7 @@ SCHEMA:
 }
 
 CRITICAL: For each highlight, provide both:
-- "short_text": A concise, punchy summary for TTS and on-screen captions (max 50 characters)
+- "short_text": A concise, punchy summary for TTS and on-screen captions (max 90 characters)
 - "long_text": A detailed, paragraph-form explanation for the web results page
 
 RULES:
