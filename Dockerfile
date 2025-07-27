@@ -50,12 +50,12 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p uploads output static temp
 
-# Expose the correct port for the application
-EXPOSE 8080
+# Expose port dynamically (Railway will set $PORT)
+EXPOSE $PORT
 
-# Health check
+# Health check using dynamic port
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost:$PORT/health || exit 1
 
-# Command to run the application
+# Command to run the application (Python code handles port binding)
 CMD ["python", "main_simple.py"] 
