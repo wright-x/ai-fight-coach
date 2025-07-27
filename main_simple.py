@@ -668,7 +668,8 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
                     "highlights": [
                         {
                             "timestamp": "00:15",
-                            "detailed_feedback": "Mock analysis: Good technique observed",
+                            "short_text": "Tuck your chin and keep your guard up",
+                            "long_text": "At 15 seconds, I observed that your guard was slightly lowered and your chin was exposed. This creates a vulnerability that an opponent could exploit. You should maintain a tight guard position with your hands protecting your face at all times.",
                             "action_required": "Continue practicing"
                         }
                     ],
@@ -687,7 +688,8 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
                 "highlights": [
                     {
                         "timestamp": "00:15",
-                        "detailed_feedback": "Mock analysis: Good technique observed",
+                        "short_text": "Tuck your chin and keep your guard up",
+                        "long_text": "At 15 seconds, I observed that your guard was slightly lowered and your chin was exposed. This creates a vulnerability that an opponent could exploit. You should maintain a tight guard position with your hands protecting your face at all times.",
                         "action_required": "Continue practicing"
                     }
                 ],

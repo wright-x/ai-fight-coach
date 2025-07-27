@@ -69,7 +69,8 @@ class GeminiClient:
                   "highlights": [
                     {
                       "timestamp": "00:15",
-                      "detailed_feedback": "Description of what was observed",
+                      "short_text": "Tuck your chin and keep your guard up",
+                      "long_text": "At 15 seconds, I observed that your guard was slightly lowered and your chin was exposed. This creates a vulnerability that an opponent could exploit. You should maintain a tight guard position with your hands protecting your face at all times, and keep your chin tucked down to minimize exposure to head shots.",
                       "action_required": "What the fighter should do to improve"
                     }
                   ],
@@ -88,6 +89,10 @@ class GeminiClient:
                     }
                   ]
                 }
+                
+                CRITICAL: For each highlight, provide both:
+                - "short_text": A concise, punchy summary for TTS and on-screen captions (max 50 characters)
+                - "long_text": A detailed, paragraph-form explanation for the web results page
                 
                 Do not include any text before or after the JSON. Return ONLY the JSON object.
                 """
@@ -168,16 +173,24 @@ class GeminiClient:
             return {
                 "highlights": [
                     {
-                        "timestamp": 20,
-                        "detailed_feedback": "Good head movement and evasion",
-                        "action_required": "Keep your head moving consistently"
+                        "timestamp": "00:20",
+                        "short_text": "Keep your head moving",
+                        "long_text": "At 20 seconds, I noticed your head movement was too static. You were standing still for too long, making you an easy target. Good boxers keep their head moving constantly to avoid punches and create angles for counter-attacks.",
+                        "action_required": "Practice head movement drills daily"
                     }
                 ],
                 "recommended_drills": [
                     {
                         "drill_name": "Head Movement Drills",
                         "description": "Practice slipping and weaving",
-                        "problem_it_fixes": "Improves defensive head movement"
+                        "problem_it_fixes": "Static head positioning"
+                    }
+                ],
+                "youtube_recommendations": [
+                    {
+                        "title": "Boxing Head Movement Masterclass",
+                        "url": "https://www.youtube.com/watch?v=example1",
+                        "problem_solved": "Improves head movement and evasion"
                     }
                 ]
             }
@@ -185,16 +198,24 @@ class GeminiClient:
             return {
                 "highlights": [
                     {
-                        "timestamp": 15,
-                        "detailed_feedback": "Good overall technique",
-                        "action_required": "Continue practicing consistently"
+                        "timestamp": "00:15",
+                        "short_text": "Tuck your chin and keep your guard up",
+                        "long_text": "At 15 seconds, I observed that your guard was slightly lowered and your chin was exposed. This creates a vulnerability that an opponent could exploit. You should maintain a tight guard position with your hands protecting your face at all times.",
+                        "action_required": "Continue practicing guard position"
                     }
                 ],
                 "recommended_drills": [
                     {
-                        "drill_name": "Shadow Boxing",
-                        "description": "Practice combinations in front of mirror",
-                        "problem_it_fixes": "Improves overall technique"
+                        "drill_name": "Guard Position Drill",
+                        "description": "Practice maintaining proper guard",
+                        "problem_it_fixes": "Low guard and exposed chin"
+                    }
+                ],
+                "youtube_recommendations": [
+                    {
+                        "title": "Boxing Guard Fundamentals",
+                        "url": "https://www.youtube.com/watch?v=example2",
+                        "problem_solved": "Improves guard positioning and defense"
                     }
                 ]
             } 

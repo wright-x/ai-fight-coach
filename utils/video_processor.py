@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 import mediapipe as mp
-from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips, ImageSequenceClip
+from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips, ImageSequenceClip, TextClip, ColorClip
 from PIL import Image, ImageDraw, ImageFont
 import base64
 import tempfile
@@ -19,14 +19,15 @@ class VideoProcessor:
             'blue': (255, 0, 0),
             'green': (0, 255, 0),
             'yellow': (0, 255, 255),
-            'magenta': (255, 0, 255)  # For head pointer
+            'magenta': (255, 0, 255),  # For head pointer
+            'purple': (128, 0, 128)    # For neon aesthetic
         }
         
         print("✅ VideoProcessor initialized (surgical mode)")
 
     def create_highlight_video(self, video_path: str, highlights: list, output_path: str, user_name: str = "FIGHTER") -> str:
         """
-        Main entry point - creates final video with t-3 to t+3 highlights at 0.7x speed
+        Main entry point - creates final video with intro card, title cards, and t-1 to t+1 highlights at 0.4x speed
         """
         # CRITICAL: Proper MediaPipe resource management with with statement
         with mp.solutions.pose.Pose(
@@ -42,36 +43,47 @@ class VideoProcessor:
                 source_clip = VideoFileClip(video_path)
                 source_fps = source_clip.fps
                 source_duration = source_clip.duration
+                source_width, source_height = source_clip.size
                 
-                print(f"📹 Source video: {source_duration:.2f}s at {source_fps}fps")
+                print(f"📹 Source video: {source_duration:.2f}s at {source_fps}fps, {source_width}x{source_height}")
                 
-                processed_clips = []
+                all_clips = []
+                
+                # CRITICAL: Generate Intro Card ("HIGHLIGHTS")
+                intro_card = self._create_text_card("HIGHLIGHTS", source_width, source_height, source_fps, duration=2.0)
+                all_clips.append(intro_card)
                 
                 # Process each highlight with surgical precision
                 for i, highlight in enumerate(highlights):
                     print(f"🎯 Processing highlight {i+1}/{len(highlights)}")
                     
+                    # CRITICAL: Generate Title Card ("HIGHLIGHT i+1")
+                    title_card = self._create_text_card(f"HIGHLIGHT {i+1}", source_width, source_height, source_fps, duration=1.5)
+                    all_clips.append(title_card)
+                    
                     # Extract timestamp and convert to seconds
                     timestamp = self._parse_timestamp(highlight.get('timestamp', '00:00'))
                     
-                    # CRITICAL: t-3 to t+3 window
-                    start_time = max(0, timestamp - 3)
-                    end_time = min(source_duration, timestamp + 3)
+                    # CRITICAL: t-1 to t+1 window (2-second total duration)
+                    start_time = max(0, timestamp - 1)
+                    end_time = min(source_duration, timestamp + 1)
                     
                     print(f"⏰ Highlight window: {start_time:.2f}s to {end_time:.2f}s")
                     
                     # Extract the highlight clip
                     highlight_clip = source_clip.subclip(start_time, end_time)
                     
-                    # CRITICAL: Slow down to 0.7x speed
-                    slowed_clip = highlight_clip.speedx(0.7)
+                    # CRITICAL: Slow down to 0.4x speed
+                    slowed_clip = highlight_clip.speedx(0.4)
                     
                     # Process frames with overlays
                     processed_frames = []
                     for frame in slowed_clip.iter_frames():
+                        # CRITICAL: Convert BGR to RGB before processing
+                        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         processed_frame = self._add_overlays(
-                            frame, 
-                            highlight.get('detailed_feedback', ''),
+                            frame_rgb, 
+                            highlight.get('short_text', ''),
                             highlight.get('action_required', ''),
                             user_name,
                             pose  # Pass the pose object to the overlay method
@@ -80,24 +92,15 @@ class VideoProcessor:
                     
                     # Create new clip from processed frames
                     processed_clip = ImageSequenceClip(processed_frames, fps=slowed_clip.fps)
-                    
-                    # Add TTS audio if available
-                    if 'tts_audio' in highlight:
-                        try:
-                            audio_clip = AudioFileClip(highlight['tts_audio'])
-                            processed_clip = processed_clip.set_audio(audio_clip)
-                        except Exception as e:
-                            print(f"⚠️ TTS audio failed for highlight {i+1}: {e}")
-                    
-                    processed_clips.append(processed_clip)
+                    all_clips.append(processed_clip)
                     
                     # Cleanup
                     highlight_clip.close()
                     slowed_clip.close()
                 
-                # CRITICAL: Concatenate all clips
-                if processed_clips:
-                    final_video = concatenate_videoclips(processed_clips)
+                # CRITICAL: Concatenate all clips (Intro -> Title -> Clip sequence)
+                if all_clips:
+                    final_video = concatenate_videoclips(all_clips)
                     
                     # Write final video with proper codec
                     final_video.write_videofile(
@@ -111,7 +114,7 @@ class VideoProcessor:
                     
                     # Cleanup
                     final_video.close()
-                    for clip in processed_clips:
+                    for clip in all_clips:
                         clip.close()
                     
                     print(f"✅ Surgical video processing complete: {output_path}")
@@ -130,14 +133,41 @@ class VideoProcessor:
                 if 'source_clip' in locals():
                     source_clip.close()
 
-    def _add_overlays(self, frame, feedback_text, action_text, user_name, pose):
+    def _create_text_card(self, text: str, width: int, height: int, fps: float, duration: float = 2.0):
+        """Create a text card with neon aesthetic"""
+        try:
+            # Create a black background
+            bg_color = (0, 0, 0)  # Black
+            card = ColorClip(size=(width, height), color=bg_color, duration=duration)
+            
+            # Create text clip with neon purple color
+            text_clip = TextClip(
+                text,
+                fontsize=int(width * 0.08),  # Dynamic font size
+                color='white',
+                stroke_color='purple',
+                stroke_width=3,
+                font='Arial-Bold'
+            ).set_position('center').set_duration(duration)
+            
+            # Composite text over background
+            final_card = card.set_make_frame(lambda t: np.array(card.get_frame(t)))
+            final_card = final_card.set_audio(None)  # No audio for cards
+            
+            return final_card
+            
+        except Exception as e:
+            print(f"⚠️ Text card creation failed: {e}")
+            # Fallback: simple color clip
+            return ColorClip(size=(width, height), color=(0, 0, 0), duration=duration)
+
+    def _add_overlays(self, frame, short_text, action_text, user_name, pose):
         """
         Add head pointer and static captions with thick black outline
         """
         try:
             # Convert frame to PIL for text rendering
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            pil_frame = Image.fromarray(frame_rgb)
+            pil_frame = Image.fromarray(frame)
             draw = ImageDraw.Draw(pil_frame)
             
             h, w, _ = frame.shape
@@ -146,17 +176,10 @@ class VideoProcessor:
             head_pos = self._detect_head_position(frame, pose)
             if head_pos:
                 x, y = head_pos
-                # Draw magenta circle pointer
-                radius = max(10, int(w * 0.02))  # 2% of frame width, minimum 10px
-                draw.ellipse(
-                    (x - radius, y - radius, x + radius, y + radius),
-                    outline=self.colors['magenta'],
-                    width=4
-                )
                 
-                # Add "FIGHTER" label
+                # Draw "FIGHTER" label above the pointer
                 label_text = user_name
-                label_font_size = max(20, int(w * 0.025))
+                label_font_size = max(20, int(w * 0.025))  # Dynamic font size
                 try:
                     label_font = ImageFont.truetype("arial.ttf", label_font_size)
                 except:
@@ -165,8 +188,9 @@ class VideoProcessor:
                 # Position label above the pointer
                 label_bbox = draw.textbbox((0, 0), label_text, font=label_font)
                 label_width = label_bbox[2] - label_bbox[0]
+                label_height = label_bbox[3] - label_bbox[1]
                 label_x = x - label_width // 2
-                label_y = y - radius - label_font_size - 5
+                label_y = y - int(h * 0.1)  # 10% of frame height above pointer
                 
                 # Draw label with outline
                 draw.text(
@@ -177,23 +201,37 @@ class VideoProcessor:
                     stroke_width=2,
                     stroke_fill=self.colors['black']
                 )
-            
-            # CRITICAL: Static captions at bottom center
-            if feedback_text or action_text:
-                # Combine text
-                caption_text = f"{feedback_text}\n{action_text}" if action_text else feedback_text
                 
-                # Calculate font size (4% of frame width)
-                font_size = max(24, int(w * 0.04))
+                # Draw thin vertical line from label to pointer
+                line_start_y = label_y + label_height + 5
+                line_end_y = y - int(w * 0.02)  # 2% of frame width above pointer
+                draw.line(
+                    [(x, line_start_y), (x, line_end_y)],
+                    fill=self.colors['white'],
+                    width=2
+                )
+                
+                # Draw small, clean circle at head position
+                radius = max(5, int(w * 0.015))  # 1.5% of frame width, minimum 5px
+                draw.ellipse(
+                    (x - radius, y - radius, x + radius, y + radius),
+                    outline=self.colors['magenta'],
+                    width=3
+                )
+            
+            # CRITICAL: Static captions at bottom center using short_text
+            if short_text:
+                # Calculate font size (3% of frame width)
+                font_size = max(20, int(w * 0.03))
                 
                 try:
-                    # Try to use a system font
+                    # Try to use a clean, sharp font
                     font = ImageFont.truetype("arial.ttf", font_size)
                 except:
                     font = ImageFont.load_default()
                 
                 # CRITICAL: Position at bottom center with 5% margin
-                text_bbox = draw.textbbox((0, 0), caption_text, font=font)
+                text_bbox = draw.textbbox((0, 0), short_text, font=font)
                 text_width = text_bbox[2] - text_bbox[0]
                 text_height = text_bbox[3] - text_bbox[1]
                 
@@ -203,10 +241,10 @@ class VideoProcessor:
                 # CRITICAL: Draw text with thick black outline (no background)
                 draw.text(
                     (text_x, text_y),
-                    caption_text,
+                    short_text,
                     font=font,
                     fill=self.colors['white'],
-                    stroke_width=4,  # Thick outline
+                    stroke_width=3,  # Thick outline
                     stroke_fill=self.colors['black']
                 )
             
@@ -222,8 +260,7 @@ class VideoProcessor:
         Detect head position using MediaPipe pose landmarks
         """
         try:
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = pose.process(frame_rgb)
+            results = pose.process(frame)
             
             if results.pose_landmarks:
                 # Use nose landmark for head position
