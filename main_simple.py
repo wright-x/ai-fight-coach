@@ -51,54 +51,45 @@ def initialize_components():
     
     logger.info("🔧 Starting component initialization...")
 
-    # Test each component individually
+    # Initialize VideoProcessor (main component)
     try:
-        logger.info("📁 Testing utils.video_processor import...")
+        logger.info("📁 Initializing VideoProcessor...")
         from utils.video_processor import VideoProcessor
         video_processor = VideoProcessor()
         logger.info("✅ VideoProcessor initialized successfully")
     except Exception as e:
         logger.error(f"❌ VideoProcessor failed: {e}")
         logger.error(f"📋 Traceback: {traceback.format_exc()}")
-        logger.info("📋 Trying fallback video processor...")
-        try:
-            from utils.video_processor_fallback import VideoProcessorFallback
-            video_processor = VideoProcessorFallback()
-            logger.info("✅ VideoProcessorFallback initialized successfully")
-        except Exception as e2:
-            logger.error(f"❌ VideoProcessorFallback also failed: {e2}")
-            logger.info("📋 Trying basic video processor...")
-            try:
-                from utils.video_processor_basic import VideoProcessorBasic
-                video_processor = VideoProcessorBasic()
-                logger.info("✅ VideoProcessorBasic initialized successfully")
-            except Exception as e3:
-                logger.error(f"❌ VideoProcessorBasic also failed: {e3}")
-                video_processor = None
-                logger.info("📋 Video processing will be disabled")
+        video_processor = None
+        logger.warning("⚠️ Video processing will be disabled - this is a critical error!")
 
+    # Initialize GeminiClient
     try:
-        logger.info("🤖 Testing utils.gemini_client import...")
+        logger.info("🤖 Initializing GeminiClient...")
         from utils.gemini_client import GeminiClient
         gemini_client = GeminiClient()
         logger.info("✅ GeminiClient initialized successfully")
     except Exception as e:
         logger.error(f"❌ GeminiClient failed: {e}")
         logger.error(f"📋 Traceback: {traceback.format_exc()}")
-        logger.info("📋 This is expected in Railway environment - AI analysis will be limited")
+        gemini_client = None
+        logger.warning("⚠️ AI analysis will be limited")
 
+    # Initialize TTSClient
     try:
-        logger.info("🔊 Testing utils.tts_client import...")
+        logger.info("🔊 Initializing TTSClient...")
         from utils.tts_client import TTSClient
         tts_client = TTSClient()
         logger.info("✅ TTSClient initialized successfully")
     except Exception as e:
         logger.error(f"❌ TTSClient failed: {e}")
         logger.error(f"📋 Traceback: {traceback.format_exc()}")
-        logger.info("📋 This is expected in Railway environment - TTS will be limited")
+        tts_client = None
+        logger.warning("⚠️ TTS will be limited")
 
+    # Initialize UserManager
     try:
-        logger.info("👥 Testing user_management import...")
+        logger.info("👥 Initializing UserManager...")
         from user_management import UserManager
         from email_config import SMTP_CONFIG, ADMIN_EMAIL
         user_manager = UserManager(csv_file="users.csv", smtp_config=SMTP_CONFIG)
@@ -106,6 +97,7 @@ def initialize_components():
     except Exception as e:
         logger.error(f"❌ UserManager failed: {e}")
         logger.error(f"📋 Traceback: {traceback.format_exc()}")
+        user_manager = None
 
     logger.info("🏁 Component initialization complete!")
     logger.info(f"📊 Component Status:")
@@ -630,6 +622,7 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
         
         # Always attempt video processing, even if no highlights
         highlight_video_path = f"output/highlight_{job_id}.mp4"
+        final_video_path = None
         
         try:
             if video_processor:
@@ -641,6 +634,7 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
                 if 'user' in active_jobs[job_id]:
                     user_name = active_jobs[job_id]['user'].get('name', 'FIGHTER')
                 
+                logger.info(f"🎬 Calling video_processor.create_highlight_video...")
                 video_processor.create_highlight_video(
                     video_path=temp_video_path,
                     highlights=analysis_result["highlights"],
@@ -656,36 +650,52 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
                     logger.info(f"📊 Processed video file size: {file_size} bytes")
                 else:
                     logger.error(f"❌ Processed video file does not exist: {processed_video_path}")
+                    raise FileNotFoundError(f"Processed video file not found: {processed_video_path}")
                 
                 # Generate TTS audio for highlights
                 if tts_client and analysis_result.get("highlights"):
                     logger.info(f"🔊 Generating TTS audio for highlights: {job_id}")
-                    audio_path = f"output/audio_{job_id}.mp3"
-                    tts_client.generate_highlight_audio(analysis_result["highlights"], audio_path)
-                    
-                    # Add audio to video
-                    final_video_path = f"output/final_{job_id}.mp4"
-                    logger.info(f"🎬 Adding audio to video: {final_video_path}")
-                    video_processor.add_audio_to_video(processed_video_path, audio_path, final_video_path)
-                    logger.info(f"✅ Final video with audio created: {final_video_path}")
-                    
-                    # Store the final video in memory
                     try:
-                        with open(final_video_path, 'rb') as f:
-                            final_video_content = f.read()
-                        in_memory_files[job_id] = {
-                            "content": final_video_content,
-                            "filename": f"final_{job_id}.mp4",
-                            "content_type": "video/mp4"
-                        }
-                        logger.info(f"✅ Final video stored in memory: {len(final_video_content)} bytes")
-                    except Exception as e:
-                        logger.error(f"❌ Error storing final video in memory: {e}")
+                        audio_path = f"output/audio_{job_id}.mp3"
+                        tts_client.generate_highlight_audio(analysis_result["highlights"], audio_path)
+                        logger.info(f"✅ TTS audio generated: {audio_path}")
+                        
+                        # Add audio to video
+                        final_video_path = f"output/final_{job_id}.mp4"
+                        logger.info(f"🎬 Adding audio to video: {final_video_path}")
+                        video_processor.add_audio_to_video(processed_video_path, audio_path, final_video_path)
+                        logger.info(f"✅ Final video with audio created: {final_video_path}")
+                        
+                        # Verify final video exists
+                        if not os.path.exists(final_video_path):
+                            logger.error(f"❌ Final video file does not exist: {final_video_path}")
+                            final_video_path = processed_video_path
+                            logger.info(f"🔄 Using processed video as final: {final_video_path}")
+                        
+                    except Exception as audio_error:
+                        logger.error(f"❌ TTS/Audio processing failed: {audio_error}")
+                        logger.error(f"📋 Audio error traceback: {traceback.format_exc()}")
                         final_video_path = processed_video_path
+                        logger.info(f"🔄 Using processed video without audio: {final_video_path}")
                 else:
                     final_video_path = processed_video_path
-                    
-                    # Store the processed video in memory
+                    logger.info(f"🔄 No TTS client or highlights, using processed video: {final_video_path}")
+                
+                # Store the final video in memory
+                logger.info(f"💾 Storing video in memory: {final_video_path}")
+                try:
+                    with open(final_video_path, 'rb') as f:
+                        final_video_content = f.read()
+                    in_memory_files[job_id] = {
+                        "content": final_video_content,
+                        "filename": f"final_{job_id}.mp4",
+                        "content_type": "video/mp4"
+                    }
+                    logger.info(f"✅ Final video stored in memory: {len(final_video_content)} bytes")
+                except Exception as memory_error:
+                    logger.error(f"❌ Error storing final video in memory: {memory_error}")
+                    logger.error(f"📋 Memory error traceback: {traceback.format_exc()}")
+                    # Try to store the processed video instead
                     try:
                         with open(processed_video_path, 'rb') as f:
                             processed_video_content = f.read()
@@ -695,16 +705,32 @@ def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
                             "content_type": "video/mp4"
                         }
                         logger.info(f"✅ Processed video stored in memory: {len(processed_video_content)} bytes")
-                    except Exception as e:
-                        logger.error(f"❌ Error storing processed video in memory: {e}")
+                    except Exception as fallback_error:
+                        logger.error(f"❌ Fallback video storage also failed: {fallback_error}")
+                        raise fallback_error
             else:
                 logger.warning(f"⚠️ VideoProcessor not available, using original video")
                 final_video_path = temp_video_path
                 
-        except Exception as e:
-            logger.error(f"❌ Error creating highlight video: {e}")
-            logger.error(f"📋 Traceback: {traceback.format_exc()}")
-            final_video_path = temp_video_path
+        except Exception as video_error:
+            logger.error(f"❌ CRITICAL ERROR in video processing: {video_error}")
+            logger.error(f"📋 Video processing traceback: {traceback.format_exc()}")
+            
+            # Fallback: store original video
+            try:
+                logger.info(f"🔄 Fallback: storing original video in memory")
+                with open(temp_video_path, 'rb') as f:
+                    original_video_content = f.read()
+                in_memory_files[job_id] = {
+                    "content": original_video_content,
+                    "filename": f"original_{job_id}.mp4",
+                    "content_type": "video/mp4"
+                }
+                logger.info(f"✅ Original video stored in memory: {len(original_video_content)} bytes")
+            except Exception as fallback_error:
+                logger.error(f"❌ Fallback video storage failed: {fallback_error}")
+                logger.error(f"📋 Fallback error traceback: {traceback.format_exc()}")
+                raise fallback_error
         
         # Clean up temp file
         try:

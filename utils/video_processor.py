@@ -75,9 +75,10 @@ class VideoProcessor:
             print(f"👤 User: {user_name}")
             
             # Load and analyze video
+            print(f"📁 Opening video file: {video_path}")
             cap = cv2.VideoCapture(video_path)
             if not cap.isOpened():
-                raise Exception("Could not open video file")
+                raise Exception(f"Could not open video file: {video_path}")
             
             # Get video properties
             fps = cap.get(cv2.CAP_PROP_FPS)
@@ -93,60 +94,81 @@ class VideoProcessor:
             is_vertical = height > width
             
             # Create output video writer
+            print(f"🎬 Creating video writer: {output_path}")
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
             
+            if not out.isOpened():
+                raise Exception(f"Could not create output video writer: {output_path}")
+            
             # Generate video segments
+            print(f"🎬 Generating video segments...")
             all_segments = []
             
             # 1. Opening Card (1.5 seconds)
-            print("🎬 Creating opening card...")
+            print(f"🎬 Creating opening card...")
             opening_frames = self._create_opening_card(width, height, fps, 1.5)
             all_segments.extend(opening_frames)
+            print(f"✅ Opening card created: {len(opening_frames)} frames")
             
             # 2. Process each highlight
             for i, highlight in enumerate(highlights):
-                print(f"🎯 Processing highlight {i+1}/{len(highlights)}")
+                print(f"🎬 Processing highlight {i+1}/{len(highlights)}...")
                 
-                # Title card (1 second)
-                title_frames = self._create_title_card(f"HIGHLIGHT {i+1}", width, height, fps, 1.0)
+                # Title card for highlight
+                title = f"Highlight {i+1}"
+                title_frames = self._create_title_card(title, width, height, fps, 1.0)
                 all_segments.extend(title_frames)
+                print(f"✅ Title card created: {len(title_frames)} frames")
                 
-                # Analysis frame (3 seconds freeze-frame)
-                analysis_frames = self._create_analysis_frame(
-                    cap, highlight, width, height, fps, 3.0, user_name
-                )
+                # Analysis frame with MediaPipe pose
+                print(f"🎬 Creating analysis frame for highlight {i+1}...")
+                analysis_frames = self._create_analysis_frame(cap, highlight, width, height, fps, 2.0, user_name)
                 all_segments.extend(analysis_frames)
+                print(f"✅ Analysis frame created: {len(analysis_frames)} frames")
                 
-                # Slow motion clip (6 seconds at 0.5x speed)
-                slow_motion_frames = self._create_slow_motion_clip(
-                    cap, highlight, width, height, fps, 6.0, user_name
-                )
+                # Slow motion clip
+                print(f"🎬 Creating slow motion clip for highlight {i+1}...")
+                slow_motion_frames = self._create_slow_motion_clip(cap, highlight, width, height, fps, 3.0, user_name)
                 all_segments.extend(slow_motion_frames)
+                print(f"✅ Slow motion clip created: {len(slow_motion_frames)} frames")
             
             # 3. End Card (1.5 seconds)
-            print("🎬 Creating end card...")
+            print(f"🎬 Creating end card...")
             end_frames = self._create_end_card(width, height, fps, 1.5)
             all_segments.extend(end_frames)
+            print(f"✅ End card created: {len(end_frames)} frames")
             
             # Write all frames to video
             print(f"💾 Writing {len(all_segments)} frames to video...")
-            for frame in all_segments:
+            for i, frame in enumerate(all_segments):
+                if i % 100 == 0:  # Progress update every 100 frames
+                    print(f"📊 Writing frame {i+1}/{len(all_segments)}...")
                 out.write(frame)
             
-            # Cleanup
-            cap.release()
+            # Release resources
+            print(f"🔧 Releasing video resources...")
             out.release()
+            cap.release()
             
             print(f"✅ Professional boxing analysis created: {output_path}")
             return output_path
             
         except Exception as e:
-            print(f"❌ Error creating analysis video: {e}")
-            print(f"📋 Traceback: {traceback.format_exc()}")
-            # Fallback to simple copy
-            shutil.copy2(video_path, output_path)
-            return output_path
+            print(f"❌ CRITICAL ERROR in create_highlight_video: {e}")
+            print(f"📋 Full traceback: {traceback.format_exc()}")
+            
+            # Clean up resources
+            try:
+                if 'out' in locals() and out is not None:
+                    out.release()
+                if 'cap' in locals() and cap is not None:
+                    cap.release()
+            except Exception as cleanup_error:
+                print(f"⚠️ Error during cleanup: {cleanup_error}")
+            
+            # Re-raise the error to be caught by the main processing function
+            raise e
     
     def _create_opening_card(self, width: int, height: int, fps: float, duration: float) -> List[np.ndarray]:
         """Create opening card with title and subtitle"""
