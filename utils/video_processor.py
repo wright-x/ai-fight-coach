@@ -104,10 +104,10 @@ class VideoProcessor:
                 final_clips.append(highlight_clip)
                 print(f"✅ Highlight clip {i+1} added to final_clips")
                 
-                # Add 1.5 second gap between highlights (except after the last one)
+                # Add 0.75 second gap between highlights (except after the last one)
                 if i < len(highlights) - 1:
-                    print(f"⏸️ Adding 1.5s gap after highlight {i+1}...")
-                    gap_clip = self._create_gap_clip(source_width, source_height, source_fps, duration=1.5)
+                    print(f"⏸️ Adding 0.75s gap after highlight {i+1}...")
+                    gap_clip = self._create_gap_clip(source_width, source_height, source_fps, duration=0.75)
                     final_clips.append(gap_clip)
                     print(f"✅ Gap clip added after highlight {i+1}")
             
@@ -657,7 +657,7 @@ class VideoProcessor:
             shutil.copy2(video_path, output_path)
             return output_path 
 
-    def _create_gap_clip(self, width: int, height: int, fps: float, duration: float = 1.5):
+    def _create_gap_clip(self, width: int, height: int, fps: float, duration: float = 0.75):
         """Create a silent gap clip between highlights"""
         try:
             # Create a black background clip
