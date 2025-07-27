@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 import mediapipe as mp
-from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips, ImageSequenceClip, TextClip, ColorClip, CompositeVideoClip, CompositeAudioClip
+from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips, ImageSequenceClip, TextClip, ColorClip, CompositeVideoClip, CompositeAudioClip, ImageClip
 from PIL import Image, ImageDraw, ImageFont
 import base64
 import tempfile
@@ -97,32 +97,33 @@ class VideoProcessor:
                     final_clips.append(gap_clip)
                     print(f"✅ Gap clip added after highlight {i+1}")
             
-            # --- START OF NEW, CRITICAL FIX ---
-            print(f"🛡️ Starting Resolution Safety Check for {len(final_clips)} clips...")
+            # --- INSERT THIS CODE BLOCK BEFORE `concatenate_videoclips` ---
+            print(f"🛡️ Starting Final Resolution Safety Check...")
             enforced_clips = []
-            target_size = (source_width, source_height) # The one true resolution
+            target_size = (source_width, source_height) # The one and only correct size
 
             for i, clip in enumerate(final_clips):
-                # Check if the clip's size matches the target size
                 if clip.size != [target_size[0], target_size[1]]:
-                    print(f"⚠️ Clip {i} has mismatched size {clip.size}. Enforcing target size {target_size}.")
-                    # Explicitly resize the clip to the correct dimensions
+                    print(f"⚠️ Clip {i} has mismatched size {clip.size}. ENFORCING target size {target_size}.")
                     resized_clip = clip.resize(newsize=target_size)
                     enforced_clips.append(resized_clip)
-                    # It's good practice to close the old, un-resized clip to free memory
-                    clip.close()
+                    clip.close() # Free memory from the old clip
                 else:
-                    # The clip is already the correct size, just add it to the new list
-                    print(f"✅ Clip {i} has correct size {clip.size}.")
                     enforced_clips.append(clip)
 
-            print("✅ Resolution Safety Check complete. All clips are now the correct size.")
-            # --- END OF NEW, CRITICAL FIX ---
+            print("✅ Safety Check complete. All clips conform to the correct resolution.")
 
-            # CRITICAL: Concatenate all clips in correct order
-            if enforced_clips:
-                print(f"🎬 Concatenating {len(enforced_clips)} resolution-enforced clips...")
-                final_video = concatenate_videoclips(enforced_clips)
+            # Now, use the new, clean list for the final concatenation
+            final_video = concatenate_videoclips(enforced_clips)
+
+            # Clean up the enforced clips list
+            for clip in enforced_clips:
+                if clip in final_clips: continue # Avoid double-closing
+                clip.close()
+
+            # --- END OF THE NEW CODE BLOCK ---
+
+            # CRITICAL: Video concatenation is now handled in the safety check above
                 
                 # Write final video with proper codec
                 final_video.write_videofile(
@@ -352,55 +353,45 @@ class VideoProcessor:
             return ColorClip(size=(640, 480), color=(0, 0, 0), duration=2.0)
 
     def _create_text_card(self, text: str, width: int, height: int, fps: float, duration: float = 2.0):
-        """Create a text card using actual image files instead of generated text"""
+        """
+        Loads a pre-made image for the given title card, resizes it to match the
+        source video's dimensions, and returns it as a video clip.
+        """
         try:
-            print(f"🎬 Creating image card for: '{text}' for {duration}s")
-            
-            # Map text to image files
-            image_mapping = {
-                "HIGHLIGHTS": "static/images/highlights.png",
-                "HIGHLIGHT 1": "static/images/highlight1.png", 
-                "HIGHLIGHT 2": "static/images/highlight2.png",
-                "HIGHLIGHT 3": "static/images/highlight3.png",
-                "HIGHLIGHT 4": "static/images/highlight4.png",
-                "HIGHLIGHT 5": "static/images/highlight5.png"
+            # 1. Determine which image to load based on the text.
+            image_map = {
+                "HIGHLIGHTS": "static/images/HIGHLIGHTS.png",
+                "HIGHLIGHT 1": "static/images/HIGHLIGHTS (1).png",
+                "HIGHLIGHT 2": "static/images/HIGHLIGHTS (2).png",
+                "HIGHLIGHT 3": "static/images/HIGHLIGHTS (3).png",
+                "HIGHLIGHT 4": "static/images/HIGHLIGHTS (4).png",
+                "HIGHLIGHT 5": "static/images/HIGHLIGHTS (5).png"
+                # Add more here if needed
             }
             
-            image_path = image_mapping.get(text)
-            if not image_path:
-                print(f"⚠️ No image found for text: {text}, using fallback")
-                return self._create_fallback_text_card(text, width, height, fps, duration)
+            image_path = image_map.get(text)
+            if not image_path or not os.path.exists(image_path):
+                raise FileNotFoundError(f"Title card image not found for text: '{text}' at path: {image_path}")
+
+            print(f"🎬 Creating image card from: {image_path}")
+
+            # 2. Load the image and convert it into a video clip.
+            card = ImageClip(image_path).set_duration(duration)
             
-            # Check if image file exists
-            if not os.path.exists(image_path):
-                print(f"⚠️ Image file not found: {image_path}, using fallback")
-                return self._create_fallback_text_card(text, width, height, fps, duration)
+            # 3. CRITICAL ASPECT RATIO FIX: Resize the card to match the source video.
+            # This is non-negotiable.
+            card = card.resize(newsize=(width, height))
             
-            # Load the image and create video clip
-            try:
-                from PIL import Image
-                import numpy as np
-                
-                # Open and resize image to match video dimensions
-                img = Image.open(image_path)
-                img = img.resize((width, height), Image.Resampling.LANCZOS)
-                
-                # Convert to numpy array
-                img_array = np.array(img)
-                
-                # Create video clip from image
-                image_clip = ImageSequenceClip([img_array], fps=fps, duration=duration)
-                
-                print(f"✅ Image card '{text}' created successfully from {image_path}")
-                return image_clip
-                
-            except Exception as img_error:
-                print(f"⚠️ Image processing failed: {img_error}, using fallback")
-                return self._create_fallback_text_card(text, width, height, fps, duration)
+            # 4. Set the FPS to match the main video for smooth concatenation.
+            card = card.set_fps(fps)
             
+            print(f"✅ Image card '{text}' created successfully with size {card.size}")
+            return card
+
         except Exception as e:
             print(f"❌ Image card creation failed: {e}")
-            return self._create_fallback_text_card(text, width, height, fps, duration)
+            # Fallback to a simple black screen if the image fails for any reason.
+            return ColorClip(size=(width, height), color=(0, 0, 0), duration=duration).set_fps(fps)
 
     def _create_fallback_text_card(self, text: str, width: int, height: int, fps: float, duration: float = 2.0):
         """Fallback method to create text card if image loading fails"""
