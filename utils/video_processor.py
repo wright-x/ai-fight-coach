@@ -111,10 +111,31 @@ class VideoProcessor:
                     final_clips.append(gap_clip)
                     print(f"✅ Gap clip added after highlight {i+1}")
             
-            # CRITICAL: All clips are now guaranteed to be the correct size
-            # No safety net needed - resolution is enforced at creation time
-            print(f"🎬 Concatenating {len(final_clips)} resolution-guaranteed clips...")
-            final_video = concatenate_videoclips(final_clips)
+            # --- START OF NEW, CRITICAL FIX ---
+            print(f"🛡️ Starting Final Resolution Safety Check for {len(final_clips)} clips...")
+            enforced_clips = []
+            target_size = (source_width, source_height) # The one and only correct resolution
+
+            for i, clip in enumerate(final_clips):
+                # Check if the clip's size is already correct
+                if clip.size != [target_size[0], target_size[1]]:
+                    print(f"⚠️ Clip {i} has mismatched size {clip.size}. ENFORCING target size {target_size}.")
+                    # Explicitly resize the clip to the correct dimensions
+                    resized_clip = clip.resize(newsize=target_size)
+                    enforced_clips.append(resized_clip)
+                    clip.close() # Free memory from the old, incorrect clip
+                else:
+                    # The clip is already the correct size, just add it to the new list
+                    print(f"✅ Clip {i} has correct size {clip.size}.")
+                    enforced_clips.append(clip)
+
+            print("✅ Resolution Safety Check complete. All clips now conform to the correct resolution.")
+            # --- END OF NEW, CRITICAL FIX ---
+
+            # Now, use the new, clean, and safe list for the final concatenation
+            if enforced_clips:
+                print(f"🎬 Concatenating {len(enforced_clips)} resolution-enforced clips...")
+                final_video = concatenate_videoclips(enforced_clips)
             
             # Write final video with proper codec
             final_video.write_videofile(
@@ -130,6 +151,10 @@ class VideoProcessor:
             # Cleanup
             final_video.close()
             source_clip.close()
+            
+            # The original final_clips list still holds references that need to be closed
+            for clip in final_clips:
+                clip.close()
             
             print(f"✅ Final video created: {output_path}")
             return output_path
@@ -305,11 +330,6 @@ class VideoProcessor:
             
             # Create new clip from processed frames
             processed_clip = ImageSequenceClip(processed_frames, fps=slowed_clip.fps)
-            
-            # --- ADD THIS MANDATORY LINE ---
-            # Enforce the correct size, even if it should already be correct.
-            processed_clip = processed_clip.resize(newsize=(source_clip.w, source_clip.h))
-            # --- END MANDATORY LINE ---
             
             # Cleanup
             highlight_clip.close()
