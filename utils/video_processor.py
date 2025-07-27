@@ -2,10 +2,11 @@ import os
 import cv2
 import numpy as np
 import mediapipe as mp
-from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips, ImageSequenceClip, TextClip, ColorClip
+from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips, ImageSequenceClip, TextClip, ColorClip, CompositeVideoClip, CompositeAudioClip
 from PIL import Image, ImageDraw, ImageFont
 import base64
 import tempfile
+import textwrap
 
 class VideoProcessor:
     """Surgical VideoProcessor with correct audio sync pipeline"""
@@ -64,16 +65,20 @@ class VideoProcessor:
             final_clips = []
             
             # CRITICAL: Generate 2-second Intro Title Card ("HIGHLIGHTS")
+            print("🎬 Creating intro card...")
             intro_card = self._create_text_card("HIGHLIGHTS", source_width, source_height, source_fps, duration=2.0)
             final_clips.append(intro_card)
+            print("✅ Intro card added to final_clips")
             
             # CRITICAL: Process each highlight with individual TTS
             for i, highlight in enumerate(highlights):
                 print(f"🎯 Processing highlight {i+1}/{len(highlights)}")
                 
                 # CRITICAL: Generate 1.5-second Highlight Title Card
+                print(f"🎬 Creating title card for highlight {i+1}...")
                 title_card = self._create_text_card(f"HIGHLIGHT {i+1}", source_width, source_height, source_fps, duration=1.5)
                 final_clips.append(title_card)
+                print(f"✅ Title card {i+1} added to final_clips")
                 
                 # CRITICAL: Generate individual highlight clip with its own audio
                 highlight_clip = self._create_single_highlight_clip(
@@ -83,6 +88,7 @@ class VideoProcessor:
                     source_fps
                 )
                 final_clips.append(highlight_clip)
+                print(f"✅ Highlight clip {i+1} added to final_clips")
             
             # CRITICAL: Concatenate all clips in correct order
             if final_clips:
@@ -136,12 +142,21 @@ class VideoProcessor:
             # Step 2: Generate video with overlays (silent)
             video_clip = self._generate_highlight_video(source_clip, highlight, user_name, source_fps)
             
-            # Step 3: Attach audio to video if available
+            # Step 3: Attach audio to video if available with 1-second delay
             if audio_path and os.path.exists(audio_path):
                 try:
                     audio_clip = AudioFileClip(audio_path)
-                    final_clip = video_clip.set_audio(audio_clip)
-                    print(f"✅ Audio attached to highlight clip")
+                    
+                    # CRITICAL: Create 1-second silence and prepend to TTS audio
+                    from moviepy.audio.AudioClip import AudioClip
+                    silence = AudioClip(make_frame=lambda t: [0, 0], duration=1, fps=44100)
+                    
+                    # Prepend the silence to the TTS audio
+                    final_audio = CompositeAudioClip([silence, audio_clip.set_start(1)])
+                    
+                    # Set the new composite audio to the video
+                    final_clip = video_clip.set_audio(final_audio)
+                    print(f"✅ Audio attached to highlight clip with 1-second delay")
                     return final_clip
                 except Exception as e:
                     print(f"⚠️ Audio attachment failed: {e}, returning silent clip")
@@ -213,10 +228,10 @@ class VideoProcessor:
             ) as pose:
                 
                 for frame in slowed_clip.iter_frames():
-                    # CRITICAL: Convert BGR to RGB before processing
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    # CRITICAL: MoviePy iter_frames() already returns RGB, NO conversion needed
+                    # DELETED: frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     processed_frame = self._add_overlays(
-                        frame_rgb, 
+                        frame,  # Pass original RGB frame directly
                         highlight.get('action_required', ''),
                         user_name,
                         pose
@@ -261,8 +276,10 @@ class VideoProcessor:
             return ColorClip(size=(640, 480), color=(0, 0, 0), duration=2.0)
 
     def _create_text_card(self, text: str, width: int, height: int, fps: float, duration: float = 2.0):
-        """Create a text card with neon aesthetic"""
+        """Create a text card with neon aesthetic - FIXED to return proper CompositeVideoClip"""
         try:
+            print(f"🎬 Creating text card: '{text}' for {duration}s")
+            
             # Create a black background
             bg_color = (0, 0, 0)  # Black
             card = ColorClip(size=(width, height), color=bg_color, duration=duration)
@@ -277,10 +294,9 @@ class VideoProcessor:
                 font='Arial-Bold'
             ).set_position('center').set_duration(duration)
             
-            # Composite text over background
-            final_card = card.set_make_frame(lambda t: np.array(card.get_frame(t)))
-            final_card = final_card.set_audio(None)  # No audio for cards
-            
+            # CRITICAL: Return proper CompositeVideoClip
+            final_card = CompositeVideoClip([card, text_clip])
+            print(f"✅ Text card '{text}' created successfully")
             return final_card
             
         except Exception as e:
@@ -293,7 +309,7 @@ class VideoProcessor:
         CRITICAL: Add head pointer and static captions with proper color conversion and dynamic sizing
         """
         try:
-            # CRITICAL: Convert frame to PIL for text rendering (already RGB from cv2.cvtColor)
+            # CRITICAL: Convert frame to PIL for text rendering (already RGB from MoviePy)
             pil_frame = Image.fromarray(frame)
             draw = ImageDraw.Draw(pil_frame)
             
@@ -346,10 +362,13 @@ class VideoProcessor:
                     width=3
                 )
             
-            # CRITICAL: Static captions with Montserrat Semi-Bold, 30% bigger, THICK outline
+            # CRITICAL: Static captions with text wrapping, 30% from bottom, 30% bigger
             if action_text:
-                # Calculate font size (5.5% of frame width - 30% bigger than before)
-                font_size = max(26, int(w * 0.055))
+                # CRITICAL: Text wrapping to prevent spilling
+                wrapped_lines = textwrap.wrap(action_text, width=30)
+                
+                # Calculate font size (7% of frame width - 30% bigger than before)
+                font_size = max(26, int(w * 0.07))
                 
                 try:
                     # Try to use Montserrat Semi-Bold font
@@ -361,23 +380,37 @@ class VideoProcessor:
                     except:
                         font = ImageFont.load_default()
                 
-                # CRITICAL: Position at bottom center with 5% margin
-                text_bbox = draw.textbbox((0, 0), action_text, font=font)
-                text_width = text_bbox[2] - text_bbox[0]
-                text_height = text_bbox[3] - text_bbox[1]
+                # Calculate total text height for all lines
+                total_text_height = 0
+                line_heights = []
+                for line in wrapped_lines:
+                    text_bbox = draw.textbbox((0, 0), line, font=font)
+                    line_height = text_bbox[3] - text_bbox[1]
+                    line_heights.append(line_height)
+                    total_text_height += line_height
                 
-                text_x = (w - text_width) // 2
-                text_y = h - text_height - int(h * 0.05)  # 5% margin from bottom
+                # CRITICAL: Position at 30% from bottom of screen
+                text_y = h - total_text_height - int(h * 0.30)
                 
-                # CRITICAL: Draw text with THICK black outline (no background)
-                draw.text(
-                    (text_x, text_y),
-                    action_text,
-                    font=font,
-                    fill=self.colors['white'],
-                    stroke_width=4,  # THICK outline
-                    stroke_fill=self.colors['black']
-                )
+                # Draw each line of wrapped text
+                current_y = text_y
+                for i, line in enumerate(wrapped_lines):
+                    text_bbox = draw.textbbox((0, 0), line, font=font)
+                    text_width = text_bbox[2] - text_bbox[0]
+                    text_x = (w - text_width) // 2
+                    
+                    # CRITICAL: Draw text with THICK black outline (no background)
+                    draw.text(
+                        (text_x, current_y),
+                        line,
+                        font=font,
+                        fill=self.colors['white'],
+                        stroke_width=4,  # THICK outline
+                        stroke_fill=self.colors['black']
+                    )
+                    
+                    # Move to next line
+                    current_y += line_heights[i] + 5  # 5px spacing between lines
             
             # Convert back to numpy array
             return np.array(pil_frame)
