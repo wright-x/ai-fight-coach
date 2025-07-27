@@ -42,7 +42,7 @@ class GeminiClient:
             # Read prompt from file based on analysis type
             prompt_file = f"prompts/{analysis_type}_prompt.txt"
             if analysis_type == "everything":
-                prompt_file = "prompts/everything_prompt.txt"
+                prompt_file = "prompts/default_prompt.txt"
             
             try:
                 with open(prompt_file, 'r', encoding='utf-8') as f:
@@ -86,6 +86,35 @@ class GeminiClient:
                 
                 Do not include any text before or after the JSON. Return ONLY the JSON object.
                 """
+            
+            # Load video database and add to prompt
+            try:
+                from video_database import VIDEO_DATABASE
+                video_db_text = f"""
+                
+                VIDEO DATABASE - ONLY USE THESE VIDEOS:
+                
+                Available categories: {list(VIDEO_DATABASE.keys())}
+                
+                For analysis_type "{analysis_type}", use videos from these categories:
+                - "everything" - for general boxing fundamentals
+                - "head_movement" - for defense and head movement issues  
+                - "punch_techniques" - for punching technique problems
+                - "footwork" - for footwork and positioning issues
+                
+                Available videos by category:
+                """
+                
+                for category, videos in VIDEO_DATABASE.items():
+                    video_db_text += f"\n{category.upper()} VIDEOS:\n"
+                    for i, video in enumerate(videos[:10], 1):  # Show first 10 videos per category
+                        video_db_text += f"{i}. {video['title']} - {video['url']}\n"
+                
+                prompt += video_db_text
+                print(f"📚 Added video database to prompt")
+                
+            except ImportError as e:
+                print(f"⚠️ Could not load video database: {e}")
             
             # Send to Gemini
             response = self.model.generate_content([

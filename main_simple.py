@@ -3,25 +3,29 @@ AI Fight Coach - Simplified Main FastAPI Application
 Version with better error handling for deployment
 """
 
+# Suppress TensorFlow/MediaPipe C++ warnings
 import os
-import uuid
-import shutil
-import threading
-import time
-import io
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
-from pathlib import Path
-import json
-import logging
-import traceback
-import secrets
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress INFO and WARNING messages
+os.environ['CUDA_VISIBLE_DEVICES'] = ''   # Disable CUDA warnings
 
-from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks, Response, Request
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+# Standard library imports
+import json
+import shutil
+import tempfile
+import time
+import traceback
+import threading
+from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Any, Optional
+
+# Third-party imports
+from fastapi import FastAPI, File, UploadFile, Form, Request, BackgroundTasks, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 # Set up detailed logging
+import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

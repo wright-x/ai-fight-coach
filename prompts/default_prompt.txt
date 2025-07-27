@@ -41,10 +41,15 @@ RULES:
    - Make drills specific and actionable
 
 3. For YouTube recommendations:
-   - ONLY recommend videos that you can verify exist on YouTube
-   - Search for real, existing boxing training videos that match the problems
-   - Use popular boxing channels like: Precision Striking, FightTips, ExpertBoxing, Coach Anthony, etc.
-   - Verify the video title and URL are accurate before including
-   - If you can't find a specific video, skip that recommendation rather than making up a fake one
+   - ONLY select videos from the provided curated database
+   - DO NOT search for videos on YouTube or make up fake videos
+   - Choose 2-3 videos that best match the problems identified in highlights
+   - Use these exact video categories:
+     * "everything" - for general boxing fundamentals
+     * "head_movement" - for defense and head movement issues
+     * "punch_techniques" - for punching technique problems
+     * "footwork" - for footwork and positioning issues
+   - Each video must be a real, verified boxing training video from the database
+   - Match the video to the specific problem it solves
 
-FINAL INSTRUCTION: Respond with ONLY the JSON object. No other text, no markdown, no code blocks, no explanations. The JSON must contain highlights, recommended_drills, and youtube_recommendations arrays as shown in the schema above. ONLY include YouTube videos you can verify exist. 
+FINAL INSTRUCTION: Respond with ONLY the JSON object. No other text, no markdown, no code blocks, no explanations. The JSON must contain highlights, recommended_drills, and youtube_recommendations arrays as shown in the schema above. ONLY use videos from the provided database - DO NOT search YouTube or create fake videos. 

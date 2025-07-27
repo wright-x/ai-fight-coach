@@ -556,29 +556,88 @@ class VideoProcessor:
             return 0.0
     
     def add_audio_to_video(self, video_path: str, audio_path: str, output_path: str) -> str:
-        """Add TTS audio to video with proper sync"""
+        """Add audio to video using moviepy with robust error handling"""
         try:
-            if os.path.exists(audio_path):
-                # Use ffmpeg to combine video and audio
-                import subprocess
-                cmd = [
-                    'ffmpeg', '-y',
-                    '-i', video_path,
-                    '-i', audio_path,
-                    '-c:v', 'copy',
-                    '-c:a', 'aac',
-                    '-shortest',
-                    output_path
-                ]
-                subprocess.run(cmd, check=True, capture_output=True)
-                print(f"✅ Audio added to video: {output_path}")
+            print(f"🎬 Starting robust video composition...")
+            print(f"📁 Video path: {video_path}")
+            print(f"🔊 Audio path: {audio_path}")
+            print(f"📤 Output path: {output_path}")
+            
+            # Check if input files exist
+            if not os.path.exists(video_path):
+                print(f"❌ CRITICAL: Input video file not found at {video_path}")
+                return video_path
+            
+            if not os.path.exists(audio_path):
+                print(f"❌ CRITICAL: Input audio file not found at {audio_path}")
+                return video_path
+            
+            print(f"✅ Input files verified")
+            
+            # Import moviepy
+            try:
+                from moviepy.editor import VideoFileClip, AudioFileClip
+                print(f"✅ MoviePy imported successfully")
+            except ImportError as e:
+                print(f"❌ MoviePy import failed: {e}")
+                return video_path
+            
+            print(f"🎬 Loading video clip from: {video_path}")
+            video_clip = VideoFileClip(video_path)
+            print(f"✅ Video clip loaded: {video_clip.duration}s duration")
+
+            print(f"🔊 Loading audio clip from: {audio_path}")
+            audio_clip = AudioFileClip(audio_path)
+            print(f"✅ Audio clip loaded: {audio_clip.duration}s duration")
+
+            print(f"🎬 Setting audio of the video clip...")
+            final_clip = video_clip.set_audio(audio_clip)
+            print(f"✅ Audio set successfully")
+
+            print(f"💾 Writing final video to: {output_path} with 'libx264' codec...")
+            # Use a standard, reliable codec and specify the logger
+            final_clip.write_videofile(
+                output_path, 
+                codec="libx264", 
+                audio_codec="aac", 
+                logger='bar',
+                verbose=False,
+                loglevel='error'
+            )
+            print(f"✅ Final video written successfully")
+
+            # Resource cleanup
+            print(f"🧹 Cleaning up resources...")
+            video_clip.close()
+            audio_clip.close()
+            final_clip.close()
+            print(f"✅ Resources cleaned up")
+            
+            # Verify output file exists
+            if os.path.exists(output_path):
+                file_size = os.path.getsize(output_path)
+                print(f"✅ SUCCESS: Final video saved successfully to {output_path} ({file_size} bytes)")
                 return output_path
             else:
-                print(f"⚠️ Audio file not found: {audio_path}")
-                shutil.copy2(video_path, output_path)
-                return output_path
-                
+                print(f"❌ CRITICAL: Output file was not created: {output_path}")
+                return video_path
+
         except Exception as e:
-            print(f"❌ Error adding audio to video: {e}")
-            shutil.copy2(video_path, output_path)
-            return output_path 
+            print(f"❌ CRITICAL FAILURE during video and audio merge process: {e}")
+            print(f"📋 Full traceback: {traceback.format_exc()}")
+            
+            # Ensure clips are closed even if it fails
+            try:
+                if 'video_clip' in locals() and video_clip:
+                    video_clip.close()
+                if 'audio_clip' in locals() and audio_clip:
+                    audio_clip.close()
+                if 'final_clip' in locals() and final_clip:
+                    final_clip.close()
+                print(f"✅ Emergency cleanup completed")
+            except Exception as cleanup_error:
+                print(f"⚠️ Emergency cleanup failed: {cleanup_error}")
+            
+            # Return original video path as fallback
+            print(f"🔄 Returning original video as fallback: {video_path}")
+            return video_path 
