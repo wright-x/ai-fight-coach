@@ -34,7 +34,7 @@ class User(Base):
     # name = Column(String, nullable=True)  # Temporarily disabled - column doesn't exist
     signup_ts = Column(DateTime, default=datetime.utcnow, nullable=False)
     upload_count = Column(Integer, default=0, nullable=False)
-    jobs = relationship("Job", back_populates="user")
+    # jobs = relationship("Job", back_populates="user")  # Temporarily disabled - relationship error
 
 class Job(Base):
     __tablename__ = "jobs"
@@ -45,17 +45,17 @@ class Job(Base):
     status = Column(String, default="processing", nullable=False)
     # analysis_type = Column(String, default="general", nullable=False)  # Temporarily disabled - column doesn't exist
     view_count = Column(Integer, default=0, nullable=False)
-    user = relationship("User", back_populates="jobs")
-    views = relationship("JobView", back_populates="job")
+    # user = relationship("User", back_populates="jobs")  # Temporarily disabled - relationship error
+    # views = relationship("JobView", back_populates="job")  # Temporarily disabled - relationship error
 
 class JobView(Base):
     __tablename__ = "job_views"
     id = Column(Integer, primary_key=True, index=True)
-    job_id = Column(String, nullable=False)
+    job_id = Column(String, ForeignKey("jobs.id"), nullable=False)
     viewed_ts = Column(DateTime, default=datetime.utcnow, nullable=False)
     ip_address = Column(String, nullable=True)
     user_agent = Column(String, nullable=True)
-    job = relationship("Job", back_populates="views")
+    # job = relationship("Job", back_populates="views")  # Temporarily disabled - relationship error
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -80,7 +80,7 @@ class DatabaseService:
             existing_user = self.db.query(User).filter(User.email == email).first()
             if existing_user:
                 logger.info(f"User already exists: {existing_user.id}")
-                return existing_user
+                return existing_user  # Return existing user instead of None
             
             # Create new user (without name column)
             user = User(email=email)
@@ -251,15 +251,15 @@ async def register_user(request: Request, db: Session = Depends(get_db)):
             logger.error(f"User creation failed for email: {email}")
             return JSONResponse({
                 "success": False,
-                "message": "User already exists with this email."
+                "message": "Database error. Please try again."
             })
         
-        logger.info(f"User created successfully: {user.id}")
+        logger.info(f"User processed successfully: {user.id}")
         
-        # Set cookies for 30 days
+        # Set cookies for 30 days (for both new and existing users)
         response = JSONResponse({
             "success": True,
-            "message": f"Welcome {name}! Your account has been created successfully."
+            "message": f"Welcome {name}! Your account is ready."
         })
         
         response.set_cookie(
