@@ -199,15 +199,40 @@ async def main_page():
 async def register_user(request: Request, db: Session = Depends(get_db)):
     """Register a new user"""
     try:
+        logger.info("Registration attempt started")
+        
         body = await request.json()
         name = body.get("name")
         email = body.get("email")
         
+        logger.info(f"Registration data: name={name}, email={email}")
+        
         if not name or not email:
+            logger.error("Registration failed: Missing name or email")
             raise HTTPException(status_code=400, detail="Name and email are required")
+        
+        # Test database connection
+        try:
+            db.execute("SELECT 1")
+            logger.info("Database connection successful")
+        except Exception as db_error:
+            logger.error(f"Database connection failed: {db_error}")
+            return JSONResponse({
+                "success": False,
+                "message": "Database connection failed. Please try again."
+            })
         
         db_service = DatabaseService(db)
         user = db_service.create_user(email=email, name=name)
+        
+        if not user:
+            logger.error(f"User creation failed for email: {email}")
+            return JSONResponse({
+                "success": False,
+                "message": "User already exists with this email."
+            })
+        
+        logger.info(f"User created successfully: {user.id}")
         
         # Set cookies for 30 days
         response = JSONResponse({
@@ -234,10 +259,15 @@ async def register_user(request: Request, db: Session = Depends(get_db)):
             path="/"
         )
         
+        logger.info("Registration completed successfully")
         return response
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Registration error: {e}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         return JSONResponse({
             "success": False,
             "message": "Registration failed. Please try again."
@@ -252,18 +282,45 @@ async def admin_dashboard():
 async def admin_stats(db: Session = Depends(get_db), _: bool = Depends(verify_admin_token)):
     """Get admin statistics"""
     try:
+        logger.info("Admin stats request started")
+        
+        # Test database connection
+        try:
+            db.execute("SELECT 1")
+            logger.info("Database connection successful for admin stats")
+        except Exception as db_error:
+            logger.error(f"Database connection failed for admin stats: {db_error}")
+            raise HTTPException(status_code=500, detail="Database connection failed")
+        
         db_service = DatabaseService(db)
         stats = db_service.get_admin_stats()
+        logger.info(f"Admin stats retrieved: {stats}")
         return stats
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Admin stats error: {e}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/admin/users")
 async def admin_users(db: Session = Depends(get_db), _: bool = Depends(verify_admin_token)):
     """Get all users with stats"""
     try:
+        logger.info("Admin users request started")
+        
+        # Test database connection
+        try:
+            db.execute("SELECT 1")
+            logger.info("Database connection successful for admin users")
+        except Exception as db_error:
+            logger.error(f"Database connection failed for admin users: {db_error}")
+            raise HTTPException(status_code=500, detail="Database connection failed")
+        
         users = db.query(User).all()
+        logger.info(f"Found {len(users)} users")
+        
         result = []
         for user in users:
             db_service = DatabaseService(db)
@@ -278,16 +335,34 @@ async def admin_users(db: Session = Depends(get_db), _: bool = Depends(verify_ad
                 "total_views": stats["total_views"],
                 "completed_jobs": stats["completed_jobs"]
             })
+        
+        logger.info(f"Admin users data prepared: {len(result)} users")
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Admin users error: {e}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/admin/jobs")
 async def admin_jobs(db: Session = Depends(get_db), _: bool = Depends(verify_admin_token)):
     """Get all jobs with view counts"""
     try:
+        logger.info("Admin jobs request started")
+        
+        # Test database connection
+        try:
+            db.execute("SELECT 1")
+            logger.info("Database connection successful for admin jobs")
+        except Exception as db_error:
+            logger.error(f"Database connection failed for admin jobs: {db_error}")
+            raise HTTPException(status_code=500, detail="Database connection failed")
+        
         jobs = db.query(Job).all()
+        logger.info(f"Found {len(jobs)} jobs")
+        
         result = []
         for job in jobs:
             view_count = db.query(JobView).filter(JobView.job_id == job.id).count()
@@ -300,9 +375,15 @@ async def admin_jobs(db: Session = Depends(get_db), _: bool = Depends(verify_adm
                 "video_url": job.video_url,
                 "view_count": view_count
             })
+        
+        logger.info(f"Admin jobs data prepared: {len(result)} jobs")
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Admin jobs error: {e}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Video upload endpoint
