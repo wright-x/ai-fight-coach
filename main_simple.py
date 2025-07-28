@@ -416,10 +416,10 @@ async def admin_jobs(db: Session = Depends(get_db), _: bool = Depends(verify_adm
 # Video upload endpoint
 @app.post("/upload-video")
 async def upload_video(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     email: str = Form(...),
     analysis_type: str = Form(...),
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """Upload and process video"""
