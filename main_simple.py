@@ -44,7 +44,7 @@ class Job(Base):
     video_url = Column(String, nullable=True)
     status = Column(String, default="processing", nullable=False)
     # analysis_type = Column(String, default="general", nullable=False)  # Temporarily disabled - column doesn't exist
-    view_count = Column(Integer, default=0, nullable=False)
+    # view_count = Column(Integer, default=0, nullable=False)  # Temporarily disabled - column doesn't exist
     # user = relationship("User", back_populates="jobs")  # Temporarily disabled - relationship error
     # views = relationship("JobView", back_populates="job")  # Temporarily disabled - relationship error
 
@@ -298,7 +298,11 @@ async def register_user(request: Request, db: Session = Depends(get_db)):
 # Admin dashboard
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard():
-    return FileResponse("static/admin.html")
+    response = FileResponse("static/admin.html")
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 @app.get("/api/admin/stats")
 async def admin_stats(db: Session = Depends(get_db), _: bool = Depends(verify_admin_token)):
