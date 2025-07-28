@@ -16,8 +16,9 @@ from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text, ForeignKey, text
-from sqlalchemy.orm import sessionmaker, Session, declarative_base
+from sqlalchemy.orm import sessionmaker, Session, declarative_base, relationship
 from pydantic import BaseModel
+import uuid
 
 # Database setup
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/dbname")
@@ -30,18 +31,22 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    name = Column(String, nullable=True)
+    # name = Column(String, nullable=True)  # Temporarily disabled - column doesn't exist
     signup_ts = Column(DateTime, default=datetime.utcnow, nullable=False)
     upload_count = Column(Integer, default=0, nullable=False)
+    jobs = relationship("Job", back_populates="user")
 
 class Job(Base):
     __tablename__ = "jobs"
     id = Column(String, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_ts = Column(DateTime, default=datetime.utcnow, nullable=False)
     video_url = Column(String, nullable=True)
     status = Column(String, default="processing", nullable=False)
-    analysis_type = Column(String, default="general", nullable=False)
+    # analysis_type = Column(String, default="general", nullable=False)  # Temporarily disabled - column doesn't exist
+    view_count = Column(Integer, default=0, nullable=False)
+    user = relationship("User", back_populates="jobs")
+    views = relationship("JobView", back_populates="job")
 
 class JobView(Base):
     __tablename__ = "job_views"
@@ -50,6 +55,7 @@ class JobView(Base):
     viewed_ts = Column(DateTime, default=datetime.utcnow, nullable=False)
     ip_address = Column(String, nullable=True)
     user_agent = Column(String, nullable=True)
+    job = relationship("Job", back_populates="views")
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -67,30 +73,46 @@ class DatabaseService:
     def __init__(self, db: Session):
         self.db = db
     
-    def create_user(self, email: str, name: str = None) -> User:
-        """Create a new user"""
-        existing_user = self.db.query(User).filter(User.email == email).first()
-        if existing_user:
-            return existing_user
-        
-        user = User(email=email, name=name)
-        self.db.add(user)
-        self.db.commit()
-        self.db.refresh(user)
-        return user
+    def create_user(self, email: str, name: str = None) -> Optional[User]:
+        """Create a new user or return existing one"""
+        try:
+            # Check if user already exists
+            existing_user = self.db.query(User).filter(User.email == email).first()
+            if existing_user:
+                logger.info(f"User already exists: {existing_user.id}")
+                return existing_user
+            
+            # Create new user (without name column)
+            user = User(email=email)
+            self.db.add(user)
+            self.db.commit()
+            self.db.refresh(user)
+            
+            logger.info(f"Created new user: {user.id}")
+            return user
+        except Exception as e:
+            logger.error(f"Error creating user: {e}")
+            self.db.rollback()
+            return None
     
     def create_job(self, user_id: int, video_url: str = None, analysis_type: str = "general") -> Job:
         """Create a new job"""
-        job = Job(
-            id=tempfile.mktemp(suffix="")[-12:],  # Simple job ID
-            user_id=user_id,
-            video_url=video_url,
-            analysis_type=analysis_type
-        )
-        self.db.add(job)
-        self.db.commit()
-        self.db.refresh(job)
-        return job
+        try:
+            job = Job(
+                id=str(uuid.uuid4()),
+                user_id=user_id,
+                video_url=video_url,
+                status="processing"
+                # analysis_type column doesn't exist
+            )
+            self.db.add(job)
+            self.db.commit()
+            self.db.refresh(job)
+            return job
+        except Exception as e:
+            logger.error(f"Error creating job: {e}")
+            self.db.rollback()
+            raise
     
     def update_job_status(self, job_id: str, status: str, video_url: str = None):
         """Update job status"""
@@ -202,14 +224,14 @@ async def register_user(request: Request, db: Session = Depends(get_db)):
         logger.info("Registration attempt started")
         
         body = await request.json()
-        name = body.get("name")
+        name = body.get("name", "Anonymous")  # Default name since column doesn't exist
         email = body.get("email")
         
         logger.info(f"Registration data: name={name}, email={email}")
         
-        if not name or not email:
-            logger.error("Registration failed: Missing name or email")
-            raise HTTPException(status_code=400, detail="Name and email are required")
+        if not email:
+            logger.error("Registration failed: Missing email")
+            raise HTTPException(status_code=400, detail="Email is required")
         
         # Test database connection
         try:
@@ -328,7 +350,7 @@ async def admin_users(db: Session = Depends(get_db), _: bool = Depends(verify_ad
             result.append({
                 "id": user.id,
                 "email": user.email,
-                "name": user.name,
+                "name": "Anonymous",  # Default since column doesn't exist
                 "signup_ts": user.signup_ts.isoformat(),
                 "upload_count": user.upload_count,
                 "total_jobs": stats["total_jobs"],
@@ -371,7 +393,7 @@ async def admin_jobs(db: Session = Depends(get_db), _: bool = Depends(verify_adm
                 "user_id": job.user_id,
                 "created_ts": job.created_ts.isoformat(),
                 "status": job.status,
-                "analysis_type": job.analysis_type,
+                "analysis_type": "general",  # Default since column doesn't exist
                 "video_url": job.video_url,
                 "view_count": view_count
             })
