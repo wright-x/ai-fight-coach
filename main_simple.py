@@ -418,9 +418,9 @@ async def admin_jobs(db: Session = Depends(get_db), _: bool = Depends(verify_adm
 async def upload_video(
     file: UploadFile = File(...),
     email: str = Form(...),
-    analysis_type: str = Form("general"),
-    db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks
+    analysis_type: str = Form(...),
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
 ):
     """Upload and process video"""
     try:
