@@ -53,35 +53,13 @@ class VideoProcessor:
         try:
             print(f"🎬 Starting surgical video processing for {len(highlights)} highlights")
             
-            # Load source video - PRESERVE ORIGINAL DIMENSIONS
+            # Load source video
             source_clip = VideoFileClip(video_path)
-            
-            # --- SMART DOWNSCALING TO PREVENT CORRUPTION ---
-            # We need to downscale to prevent file corruption, but preserve aspect ratio
-            MAX_HEIGHT = 720  # Safe maximum height to prevent corruption
-            w, h = source_clip.size
-            
-            if h > MAX_HEIGHT:
-                print(f"🔥 High-resolution video detected ({h}p). Smart downscaling to {MAX_HEIGHT}p to prevent corruption.")
-                print(f"📐 Original aspect ratio: {w}:{h} = {w/h:.2f}")
-                
-                # Calculate new width to preserve aspect ratio
-                new_height = MAX_HEIGHT
-                new_width = int((w / h) * new_height)
-                
-                # Resize while preserving aspect ratio
-                source_clip = source_clip.resize(newsize=(new_width, new_height))
-                print(f"✅ Smart downscaled. New size: {source_clip.size} (aspect ratio preserved: {new_width/new_height:.2f})")
-            else:
-                print(f"✅ Video resolution is safe ({h}p). No downscaling needed.")
-            
-            # Use final dimensions throughout
             source_fps = source_clip.fps
             source_duration = source_clip.duration
             source_width, source_height = source_clip.size
             
             print(f"📹 Source video: {source_duration:.2f}s at {source_fps}fps, {source_width}x{source_height}")
-            print(f"🔒 FINAL ASPECT RATIO: {source_width}:{source_height} = {source_width/source_height:.2f}")
             
             # CRITICAL: Create empty list for final clips
             final_clips = []
@@ -112,43 +90,61 @@ class VideoProcessor:
                 final_clips.append(highlight_clip)
                 print(f"✅ Highlight clip {i+1} added to final_clips")
                 
-                # Add 0.75 second gap between highlights (except after the last one)
+                # Add 1.5 second gap between highlights (except after the last one)
                 if i < len(highlights) - 1:
-                    print(f"⏸️ Adding 0.75s gap after highlight {i+1}...")
-                    gap_clip = self._create_gap_clip(source_width, source_height, source_fps, duration=0.75)
+                    print(f"⏸️ Adding 1.5s gap after highlight {i+1}...")
+                    gap_clip = self._create_gap_clip(source_width, source_height, source_fps, duration=1.5)
                     final_clips.append(gap_clip)
                     print(f"✅ Gap clip added after highlight {i+1}")
             
-            # --- PRESERVE ORIGINAL ASPECT RATIO - NO RESIZING ---
-            # All clips should already be the correct size from the source video
-            # No safety net needed - we trust the original dimensions
-            print(f"🎬 Concatenating {len(final_clips)} clips with original aspect ratio...")
-            final_video = concatenate_videoclips(final_clips)
-            
-            # Write final video with proper codec and memory optimization
-            print(f"🎬 Writing final video to {output_path}")
-            final_video.write_videofile(
-                output_path,
-                codec="libx264",
-                audio_codec="aac",
-                temp_audiofile="temp-audio.m4a",
-                remove_temp=True,
-                verbose=False,
-                logger=None,
-                preset='fast',  # Faster encoding to prevent corruption
-                threads=2  # Limit threads to prevent memory issues
-            )
-            
-            # Cleanup
-            final_video.close()
-            source_clip.close()
-            
-            # The original final_clips list still holds references that need to be closed
-            for clip in final_clips:
+            # --- INSERT THIS CODE BLOCK BEFORE `concatenate_videoclips` ---
+            print(f"🛡️ Starting Final Resolution Safety Check...")
+            enforced_clips = []
+            target_size = (source_width, source_height) # The one and only correct size
+
+            for i, clip in enumerate(final_clips):
+                if clip.size != [target_size[0], target_size[1]]:
+                    print(f"⚠️ Clip {i} has mismatched size {clip.size}. ENFORCING target size {target_size}.")
+                    resized_clip = clip.resize(newsize=target_size)
+                    enforced_clips.append(resized_clip)
+                    clip.close() # Free memory from the old clip
+                else:
+                    enforced_clips.append(clip)
+
+            print("✅ Safety Check complete. All clips conform to the correct resolution.")
+
+            # Now, use the new, clean list for the final concatenation
+            final_video = concatenate_videoclips(enforced_clips)
+
+            # Clean up the enforced clips list
+            for clip in enforced_clips:
+                if clip in final_clips: continue # Avoid double-closing
                 clip.close()
-            
-            print(f"✅ Final video created: {output_path}")
-            return output_path
+
+            # --- END OF THE NEW CODE BLOCK ---
+
+            # CRITICAL: Video concatenation is now handled in the safety check above
+                
+                # Write final video with proper codec
+                final_video.write_videofile(
+                    output_path,
+                    codec="libx264",
+                    audio_codec="aac",
+                    temp_audiofile="temp-audio.m4a",
+                    remove_temp=True,
+                    verbose=False,
+                    logger=None
+                )
+                
+                # Cleanup
+                final_video.close()
+                source_clip.close()
+                
+                print(f"✅ Final video created: {output_path}")
+                return output_path
+            else:
+                print("❌ No clips to concatenate")
+                return None
                 
         except Exception as e:
             print(f"❌ Video processing failed: {e}")
@@ -268,7 +264,7 @@ class VideoProcessor:
             final_audio = CompositeAudioClip(audio_clips)
             
             # Save final composite audio
-            final_audio.write_audiofile(audio_path, fps=44100, verbose=False, logger=None)
+            final_audio.write_audiofile(audio_path, verbose=False, logger=None)
             
             # Clean up audio clips
             for clip in audio_clips:
@@ -382,9 +378,9 @@ class VideoProcessor:
             # 2. Load the image and convert it into a video clip.
             card = ImageClip(image_path).set_duration(duration)
             
-            # 3. PRESERVE ORIGINAL ASPECT RATIO - NO RESIZING
-            # The image should already be the correct size
-            # We trust the original dimensions
+            # 3. CRITICAL ASPECT RATIO FIX: Resize the card to match the source video.
+            # This is non-negotiable.
+            card = card.resize(newsize=(width, height))
             
             # 4. Set the FPS to match the main video for smooth concatenation.
             card = card.set_fps(fps)
@@ -434,7 +430,7 @@ class VideoProcessor:
                 ).set_position('center').set_duration(duration)
                 print(f"✅ Text clip created with fallback font: {text_clip.size}")
             
-            # PRESERVE ORIGINAL ASPECT RATIO - NO RESIZING
+            # CRITICAL: Return proper CompositeVideoClip
             final_card = CompositeVideoClip([card, text_clip])
             print(f"✅ Fallback text card '{text}' created successfully - Final size: {final_card.size}")
             
@@ -647,7 +643,7 @@ class VideoProcessor:
             shutil.copy2(video_path, output_path)
             return output_path 
 
-    def _create_gap_clip(self, width: int, height: int, fps: float, duration: float = 0.75):
+    def _create_gap_clip(self, width: int, height: int, fps: float, duration: float = 1.5):
         """Create a silent gap clip between highlights"""
         try:
             # Create a black background clip
