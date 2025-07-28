@@ -15,7 +15,7 @@ from fastapi import FastAPI, File, UploadFile, Form, Request, BackgroundTasks, H
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text, ForeignKey, text
 from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from pydantic import BaseModel
 
@@ -213,7 +213,7 @@ async def register_user(request: Request, db: Session = Depends(get_db)):
         
         # Test database connection
         try:
-            db.execute("SELECT 1")
+            db.execute(text("SELECT 1"))
             logger.info("Database connection successful")
         except Exception as db_error:
             logger.error(f"Database connection failed: {db_error}")
@@ -286,7 +286,7 @@ async def admin_stats(db: Session = Depends(get_db), _: bool = Depends(verify_ad
         
         # Test database connection
         try:
-            db.execute("SELECT 1")
+            db.execute(text("SELECT 1"))
             logger.info("Database connection successful for admin stats")
         except Exception as db_error:
             logger.error(f"Database connection failed for admin stats: {db_error}")
@@ -312,7 +312,7 @@ async def admin_users(db: Session = Depends(get_db), _: bool = Depends(verify_ad
         
         # Test database connection
         try:
-            db.execute("SELECT 1")
+            db.execute(text("SELECT 1"))
             logger.info("Database connection successful for admin users")
         except Exception as db_error:
             logger.error(f"Database connection failed for admin users: {db_error}")
@@ -354,7 +354,7 @@ async def admin_jobs(db: Session = Depends(get_db), _: bool = Depends(verify_adm
         
         # Test database connection
         try:
-            db.execute("SELECT 1")
+            db.execute(text("SELECT 1"))
             logger.info("Database connection successful for admin jobs")
         except Exception as db_error:
             logger.error(f"Database connection failed for admin jobs: {db_error}")
