@@ -420,7 +420,7 @@ async def upload_video(
     email: str = Form(...),
     analysis_type: str = Form("general"),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = Depends()
+    background_tasks: BackgroundTasks
 ):
     """Upload and process video"""
     try:
