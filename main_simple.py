@@ -302,6 +302,7 @@ async def admin_dashboard():
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
+    response.headers["ETag"] = f'"{int(datetime.utcnow().timestamp())}"'
     return response
 
 @app.get("/api/admin/stats")
@@ -423,20 +424,71 @@ async def upload_video(
 ):
     """Upload and process video"""
     try:
+        logger.info(f"Upload request started: email={email}, analysis_type={analysis_type}")
+        logger.info(f"File details: filename={file.filename}, content_type={file.content_type}, size={file.size if hasattr(file, 'size') else 'unknown'}")
+        
+        # Validate file
+        if not file.filename:
+            logger.error("Upload failed: No filename provided")
+            return JSONResponse({
+                "success": False,
+                "message": "No file provided"
+            }, status_code=422)
+        
+        # Validate file type
+        allowed_extensions = ['.mp4', '.mov', '.avi', '.mkv']
+        file_ext = os.path.splitext(file.filename)[1].lower()
+        logger.info(f"File extension: {file_ext}")
+        
+        if file_ext not in allowed_extensions:
+            logger.error(f"Upload failed: Invalid file type {file_ext}")
+            return JSONResponse({
+                "success": False,
+                "message": f"Invalid file type. Allowed: {', '.join(allowed_extensions)}"
+            }, status_code=422)
+        
         # Create or get user
+        logger.info("Creating/getting user...")
         db_service = DatabaseService(db)
         user = db_service.create_user(email=email)
         
+        if not user:
+            logger.error(f"Upload failed: Could not create/get user for {email}")
+            return JSONResponse({
+                "success": False,
+                "message": "User creation failed"
+            }, status_code=500)
+        
+        logger.info(f"User processed: {user.id}")
+        
         # Create job
+        logger.info("Creating job...")
         job = db_service.create_job(user.id, analysis_type=analysis_type)
+        
+        if not job:
+            logger.error(f"Upload failed: Could not create job for user {user.id}")
+            return JSONResponse({
+                "success": False,
+                "message": "Job creation failed"
+            }, status_code=500)
+        
+        logger.info(f"Job created: {job.id}")
         
         # Save uploaded file
         temp_dir = "temp"
         os.makedirs(temp_dir, exist_ok=True)
         
         file_path = f"{temp_dir}/{job.id}_{file.filename}"
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        try:
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            logger.info(f"File saved to {file_path}")
+        except Exception as e:
+            logger.error(f"File save failed: {e}")
+            return JSONResponse({
+                "success": False,
+                "message": "File save failed"
+            }, status_code=500)
         
         # Store job data
         in_memory_files[job.id] = {
@@ -447,21 +499,24 @@ async def upload_video(
         # Start background processing
         if background_tasks:
             background_tasks.add_task(process_video_analysis, job.id, db)
+            logger.info(f"Background task started for job {job.id}")
         
-        logger.info(f"Job {job.id} created for user {email}")
+        logger.info(f"Job {job.id} created successfully for user {email}")
         
-        return {
+        return JSONResponse({
             "success": True,
             "job_id": job.id,
             "message": "Video uploaded successfully"
-        }
+        })
         
     except Exception as e:
         logger.error(f"Upload error: {e}")
-        return {
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        return JSONResponse({
             "success": False,
-            "message": f"Upload failed: {str(e)}"
-        }
+            "message": f"Upload failed: Unknown error"
+        }, status_code=500)
 
 # Status endpoint
 @app.get("/status/{job_id}")
