@@ -419,13 +419,13 @@ async def upload_video(
     file: UploadFile = File(...),
     email: str = Form(...),
     analysis_type: str = Form("general"),
-    background_tasks: BackgroundTasks = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    background_tasks: BackgroundTasks = Depends()
 ):
     """Upload and process video"""
     try:
         logger.info(f"Upload request started: email={email}, analysis_type={analysis_type}")
-        logger.info(f"File details: filename={file.filename}, content_type={file.content_type}, size={file.size if hasattr(file, 'size') else 'unknown'}")
+        logger.info(f"File details: filename={file.filename}, content_type={file.content_type}")
         
         # Validate file
         if not file.filename:
@@ -497,9 +497,8 @@ async def upload_video(
         }
         
         # Start background processing
-        if background_tasks:
-            background_tasks.add_task(process_video_analysis, job.id, db)
-            logger.info(f"Background task started for job {job.id}")
+        background_tasks.add_task(process_video_analysis, job.id, db)
+        logger.info(f"Background task started for job {job.id}")
         
         logger.info(f"Job {job.id} created successfully for user {email}")
         
