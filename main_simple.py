@@ -5,986 +5,486 @@ Version with better error handling for deployment
 
 # Suppress TensorFlow/MediaPipe C++ warnings
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress INFO and WARNING messages
-os.environ['CUDA_VISIBLE_DEVICES'] = ''   # Disable CUDA warnings
-
-# Standard library imports
 import json
-import shutil
+import logging
 import tempfile
-import time
-import traceback
-import threading
-import uuid
+import shutil
 from datetime import datetime
-from pathlib import Path
-from typing import List, Dict, Any, Optional
-
-# Third-party imports
-from fastapi import FastAPI, File, UploadFile, Form, Request, BackgroundTasks, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from typing import Optional, List
+from fastapi import FastAPI, File, UploadFile, Form, Request, BackgroundTasks, HTTPException, Depends
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from pydantic import BaseModel
+
+# Database setup
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/dbname")
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Database models
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=True)
+    signup_ts = Column(DateTime, default=datetime.utcnow, nullable=False)
+    upload_count = Column(Integer, default=0, nullable=False)
+
+class Job(Base):
+    __tablename__ = "jobs"
+    id = Column(String, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False)
+    created_ts = Column(DateTime, default=datetime.utcnow, nullable=False)
+    video_url = Column(String, nullable=True)
+    status = Column(String, default="processing", nullable=False)
+    analysis_type = Column(String, default="general", nullable=False)
+
+class JobView(Base):
+    __tablename__ = "job_views"
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(String, nullable=False)
+    viewed_ts = Column(DateTime, default=datetime.utcnow, nullable=False)
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+
+# Create tables
+Base.metadata.create_all(bind=engine)
+
+# Database dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Database service
+class DatabaseService:
+    def __init__(self, db: Session):
+        self.db = db
+    
+    def create_user(self, email: str, name: str = None) -> User:
+        """Create a new user"""
+        existing_user = self.db.query(User).filter(User.email == email).first()
+        if existing_user:
+            return existing_user
+        
+        user = User(email=email, name=name)
+        self.db.add(user)
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+    
+    def create_job(self, user_id: int, video_url: str = None, analysis_type: str = "general") -> Job:
+        """Create a new job"""
+        job = Job(
+            id=tempfile.mktemp(suffix="")[-12:],  # Simple job ID
+            user_id=user_id,
+            video_url=video_url,
+            analysis_type=analysis_type
+        )
+        self.db.add(job)
+        self.db.commit()
+        self.db.refresh(job)
+        return job
+    
+    def update_job_status(self, job_id: str, status: str, video_url: str = None):
+        """Update job status"""
+        job = self.db.query(Job).filter(Job.id == job_id).first()
+        if job:
+            job.status = status
+            if video_url:
+                job.video_url = video_url
+            self.db.commit()
+    
+    def record_job_view(self, job_id: str, ip_address: str = None, user_agent: str = None):
+        """Record a job view"""
+        view = JobView(job_id=job_id, ip_address=ip_address, user_agent=user_agent)
+        self.db.add(view)
+        self.db.commit()
+    
+    def get_user_stats(self, user_id: int):
+        """Get user statistics"""
+        jobs = self.db.query(Job).filter(Job.user_id == user_id).all()
+        total_views = 0
+        for job in jobs:
+            views = self.db.query(JobView).filter(JobView.job_id == job.id).count()
+            total_views += views
+        
+        return {
+            "total_jobs": len(jobs),
+            "total_views": total_views,
+            "completed_jobs": len([j for j in jobs if j.status == "completed"])
+        }
+    
+    def get_admin_stats(self):
+        """Get admin statistics"""
+        total_users = self.db.query(User).count()
+        total_jobs = self.db.query(Job).count()
+        total_views = self.db.query(JobView).count()
+        
+        return {
+            "total_users": total_users,
+            "total_jobs": total_jobs,
+            "total_views": total_views
+        }
 
 # Set up detailed logging
-import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
-app = FastAPI(title="AI Fight Coach", version="1.0.0")
+# Initialize components
+try:
+    from utils.video_processor import VideoProcessor
+    from utils.gemini_client import GeminiClient
+    from utils.tts_client import TTSClient
+    
+    video_processor = VideoProcessor()
+    gemini_client = GeminiClient()
+    tts_client = TTSClient()
+    
+    logger.info("✅ Components initialized:")
+    logger.info(f"   - VideoProcessor: {type(video_processor)}")
+    logger.info(f"   - GeminiClient: {type(gemini_client)}")
+    logger.info(f"   - TTSClient: {type(tts_client)}")
+    
+except Exception as e:
+    logger.error(f"❌ Component initialization failed: {e}")
+    raise
 
-# Create necessary directories
-for directory in ["uploads", "output", "static", "temp"]:
-    Path(directory).mkdir(exist_ok=True)
+# In-memory storage
+in_memory_files = {}
+active_jobs = {}
+
+app = FastAPI(title="AI Fight Coach", version="1.0.0")
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Initialize components with detailed error handling
-video_processor = None
-gemini_client = None
-tts_client = None
-user_manager = None
-
-# In-memory storage for Railway compatibility
-in_memory_files = {}  # {job_id: file_content}
-active_jobs = {}
-
-def initialize_components():
-    """Initialize all components with detailed logging"""
-    global video_processor, gemini_client, tts_client, user_manager
-    
-    logger.info("🔧 Starting component initialization...")
-
-    # Initialize VideoProcessor (main component)
-    try:
-        logger.info("📁 Initializing VideoProcessor...")
-        from utils.video_processor import VideoProcessor
-        logger.info("📦 VideoProcessor class imported successfully")
-        video_processor = VideoProcessor()
-        logger.info("✅ VideoProcessor initialized successfully")
-        logger.info(f"📊 VideoProcessor object: {type(video_processor)}")
-    except Exception as e:
-        logger.error(f"❌ VideoProcessor failed: {e}")
-        logger.error(f"📋 Traceback: {traceback.format_exc()}")
-        video_processor = None
-        logger.warning("⚠️ Video processing will be disabled - this is a critical error!")
-
-    # Initialize GeminiClient
-    try:
-        logger.info("🤖 Initializing GeminiClient...")
-        from utils.gemini_client import GeminiClient
-        gemini_client = GeminiClient()
-        logger.info("✅ GeminiClient initialized successfully")
-    except Exception as e:
-        logger.error(f"❌ GeminiClient failed: {e}")
-        logger.error(f"📋 Traceback: {traceback.format_exc()}")
-        gemini_client = None
-        logger.warning("⚠️ AI analysis will be limited")
-
-    # Initialize TTSClient
-    try:
-        logger.info("🔊 Initializing TTSClient...")
-        from utils.tts_client import TTSClient
-        tts_client = TTSClient()
-        logger.info("✅ TTSClient initialized successfully")
-    except Exception as e:
-        logger.error(f"❌ TTSClient failed: {e}")
-        logger.error(f"📋 Traceback: {traceback.format_exc()}")
-        tts_client = None
-        logger.warning("⚠️ TTS will be limited")
-
-    # Initialize UserManager
-    try:
-        logger.info("👥 Initializing UserManager...")
-        from user_management import UserManager
-        from email_config import SMTP_CONFIG, ADMIN_EMAIL
-        user_manager = UserManager(csv_file="users.csv", smtp_config=SMTP_CONFIG)
-        logger.info("✅ UserManager initialized successfully")
-    except Exception as e:
-        logger.error(f"❌ UserManager failed: {e}")
-        logger.error(f"📋 Traceback: {traceback.format_exc()}")
-        user_manager = None
-
-    logger.info("🏁 Component initialization complete!")
-    logger.info(f"📊 Component Status:")
-    logger.info(f"   - VideoProcessor: {'✅' if video_processor else '❌'}")
-    logger.info(f"   - GeminiClient: {'✅' if gemini_client else '❌'}")
-    logger.info(f"   - TTSClient: {'✅' if tts_client else '❌'}")
-    logger.info(f"   - UserManager: {'✅' if user_manager else '❌'}")
-
-def schedule_file_deletion(job_id: str, delay_minutes: int = 15):
-    """Schedule in-memory file deletion after the specified delay."""
-    def delete_file():
-        time.sleep(delay_minutes * 60)
-        if job_id in in_memory_files:
-            del in_memory_files[job_id]
-            logger.info(f"🗑️ Deleted in-memory file for job {job_id}")
-    
-    thread = threading.Thread(target=delete_file, daemon=True)
-    thread.start()
+# Templates
+templates = Jinja2Templates(directory="templates")
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize application on startup."""
-    logger.info("🚀 AI Fight Coach starting up...")
-    logger.info("📁 Creating directories...")
-    
-    # Create directories
-    for directory in ["uploads", "output", "static", "temp"]:
-        Path(directory).mkdir(exist_ok=True)
-        logger.info(f"✅ Created directory: {directory}")
+    """Initialize database tables"""
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables created")
 
-    initialize_components()
+# Admin token verification
+def verify_admin_token(request: Request):
+    admin_token = os.getenv("ADMIN_TOKEN", "admin123")
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    return token == admin_token
 
 @app.get("/health")
 async def health_check():
-    """Comprehensive health check endpoint"""
-    try:
-        # Check basic system health
-        health_status = {
-            "status": "healthy",
-            "timestamp": datetime.now().isoformat(),
-            "environment": os.getenv("RAILWAY_ENVIRONMENT", "development"),
-            "components": {
-                "video_processor": video_processor is not None,
-                "gemini_client": gemini_client is not None,
-                "tts_client": tts_client is not None,
-                "user_manager": user_manager is not None
-            },
-            "system": {
-                "python_version": "3.11",
-                "platform": "railway",
-                "memory_usage": "ok",
-                "disk_space": "ok"
-            },
-            "endpoints": {
-                "root": "/",
-                "health": "/health",
-                "upload": "/upload-video",
-                "status": "/status/{job_id}",
-                "video": "/video/{job_id}"
-            }
-        }
-        
-        # Check if any critical components are missing
-        if not any(health_status["components"].values()):
-            health_status["status"] = "degraded"
-            health_status["message"] = "Some components failed to initialize"
-        else:
-            health_status["message"] = "All systems operational"
-        
-        return JSONResponse(content=health_status)
-        
-    except Exception as e:
-        logger.error(f"❌ Health check failed: {e}")
-        return JSONResponse(
-            content={
-                "status": "unhealthy",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            },
-            status_code=500
-        )
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
-@app.get("/test")
-async def test_endpoint():
-    """Simple test endpoint for connectivity"""
-    return JSONResponse(content={
-        "message": "AI Boxing Analysis server is running!",
-        "status": "ok",
-        "timestamp": datetime.now().isoformat()
-    })
+# Root page - Registration
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    return FileResponse("static/register.html")
 
-@app.get("/test-video")
-async def test_video():
-    """Test endpoint to verify video serving works"""
-    logger.info("🎥 Test video endpoint requested")
-    try:
-        # Create a simple test video (1 second black video)
-        import numpy as np
-        import cv2
-        
-        # Create a simple test video
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter('test_video.mp4', fourcc, 1.0, (640,480))
-        
-        # Create a black frame
-        frame = np.zeros((480,640,3), dtype=np.uint8)
-        
-        # Write 30 frames (1 second at 30fps)
-        for _ in range(30):
-            out.write(frame)
-        
-        out.release()
-        
-        # Read the test video
-        with open('test_video.mp4', 'rb') as f:
-            video_content = f.read()
-        
-        # Clean up
-        os.remove('test_video.mp4')
-        
-        logger.info(f"✅ Test video created: {len(video_content)} bytes")
-        
-        return Response(
-            content=video_content,
-            media_type="video/mp4",
-            headers={"Content-Disposition": "inline; filename=test_video.mp4"}
-        )
-        
-    except Exception as e:
-        logger.error(f"❌ Test video creation failed: {e}")
-        return JSONResponse(content={"error": f"Test video failed: {e}"}, status_code=500)
-
-@app.get("/test-video-simple")
-async def test_video_simple():
-    """Create and serve a simple test video to verify video serving works"""
-    logger.info("🎥 Creating simple test video...")
-    try:
-        import cv2
-        import numpy as np
-        
-        # Create a simple test video (2 seconds, 640x480)
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        test_video_path = 'test_simple.mp4'
-        out = cv2.VideoWriter(test_video_path, fourcc, 30.0, (640, 480))
-        
-        # Create frames with text
-        for i in range(60):  # 2 seconds at 30fps
-            frame = np.zeros((480, 640, 3), dtype=np.uint8)
-            
-            # Add text
-            cv2.putText(frame, f"Test Video Frame {i+1}", (50, 240), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            cv2.putText(frame, "AI Fight Coach Test", (50, 280), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-            
-            out.write(frame)
-        
-        out.release()
-        
-        # Read the video file
-        with open(test_video_path, 'rb') as f:
-            video_content = f.read()
-        
-        # Clean up
-        os.remove(test_video_path)
-        
-        logger.info(f"✅ Test video created: {len(video_content)} bytes")
-        
-        headers = {
-            "Content-Disposition": "inline; filename=test_video.mp4",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-            "Cache-Control": "no-cache"
-        }
-        
-        return Response(
-            content=video_content,
-            media_type="video/mp4",
-            headers=headers
-        )
-        
-    except Exception as e:
-        logger.error(f"❌ Test video creation failed: {e}")
-        logger.error(f"📋 Traceback: {traceback.format_exc()}")
-        return JSONResponse(content={"error": f"Test video failed: {e}"}, status_code=500)
-
-@app.get("/")
-async def root():
-    """Check if user is registered and redirect appropriately"""
-    logger.info("🏠 Root page requested")
-    
-    # Provide a landing page that checks localStorage for registration status
-    return HTMLResponse(content="""
-    <html>
-        <head>
-            <title>AI Fight Coach</title>
-            <style>
-                body {
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    min-height: 100vh;
-                    margin: 0;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: white;
-                }
-                .container {
-                    text-align: center;
-                    background: rgba(255,255,255,0.1);
-                    padding: 40px;
-                    border-radius: 20px;
-                    backdrop-filter: blur(10px);
-                    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-                }
-                h1 {
-                    font-size: 3rem;
-                    margin-bottom: 20px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 15px;
-                }
-                .btn {
-                    display: inline-block;
-                    background: rgba(255,255,255,0.2);
-                    color: white;
-                    padding: 15px 30px;
-                    margin: 10px;
-                    border-radius: 25px;
-                    text-decoration: none;
-                    font-weight: 600;
-                    transition: all 0.3s ease;
-                    border: 2px solid rgba(255,255,255,0.3);
-                }
-                .btn:hover {
-                    background: rgba(255,255,255,0.3);
-                    transform: translateY(-2px);
-                }
-                .btn-primary {
-                    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-                    border-color: #28a745;
-                }
-                .btn-primary:hover {
-                    background: linear-gradient(135deg, #218838 0%, #1ea085 100%);
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>🥊 AI Fight Coach</h1>
-                <p style="font-size: 1.2rem; margin-bottom: 30px; opacity: 0.9;">
-                    Professional Boxing Analysis Powered by AI
-                </p>
-                <div id="welcome-message" style="display: none;">
-                    <p style="font-size: 1.1rem; margin-bottom: 20px;">Welcome back!</p>
-                    <a href="/main" class="btn btn-primary">Continue to Analysis</a>
-                </div>
-                <div id="new-user" style="display: none;">
-                    <p style="font-size: 1.1rem; margin-bottom: 20px;">Get started with AI-powered boxing analysis</p>
-                    <a href="/register" class="btn">Register First</a>
-                    <a href="/main" class="btn btn-primary">Try Demo</a>
-                </div>
-                <div id="loading">
-                    <p>Checking your status...</p>
-                </div>
-            </div>
-            
-            <script>
-                // Check if user is registered in localStorage
-                window.onload = function() {
-                    const userName = localStorage.getItem('userName');
-                    const userEmail = localStorage.getItem('userEmail');
-                    
-                    const welcomeDiv = document.getElementById('welcome-message');
-                    const newUserDiv = document.getElementById('new-user');
-                    const loadingDiv = document.getElementById('loading');
-                    
-                    if (userName && userEmail) {
-                        // User is registered
-                        loadingDiv.style.display = 'none';
-                        welcomeDiv.style.display = 'block';
-                    } else {
-                        // New user
-                        loadingDiv.style.display = 'none';
-                        newUserDiv.style.display = 'block';
-                    }
-                };
-            </script>
-        </body>
-    </html>
-    """)
-
-@app.get("/register")
-async def register_page():
-    """Serve registration page"""
-    logger.info("📝 Registration page requested")
-    try:
-        with open("static/register.html", "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    except FileNotFoundError:
-        logger.error("❌ Registration page not found")
-        return HTMLResponse(content="<h1>Registration page not found</h1>")
-
-@app.get("/main")
+# Main upload page
+@app.get("/main", response_class=HTMLResponse)
 async def main_page():
-    """Serve main application page"""
-    logger.info("🎯 Main page requested")
-    try:
-        with open("static/index.html", "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    except FileNotFoundError:
-        logger.error("❌ Main page not found")
-        return HTMLResponse(content="<h1>Main page not found</h1>")
+    return FileResponse("static/index.html")
 
-@app.post("/register-user")
-async def register_user(request: Request, name: str = Form(...), email: str = Form(...)):
-    """Register user"""
+# Registration endpoint
+@app.post("/register")
+async def register_user(request: Request, db: Session = Depends(get_db)):
+    """Register a new user"""
     try:
-        logger.info(f"👤 User registration: {name} ({email})")
+        body = await request.json()
+        name = body.get("name")
+        email = body.get("email")
         
-        # Create user data
-        user_data = {
-            "name": name,
-            "email": email,
-            "registered_at": datetime.now().isoformat(),
-            "session_id": str(uuid.uuid4())
-        }
+        if not name or not email:
+            raise HTTPException(status_code=400, detail="Name and email are required")
         
-        # Try to save to CSV if user manager is available
-        if user_manager:
-            try:
-                user_manager.register_user(name, email)
-                logger.info(f"✅ User saved to CSV: {email}")
-            except Exception as e:
-                logger.error(f"⚠️ Failed to save to CSV: {e}")
+        db_service = DatabaseService(db)
+        user = db_service.create_user(email=email, name=name)
         
-        # Send welcome email if available
-        if user_manager:
-            try:
-                user_manager.send_welcome_email(name, email)
-                logger.info(f"✅ Welcome email sent: {email}")
-            except Exception as e:
-                logger.error(f"⚠️ Failed to send welcome email: {e}")
-        
-        return JSONResponse(content={
+        # Set cookies for 30 days
+        response = JSONResponse({
             "success": True,
-            "message": "Registration successful! You can now upload videos.",
-            "user": user_data
+            "message": f"Welcome {name}! Your account has been created successfully."
         })
+        
+        response.set_cookie(
+            key="user_email",
+            value=email,
+            max_age=2592000,  # 30 days
+            path="/"
+        )
+        response.set_cookie(
+            key="user_name", 
+            value=name,
+            max_age=2592000,
+            path="/"
+        )
+        response.set_cookie(
+            key="user_registered",
+            value="true",
+            max_age=2592000,
+            path="/"
+        )
+        
+        return response
         
     except Exception as e:
-        logger.error(f"❌ Registration failed: {e}")
-        return JSONResponse(content={
+        logger.error(f"Registration error: {e}")
+        return JSONResponse({
             "success": False,
-            "message": f"Registration failed: {e}"
+            "message": "Registration failed. Please try again."
         })
 
-@app.get("/session")
-async def get_session(request: Request):
-    """Get current session info"""
-    # Simple session check without middleware
-    return JSONResponse(content={"user": None, "authenticated": False})
+# Admin dashboard
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard():
+    return FileResponse("static/admin.html")
 
-@app.post("/logout")
-async def logout(request: Request):
-    """Clear user session"""
-    # Simple logout without session middleware
-    return JSONResponse(content={"success": True, "message": "Logged out successfully"})
-
-@app.post("/submit-feedback")
-async def submit_feedback(request: Request):
-    """Submit user feedback"""
+@app.get("/api/admin/stats")
+async def admin_stats(db: Session = Depends(get_db), _: bool = Depends(verify_admin_token)):
+    """Get admin statistics"""
     try:
-        data = await request.json()
-        job_id = data.get('job_id')
-        feedback_type = data.get('feedback_type')
-        feedback_text = data.get('feedback_text', '')
-        
-        logger.info(f"📝 Received feedback - Job ID: {job_id}, Type: {feedback_type}")
-        
-        # Send email notification
-        if user_manager:
-            try:
-                subject = f"AI Fight Coach Feedback - {feedback_type}"
-                body = f"""
-                New feedback received:
-                
-                Job ID: {job_id}
-                Feedback Type: {feedback_type}
-                Feedback Text: {feedback_text}
-                
-                Timestamp: {datetime.now().isoformat()}
-                """
-                
-                # Send to admin email
-                admin_email = os.getenv('SMTP_EMAIL', 'admin@ai-boxing.com')
-                user_manager.send_email(admin_email, subject, body)
-                logger.info("✅ Feedback email sent successfully")
-            except Exception as e:
-                logger.error(f"❌ Failed to send feedback email: {e}")
-        
-        return JSONResponse(content={
-            "success": True,
-            "message": "Feedback submitted successfully"
-        })
-        
+        db_service = DatabaseService(db)
+        stats = db_service.get_admin_stats()
+        return stats
     except Exception as e:
-        logger.error(f"❌ Feedback submission failed: {e}")
-        return JSONResponse(content={
-            "success": False,
-            "message": f"Failed to submit feedback: {str(e)}"
-        })
+        logger.error(f"Admin stats error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/upload")
-async def upload_video_redirect(
-    background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    fighter_name: Optional[str] = Form("FIGHTER"),
-    analysis_type: Optional[str] = Form("everything")
-):
-    """Redirect /upload to /upload-video for compatibility"""
-    logger.info("🔄 Upload redirect requested")
-    return await upload_video(background_tasks, file, fighter_name, analysis_type)
+@app.get("/api/admin/users")
+async def admin_users(db: Session = Depends(get_db), _: bool = Depends(verify_admin_token)):
+    """Get all users with stats"""
+    try:
+        users = db.query(User).all()
+        result = []
+        for user in users:
+            db_service = DatabaseService(db)
+            stats = db_service.get_user_stats(user.id)
+            result.append({
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+                "signup_ts": user.signup_ts.isoformat(),
+                "upload_count": user.upload_count,
+                "total_jobs": stats["total_jobs"],
+                "total_views": stats["total_views"],
+                "completed_jobs": stats["completed_jobs"]
+            })
+        return result
+    except Exception as e:
+        logger.error(f"Admin users error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/admin/jobs")
+async def admin_jobs(db: Session = Depends(get_db), _: bool = Depends(verify_admin_token)):
+    """Get all jobs with view counts"""
+    try:
+        jobs = db.query(Job).all()
+        result = []
+        for job in jobs:
+            view_count = db.query(JobView).filter(JobView.job_id == job.id).count()
+            result.append({
+                "id": job.id,
+                "user_id": job.user_id,
+                "created_ts": job.created_ts.isoformat(),
+                "status": job.status,
+                "analysis_type": job.analysis_type,
+                "video_url": job.video_url,
+                "view_count": view_count
+            })
+        return result
+    except Exception as e:
+        logger.error(f"Admin jobs error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Video upload endpoint
 @app.post("/upload-video")
 async def upload_video(
-    request: Request,
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    fighter_name: Optional[str] = Form("FIGHTER"),
-    analysis_type: Optional[str] = Form("everything")
+    email: str = Form(...),
+    analysis_type: str = Form("general"),
+    background_tasks: BackgroundTasks = None,
+    db: Session = Depends(get_db)
 ):
-    """Upload video for AI analysis"""
+    """Upload and process video"""
     try:
-        logger.info(f"📤 Video upload started: {file.filename}")
+        # Create or get user
+        db_service = DatabaseService(db)
+        user = db_service.create_user(email=email)
         
-        # Validate file
-        if not file.filename or not file.filename.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
-            return JSONResponse(content={
-                "success": False,
-                "message": "Please upload a valid video file (.mp4, .avi, .mov, .mkv)"
-            })
+        # Create job
+        job = db_service.create_job(user.id, analysis_type=analysis_type)
         
-        # Generate job ID
-        job_id = str(uuid.uuid4())
+        # Save uploaded file
+        temp_dir = "temp"
+        os.makedirs(temp_dir, exist_ok=True)
         
-        # Store video in memory
-        video_content = await file.read()
-        in_memory_files[job_id] = {
-            "content": video_content,
-            "filename": file.filename,
-            "content_type": file.content_type
+        file_path = f"{temp_dir}/{job.id}_{file.filename}"
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Store job data
+        in_memory_files[job.id] = {
+            "path": file_path,
+            "analysis_type": analysis_type
         }
-        
-        # Initialize job
-        active_jobs[job_id] = {
-            "status": "uploaded",
-            "progress": 0,
-            "message": "Video uploaded successfully",
-            "fighter_name": fighter_name,
-            "analysis_type": analysis_type,
-            "user": {"name": "Anonymous", "email": "anonymous@example.com"},  # Default user
-            "uploaded_at": datetime.now().isoformat()
-        }
-        
-        logger.info(f"✅ Video uploaded: {job_id} ({len(video_content)} bytes)")
         
         # Start background processing
-        background_tasks.add_task(process_video_analysis, job_id, fighter_name, analysis_type)
+        if background_tasks:
+            background_tasks.add_task(process_video_analysis, job.id, db)
         
-        return JSONResponse(content={
+        logger.info(f"Job {job.id} created for user {email}")
+        
+        return {
             "success": True,
-            "job_id": job_id,
-            "message": "Video uploaded successfully! Analysis in progress..."
-        })
+            "job_id": job.id,
+            "message": "Video uploaded successfully"
+        }
         
     except Exception as e:
-        logger.error(f"❌ Upload failed: {e}")
-        logger.error(f"📋 Traceback: {traceback.format_exc()}")
-        return JSONResponse(content={
+        logger.error(f"Upload error: {e}")
+        return {
             "success": False,
-            "message": f"Upload failed: {e}"
-        })
-
-@app.get("/status/{job_id}")
-async def get_status(job_id: str):
-    logger.info(f"📊 Status check requested for job: {job_id}")
-    if job_id in active_jobs:
-        status = active_jobs[job_id]
-        logger.info(f"📈 Job {job_id} status: {status.get('status', 'unknown')}")
-        return JSONResponse(content=status)
-    else:
-        logger.warning(f"⚠️ Job {job_id} not found")
-        return JSONResponse(content={"status": "not_found"}, status_code=404)
-
-@app.get("/video/{job_id}")
-async def serve_video(job_id: str):
-    """Serve the uploaded video"""
-    logger.info(f"🎥 Video request for job: {job_id}")
-    logger.info(f"📊 Available jobs in memory: {list(in_memory_files.keys())}")
-    
-    try:
-        if job_id in in_memory_files:
-            file_info = in_memory_files[job_id]
-            logger.info(f"✅ Serving video: {file_info['filename']} ({len(file_info['content'])} bytes)")
-            logger.info(f"📋 Content type: {file_info['content_type']}")
-            
-            # Add CORS headers for video streaming
-            headers = {
-                "Content-Disposition": f"inline; filename={file_info['filename']}",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-                "Cache-Control": "no-cache"
-            }
-            
-            return Response(
-                content=file_info["content"],
-                media_type=file_info["content_type"],
-                headers=headers
-            )
-        else:
-            logger.error(f"❌ Video not found for job: {job_id}")
-            logger.error(f"📊 Available jobs: {list(in_memory_files.keys())}")
-            return JSONResponse(content={"error": "Video not found"}, status_code=404)
-    except Exception as e:
-        logger.error(f"❌ Error serving video for job {job_id}: {e}")
-        logger.error(f"📋 Traceback: {traceback.format_exc()}")
-        return JSONResponse(content={"error": f"Error serving video: {e}"}, status_code=500)
-
-@app.get("/analysis/{job_id}")
-async def get_analysis(job_id: str):
-    """Get analysis results for a job"""
-    logger.info(f"📊 Analysis request for job: {job_id}")
-    
-    try:
-        if job_id in active_jobs:
-            job_info = active_jobs[job_id]
-            if job_info.get("status") == "completed" and "analysis_result" in job_info:
-                logger.info(f"✅ Serving analysis for job: {job_id}")
-                return JSONResponse(content=job_info["analysis_result"])
-            else:
-                logger.warning(f"⚠️ Analysis not ready for job: {job_id}, status: {job_info.get('status')}")
-                return JSONResponse(content={"error": "Analysis not ready"}, status_code=404)
-        else:
-            logger.error(f"❌ Job not found: {job_id}")
-            return JSONResponse(content={"error": "Job not found"}, status_code=404)
-    except Exception as e:
-        logger.error(f"❌ Error serving analysis for job {job_id}: {e}")
-        return JSONResponse(content={"error": f"Error serving analysis: {e}"}, status_code=500)
-
-def process_video_analysis(job_id: str, fighter_name: str, analysis_type: str):
-    """Process video analysis in background"""
-    logger.info(f"🔍 Starting video analysis for job: {job_id}")
-    try:
-        active_jobs[job_id] = {"status": "processing", "progress": 0}
-        
-        # Check if file exists in memory
-        if job_id not in in_memory_files:
-            logger.error(f"❌ Video file not found in memory for job: {job_id}")
-            active_jobs[job_id] = {
-                "status": "failed",
-                "message": "Video file not found in memory"
-            }
-            return
-        
-        # Update progress
-        active_jobs[job_id]["progress"] = 10
-        logger.info(f"📈 Job {job_id} progress: 10%")
-        
-        # Save video file temporarily for Gemini analysis
-        file_info = in_memory_files[job_id]
-        temp_video_path = f"temp/video_{job_id}.mp4"
-        
-        with open(temp_video_path, 'wb') as f:
-            f.write(file_info["content"])
-        
-        logger.info(f"💾 Saved video to temp file: {temp_video_path}")
-        
-        # Update progress
-        active_jobs[job_id]["progress"] = 30
-        logger.info(f"📈 Job {job_id} progress: 30%")
-        
-        # Analyze with Gemini
-        if gemini_client:
-            logger.info(f"🤖 Calling Gemini analysis for job: {job_id}")
-            try:
-                logger.info(f"🔍 Analysis type: {analysis_type}")
-                logger.info(f"📁 Temp video path: {temp_video_path}")
-                logger.info(f"📊 Video file exists: {os.path.exists(temp_video_path)}")
-                if os.path.exists(temp_video_path):
-                    file_size = os.path.getsize(temp_video_path)
-                    logger.info(f"📊 Video file size: {file_size} bytes")
-                
-                analysis_result = gemini_client.analyze_video(temp_video_path, analysis_type)
-                logger.info(f"✅ Gemini analysis completed for job: {job_id}")
-                logger.info(f"📊 Analysis result keys: {list(analysis_result.keys()) if analysis_result else 'None'}")
-                if analysis_result and 'highlights' in analysis_result:
-                    logger.info(f"📊 Number of highlights: {len(analysis_result['highlights'])}")
-                
-                # --- ADD THIS BLOCK ---
-                import json
-                logger.info("--- GROUND TRUTH: FINAL ANALYSIS DATA TO BE SENT ---")
-                logger.info(json.dumps(analysis_result, indent=2))
-                logger.info("----------------------------------------------------")
-                # --- END BLOCK ---
-            except Exception as e:
-                logger.error(f"❌ Gemini analysis failed: {e}")
-                logger.error(f"📋 Traceback: {traceback.format_exc()}")
-                logger.warning(f"⚠️ Falling back to mock analysis due to Gemini failure")
-                analysis_result = {
-                    "highlights": [
-                        {
-                            "timestamp": "00:15",
-                            "short_text": "Tuck your chin and keep your guard up",
-                            "long_text": "At 15 seconds, I observed that your guard was slightly lowered and your chin was exposed. This creates a vulnerability that an opponent could exploit. You should maintain a tight guard position with your hands protecting your face at all times.",
-                            "action_required": "Continue practicing"
-                        }
-                    ],
-                    "recommended_drills": [
-                        {
-                            "drill_name": "Mock Drill",
-                            "description": "This is a mock drill for demonstration",
-                            "problem_it_fixes": "Mock problem fix"
-                        }
-                    ]
-                }
-        else:
-            logger.warning(f"⚠️ Gemini client not available, using mock analysis")
-            logger.error(f"❌ CRITICAL: Gemini client is None - this should not happen!")
-            analysis_result = {
-                "highlights": [
-                    {
-                        "timestamp": "00:15",
-                        "short_text": "Tuck your chin and keep your guard up",
-                        "long_text": "At 15 seconds, I observed that your guard was slightly lowered and your chin was exposed. This creates a vulnerability that an opponent could exploit. You should maintain a tight guard position with your hands protecting your face at all times.",
-                        "action_required": "Continue practicing"
-                    }
-                ],
-                "recommended_drills": [
-                    {
-                        "drill_name": "Mock Drill",
-                        "description": "This is a mock drill for demonstration",
-                        "problem_it_fixes": "Mock problem fix"
-                    }
-                ]
-            }
-        
-        # Update progress
-        active_jobs[job_id]["progress"] = 80
-        logger.info(f"📈 Job {job_id} progress: 80%")
-        
-        # Create highlight video with overlays and head tracking
-        logger.info(f"🎬 Starting video processing for job: {job_id}")
-        logger.info(f"📊 Analysis result: {analysis_result}")
-        
-        # Always attempt video processing, even if no highlights
-        highlight_video_path = f"output/highlight_{job_id}.mp4"
-        final_video_path = None
-        
-        try:
-            if video_processor:
-                logger.info(f"🎬 VideoProcessor available, creating highlight video...")
-                processed_video_path = f"output/highlight_{job_id}.mp4"
-                
-                # Get user name from session or use default
-                user_name = "FIGHTER"  # Default
-                if 'user' in active_jobs[job_id]:
-                    user_name = active_jobs[job_id]['user'].get('name', 'FIGHTER')
-                
-                logger.info(f"🎬 Calling video_processor.create_highlight_video...")
-                video_processor.create_highlight_video(
-                    video_path=temp_video_path,
-                    highlights=analysis_result["highlights"],
-                    output_path=processed_video_path,
-                    user_name=user_name
-                )
-                logger.info(f"✅ Highlight video created: {processed_video_path}")
-                
-                # Check if the processed video file exists
-                if os.path.exists(processed_video_path):
-                    logger.info(f"✅ Processed video file exists: {processed_video_path}")
-                    file_size = os.path.getsize(processed_video_path)
-                    logger.info(f"📊 Processed video file size: {file_size} bytes")
-                else:
-                    logger.error(f"❌ Processed video file does not exist: {processed_video_path}")
-                    raise FileNotFoundError(f"Processed video file not found: {processed_video_path}")
-                
-                # Generate TTS audio for highlights
-                if tts_client and analysis_result.get("highlights"):
-                    logger.info(f"🔊 Generating TTS audio for highlights: {job_id}")
-                    try:
-                        audio_path = f"output/audio_{job_id}.mp3"
-                        tts_client.generate_highlight_audio(analysis_result["highlights"], audio_path)
-                        logger.info(f"✅ TTS audio generated: {audio_path}")
-                        
-                        # Add audio to video
-                        final_video_path = f"output/final_{job_id}.mp4"
-                        logger.info(f"🎬 Adding audio to video: {final_video_path}")
-                        video_processor.add_audio_to_video(processed_video_path, audio_path, final_video_path)
-                        logger.info(f"✅ Final video with audio created: {final_video_path}")
-                        
-                        # Verify final video exists
-                        if not os.path.exists(final_video_path):
-                            logger.error(f"❌ Final video file does not exist: {final_video_path}")
-                            final_video_path = processed_video_path
-                            logger.info(f"🔄 Using processed video as final: {final_video_path}")
-                        
-                    except Exception as audio_error:
-                        logger.error(f"❌ TTS/Audio processing failed: {audio_error}")
-                        logger.error(f"📋 Audio error traceback: {traceback.format_exc()}")
-                        final_video_path = processed_video_path
-                        logger.info(f"🔄 Using processed video without audio: {final_video_path}")
-                else:
-                    final_video_path = processed_video_path
-                    logger.info(f"🔄 No TTS client or highlights, using processed video: {final_video_path}")
-                
-                # Store the final video in memory
-                logger.info(f"💾 Storing video in memory: {final_video_path}")
-                try:
-                    with open(final_video_path, 'rb') as f:
-                        final_video_content = f.read()
-                    in_memory_files[job_id] = {
-                        "content": final_video_content,
-                        "filename": f"final_{job_id}.mp4",
-                        "content_type": "video/mp4"
-                    }
-                    logger.info(f"✅ Final video stored in memory: {len(final_video_content)} bytes")
-                except Exception as memory_error:
-                    logger.error(f"❌ Error storing final video in memory: {memory_error}")
-                    logger.error(f"📋 Memory error traceback: {traceback.format_exc()}")
-                    # Try to store the processed video instead
-                    try:
-                        with open(processed_video_path, 'rb') as f:
-                            processed_video_content = f.read()
-                        in_memory_files[job_id] = {
-                            "content": processed_video_content,
-                            "filename": f"highlight_{job_id}.mp4",
-                            "content_type": "video/mp4"
-                        }
-                        logger.info(f"✅ Processed video stored in memory: {len(processed_video_content)} bytes")
-                    except Exception as fallback_error:
-                        logger.error(f"❌ Fallback video storage also failed: {fallback_error}")
-                        raise fallback_error
-            else:
-                logger.warning(f"⚠️ VideoProcessor not available, using original video")
-                final_video_path = temp_video_path
-                
-        except Exception as video_error:
-            logger.error(f"❌ CRITICAL ERROR in video processing: {video_error}")
-            logger.error(f"📋 Video processing traceback: {traceback.format_exc()}")
-            
-            # Fallback: store original video
-            try:
-                logger.info(f"🔄 Fallback: storing original video in memory")
-                with open(temp_video_path, 'rb') as f:
-                    original_video_content = f.read()
-                in_memory_files[job_id] = {
-                    "content": original_video_content,
-                    "filename": f"original_{job_id}.mp4",
-                    "content_type": "video/mp4"
-                }
-                logger.info(f"✅ Original video stored in memory: {len(original_video_content)} bytes")
-            except Exception as fallback_error:
-                logger.error(f"❌ Fallback video storage failed: {fallback_error}")
-                logger.error(f"📋 Fallback error traceback: {traceback.format_exc()}")
-                raise fallback_error
-        
-        # Clean up temp file
-        try:
-            os.remove(temp_video_path)
-            logger.info(f"🗑️ Cleaned up temp file: {temp_video_path}")
-        except:
-            pass
-        
-        # Complete processing
-        active_jobs[job_id]["progress"] = 100
-        active_jobs[job_id]["status"] = "completed"
-        active_jobs[job_id]["message"] = "Analysis completed successfully"
-        
-        # Ensure we have a video to serve
-        if job_id not in in_memory_files:
-            logger.warning(f"⚠️ No processed video found, storing original video for job: {job_id}")
-            try:
-                with open(temp_video_path, 'rb') as f:
-                    original_video_content = f.read()
-                in_memory_files[job_id] = {
-                    "content": original_video_content,
-                    "filename": f"original_{job_id}.mp4",
-                    "content_type": "video/mp4"
-                }
-                logger.info(f"✅ Original video stored in memory: {len(original_video_content)} bytes")
-            except Exception as e:
-                logger.error(f"❌ Error storing original video: {e}")
-                # Create a simple fallback video
-                try:
-                    import cv2
-                    import numpy as np
-                    
-                    fallback_path = f"temp/fallback_{job_id}.mp4"
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                    out = cv2.VideoWriter(fallback_path, fourcc, 30.0, (640, 480))
-                    
-                    for i in range(90):  # 3 seconds
-                        frame = np.zeros((480, 640, 3), dtype=np.uint8)
-                        cv2.putText(frame, "Analysis Complete!", (150, 200), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                        cv2.putText(frame, "Video processing completed", (120, 250), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                        out.write(frame)
-                    
-                    out.release()
-                    
-                    with open(fallback_path, 'rb') as f:
-                        fallback_content = f.read()
-                    
-                    in_memory_files[job_id] = {
-                        "content": fallback_content,
-                        "filename": f"fallback_{job_id}.mp4",
-                        "content_type": "video/mp4"
-                    }
-                    logger.info(f"✅ Fallback video created: {len(fallback_content)} bytes")
-                    
-                    # Clean up
-                    os.remove(fallback_path)
-                    
-                except Exception as fallback_error:
-                    logger.error(f"❌ Fallback video creation also failed: {fallback_error}")
-        
-        active_jobs[job_id]["video_url"] = f"/video/{job_id}"  # Use our custom endpoint
-        active_jobs[job_id]["analysis_result"] = analysis_result
-        
-        logger.info(f"✅ Analysis completed for job: {job_id}")
-        
-    except Exception as e:
-        logger.error(f"❌ Analysis failed for job {job_id}: {e}")
-        logger.error(f"📋 Traceback: {traceback.format_exc()}")
-        active_jobs[job_id] = {
-            "status": "failed",
-            "message": f"Analysis failed: {e}"
+            "message": f"Upload failed: {str(e)}"
         }
 
-@app.get("/users")
-async def get_users():
-    logger.info("👥 Users list requested")
+# Status endpoint
+@app.get("/status/{job_id}")
+async def get_status(job_id: str, db: Session = Depends(get_db)):
+    """Get job status"""
     try:
-        if user_manager:
-            users = user_manager.get_all_users()
-            return JSONResponse(content={"users": users})
-        else:
-            return JSONResponse(content={"users": [], "message": "User management not available"})
+        db_service = DatabaseService(db)
+        job = db.query(Job).filter(Job.id == job_id).first()
+        
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        return {
+            "job_id": job.id,
+            "status": job.status,
+            "video_url": job.video_url,
+            "created_ts": job.created_ts.isoformat()
+        }
+        
     except Exception as e:
-        logger.error(f"❌ Error getting users: {e}")
-        return JSONResponse(content={"users": [], "message": f"Error: {e}"})
+        logger.error(f"Status error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Video serving
+@app.get("/video/{job_id}")
+async def get_video(job_id: str):
+    """Serve processed video"""
+    video_path = f"output/highlight_{job_id}.mp4"
+    if os.path.exists(video_path):
+        return FileResponse(video_path)
+    else:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+# Analysis data
+@app.get("/analysis/{job_id}")
+async def get_analysis(job_id: str):
+    """Get analysis results"""
+    analysis_path = f"output/analysis_{job_id}.json"
+    if os.path.exists(analysis_path):
+        with open(analysis_path, 'r') as f:
+            return json.load(f)
+    else:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+# Results page
+@app.get("/results/{job_id}", response_class=HTMLResponse)
+async def get_results(job_id: str, db: Session = Depends(get_db)):
+    """Show results page"""
+    try:
+        # Record view
+        db_service = DatabaseService(db)
+        db_service.record_job_view(job_id)
+        
+        return FileResponse("static/index.html")
+        
+    except Exception as e:
+        logger.error(f"Results error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Video processing
+async def process_video_analysis(job_id: str, db: Session):
+    """Process video analysis"""
+    try:
+        logger.info(f"Starting analysis for job {job_id}")
+        
+        # Get job data
+        job_data = in_memory_files.get(job_id)
+        if not job_data:
+            logger.error(f"No job data found for {job_id}")
+            return
+        
+        # Update job status
+        db_service = DatabaseService(db)
+        db_service.update_job_status(job_id, "processing")
+        
+        # Process video
+        video_path = job_data["path"]
+        analysis_type = job_data["analysis_type"]
+        
+        # Create output paths
+        output_video_path = f"output/highlight_{job_id}.mp4"
+        output_analysis_path = f"output/analysis_{job_id}.json"
+        
+        os.makedirs("output", exist_ok=True)
+        
+        # Analyze video
+        analysis_result = gemini_client.analyze_video(video_path, analysis_type)
+        logger.info(json.dumps(analysis_result, indent=2))
+        
+        # Save analysis results
+        with open(output_analysis_path, 'w') as f:
+            json.dump(analysis_result, f, indent=2)
+        
+        # Generate highlight video
+        highlights = analysis_result.get('highlights', [])
+        if highlights:
+            try:
+                logger.info(f"Creating highlight video for job {job_id}")
+                video_processor.create_highlight_video(
+                    video_path=video_path,
+                    highlights=highlights,
+                    output_path=output_video_path,
+                    user_name="FIGHTER"
+                )
+                logger.info(f"Highlight video created successfully: {output_video_path}")
+            except Exception as video_error:
+                logger.error(f"Video creation failed for job {job_id}: {video_error}")
+        else:
+            logger.warning(f"No highlights found for job {job_id}")
+                
+        # Update job status
+        video_url = f"/video/{job_id}" if os.path.exists(output_video_path) else None
+        db_service.update_job_status(job_id, "completed", video_url)
+                        
+        # Cleanup
+        if os.path.exists(video_path):
+            os.remove(video_path)
+        
+        logger.info(f"Analysis completed for job {job_id}")
+        
+    except Exception as e:
+        logger.error(f"Analysis failed for job {job_id}: {e}")
+        try:
+            db_service = DatabaseService(db)
+            db_service.update_job_status(job_id, "failed")
+        except:
+            pass
 
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
-    host = "0.0.0.0"
-    
-    print(f"🚀 Starting AI Boxing Analysis server on {host}:{port}")
-    print(f"📊 Environment: {os.getenv('RAILWAY_ENVIRONMENT', 'development')}")
-    
-    try:
-        uvicorn.run(
-            app, 
-            host=host, 
-            port=port,
-            log_level="info",
-            access_log=True
-        )
-    except Exception as e:
-        print(f"❌ Server startup failed: {e}")
-        print(f"📋 Traceback: {traceback.format_exc()}")
-        # Fallback to basic server
-        import http.server
-        import socketserver
-        Handler = http.server.SimpleHTTPRequestHandler
-        with socketserver.TCPServer((host, port), Handler) as httpd:
-            print(f"🔄 Fallback server running on {host}:{port}")
-            httpd.serve_forever() 
+    uvicorn.run(app, host="0.0.0.0", port=port) 

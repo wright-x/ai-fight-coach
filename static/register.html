@@ -10,124 +10,150 @@
             padding: 0;
             box-sizing: border-box;
         }
-
+        
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 25%, #404040 50%, #2d2d2d 75%, #1a1a1a 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
+            color: #ffffff;
         }
-
+        
         .container {
-            background: white;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(220, 20, 60, 0.3);
             padding: 40px;
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
             width: 100%;
             max-width: 500px;
-            text-align: center;
         }
-
+        
         .logo {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
+            font-size: 4rem;
+            text-align: center;
+            margin-bottom: 20px;
         }
-
+        
         h1 {
-            color: #333;
+            color: #ffffff;
             margin-bottom: 30px;
             font-size: 2rem;
+            text-align: center;
         }
-
+        
         .form-group {
-            margin-bottom: 25px;
-            text-align: left;
+            margin-bottom: 20px;
         }
-
+        
         label {
             display: block;
             margin-bottom: 8px;
-            color: #555;
+            color: #ffffff;
             font-weight: 600;
         }
-
+        
         input {
             width: 100%;
             padding: 15px;
-            border: 2px solid #e1e5e9;
+            border: 2px solid rgba(220, 20, 60, 0.5);
             border-radius: 10px;
             font-size: 16px;
             transition: border-color 0.3s ease;
+            background: rgba(0, 0, 0, 0.5);
+            color: #ffffff;
         }
-
+        
         input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #dc143c;
         }
-
+        
         .submit-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
             color: white;
             border: none;
             padding: 15px 30px;
-            border-radius: 25px;
-            font-size: 18px;
+            border-radius: 10px;
+            font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s ease;
             width: 100%;
+            transition: all 0.3s ease;
+            margin-top: 20px;
         }
-
+        
         .submit-btn:hover {
             transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(220, 20, 60, 0.3);
         }
-
+        
         .submit-btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
             transform: none;
         }
-
-        .message {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 10px;
-            font-weight: 600;
-        }
-
-        .message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .message.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
+        
         .loading {
             display: none;
+            text-align: center;
             margin-top: 20px;
         }
-
+        
         .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
+            border: 3px solid #333;
+            border-top: 3px solid #dc143c;
             border-radius: 50%;
             width: 30px;
             height: 30px;
             animation: spin 1s linear infinite;
             margin: 0 auto 10px;
         }
-
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+        
+        .message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .message.success {
+            background: rgba(40, 167, 69, 0.1);
+            border: 1px solid #28a745;
+            color: #28a745;
+        }
+        
+        .message.error {
+            background: rgba(220, 20, 60, 0.1);
+            border: 1px solid #dc143c;
+            color: #dc143c;
+        }
+        
+        .skip-btn {
+            background: transparent;
+            color: #dc143c;
+            border: 2px solid #dc143c;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        
+        .skip-btn:hover {
+            background: #dc143c;
+            color: white;
         }
     </style>
 </head>
@@ -135,65 +161,108 @@
     <div class="container">
         <div class="logo">🥊</div>
         <h1>AI Fight Coach</h1>
-        <p style="color: #666; margin-bottom: 30px; line-height: 1.6;">
+        <p style="color: #ccc; margin-bottom: 30px; line-height: 1.6; text-align: center;">
             Join the exclusive community of passionate boxers taking their training to the next level with AI-powered analysis.
         </p>
-
+        
         <form id="registrationForm">
             <div class="form-group">
                 <label for="name">Full Name</label>
-                <input type="text" id="name" name="name" required placeholder="Enter your full name">
+                <input type="text" id="name" name="name" required>
             </div>
-
+            
             <div class="form-group">
                 <label for="email">Email Address</label>
-                <input type="email" id="email" name="email" required placeholder="Enter your email address">
+                <input type="email" id="email" name="email" required>
             </div>
-
-            <button type="submit" class="submit-btn" id="submitBtn">Create Account</button>
+            
+            <button type="submit" class="submit-btn">Create Account</button>
         </form>
-
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <button type="button" class="skip-btn" onclick="skipRegistration()" id="skipBtn" style="display: none;">
+                Skip Registration (Continue as Guest)
+            </button>
+        </div>
+        
         <div class="loading" id="loading">
             <div class="spinner"></div>
             <p>Creating your account...</p>
         </div>
-
+        
         <div id="message"></div>
     </div>
-
+    
     <script>
+        // Check for existing cookies on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const userEmail = getCookie('user_email');
+            const userName = getCookie('user_name');
+            const userRegistered = getCookie('user_registered');
+            
+            if (userRegistered === 'true' && userEmail && userName) {
+                // User is already registered, redirect to main page
+                window.location.href = '/main';
+                return;
+            }
+            
+            // Auto-fill form if cookies exist
+            if (userEmail) {
+                document.getElementById('email').value = userEmail;
+            }
+            if (userName) {
+                document.getElementById('name').value = userName;
+            }
+            
+            // Show skip button if user has been here before
+            if (userEmail || userName) {
+                document.getElementById('skipBtn').style.display = 'inline-block';
+            }
+        });
+        
+        function skipRegistration() {
+            // Set guest cookies and redirect
+            document.cookie = "user_registered=true; max-age=2592000; path=/";
+            document.cookie = "user_email=guest@example.com; max-age=2592000; path=/";
+            document.cookie = "user_name=Guest; max-age=2592000; path=/";
+            window.location.href = '/main';
+        }
+        
+        // Helper function to get cookies
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+        
         document.getElementById('registrationForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const submitBtn = document.getElementById('submitBtn');
             const loading = document.getElementById('loading');
             const message = document.getElementById('message');
-            
-            // Get form data
-            const formData = new FormData();
-            formData.append('name', document.getElementById('name').value);
-            formData.append('email', document.getElementById('email').value);
+            const submitBtn = document.querySelector('.submit-btn');
             
             // Show loading
-            submitBtn.disabled = true;
             loading.style.display = 'block';
+            submitBtn.disabled = true;
             message.innerHTML = '';
             
             try {
-                const response = await fetch('/register-user', {
+                const response = await fetch('/register', {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: document.getElementById('name').value,
+                        email: document.getElementById('email').value
+                    })
                 });
                 
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Store user data in localStorage
-                    localStorage.setItem('userName', document.getElementById('name').value);
-                    localStorage.setItem('userEmail', document.getElementById('email').value);
-                    localStorage.setItem('userRegistered', 'true');
-                    
-                    // Show success message
                     message.innerHTML = `<div class="message success">${result.message}</div>`;
                     
                     // Redirect to main page after 2 seconds
@@ -202,13 +271,14 @@
                     }, 2000);
                 } else {
                     message.innerHTML = `<div class="message error">${result.message}</div>`;
+                    submitBtn.disabled = false;
                 }
+                
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Registration error:', error);
                 message.innerHTML = '<div class="message error">Registration failed. Please try again.</div>';
-            } finally {
-                // Hide loading
                 submitBtn.disabled = false;
+            } finally {
                 loading.style.display = 'none';
             }
         });
