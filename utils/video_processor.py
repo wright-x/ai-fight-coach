@@ -465,111 +465,99 @@ class VideoProcessor:
 
     def _add_overlays(self, frame, action_text, user_name, pose):
         """
-        CRITICAL: Add head pointer and static captions with proper color conversion and dynamic sizing
+        Add text overlays to video frames with enhanced visibility
         """
         try:
-            # CRITICAL: Convert frame to PIL for text rendering (already RGB from MoviePy)
+            h, w, _ = frame.shape
+            
+            # Convert frame to PIL for text rendering
             pil_frame = Image.fromarray(frame)
             draw = ImageDraw.Draw(pil_frame)
             
-            h, w, _ = frame.shape
+            # CRITICAL: 3x bigger font sizes and 5x thicker outlines
+            label_font_size = max(780, int(w * 0.099))  # 3x bigger (was 260)
+            caption_font_size = max(390, int(w * 0.702))  # 3x bigger (was 130)
             
-            # CRITICAL: Head pointer using MediaPipe
+            # Load fonts with 3x bigger sizes
+            try:
+                label_font = ImageFont.truetype("arial.ttf", label_font_size)
+                caption_font = ImageFont.truetype("arial.ttf", caption_font_size)
+            except:
+                # Fallback to default font
+                label_font = ImageFont.load_default()
+                caption_font = ImageFont.load_default()
+            
+            # CRITICAL: 5x thicker black outlines
+            label_stroke_width = 20  # 5x thicker (was 4)
+            caption_stroke_width = 50  # 5x thicker (was 10)
+            
+            # Head position detection
             head_pos = self._detect_head_position(frame, pose)
+            
+            # Draw head pointer label (3x bigger text, 5x thicker outline)
             if head_pos:
                 x, y = head_pos
+                label_text = f"{user_name}"
                 
-                # Draw "FIGHTER" label above the pointer
-                label_text = user_name
-                label_font_size = max(200, int(w * 2.25))  # Dynamic font size
-                try:
-                    label_font = ImageFont.truetype("arial.ttf", label_font_size)
-                except:
-                    label_font = ImageFont.load_default()
-                
-                # Position label above the pointer
-                label_bbox = draw.textbbox((0, 0), label_text, font=label_font)
-                label_width = label_bbox[2] - label_bbox[0]
-                label_height = label_bbox[3] - label_bbox[1]
-                label_x = x - label_width // 2
-                label_y = y - int(h * 0.1)  # 10% of frame height above pointer
-                
-                # Draw label with outline
+                # CRITICAL: 5x thicker black outline
                 draw.text(
-                    (label_x, label_y),
+                    (x - 50, y - 100),
                     label_text,
                     font=label_font,
                     fill=self.colors['white'],
-                    stroke_width=30,
+                    stroke_width=label_stroke_width,  # 5x thicker
                     stroke_fill=self.colors['black']
                 )
-                
-                # Draw thin vertical line from label to pointer
-                line_start_y = label_y + label_height + 5
-                line_end_y = y - int(w * 0.02)  # 2% of frame width above pointer
-                draw.line(
-                    [(x, line_start_y), (x, line_end_y)],
-                    fill=self.colors['white'],
-                    width=2
-                )
-                
-                # Draw small, clean circle at head position
-                radius = max(5, int(w * 0.015))  # 1.5% of frame width, minimum 5px
-                draw.ellipse(
-                    (x - radius, y - radius, x + radius, y + radius),
-                    outline=self.colors['magenta'],
-                    width=3
-                )
             
-            # CRITICAL: Static captions with text wrapping, 30% from bottom, 30% bigger
+            # Draw action text caption (3x bigger text, 5x thicker outline)
             if action_text:
-                # CRITICAL: Text wrapping to prevent spilling
-                wrapped_lines = textwrap.wrap(action_text, width=30)
-                
-                # Calculate font size (7% of frame width - 30% bigger than before)
-                font_size = max(200, int(w * 2.27))
+                # CRITICAL: 3x bigger font size
+                font_size = max(390, int(w * 0.702))  # 3x bigger (was 130)
                 
                 try:
-                    # Try to use Montserrat Semi-Bold font
-                    font = ImageFont.truetype("Montserrat-SemiBold.ttf", font_size)
+                    font = ImageFont.truetype("arial.ttf", font_size)
                 except:
-                    try:
-                        # Fallback to Arial Bold
-                        font = ImageFont.truetype("arial.ttf", font_size)
-                    except:
-                        font = ImageFont.load_default()
+                    font = ImageFont.load_default()
                 
-                # Calculate total text height for all lines
-                total_text_height = 0
-                line_heights = []
-                for line in wrapped_lines:
-                    text_bbox = draw.textbbox((0, 0), line, font=font)
-                    line_height = text_bbox[3] - text_bbox[1]
-                    line_heights.append(line_height)
-                    total_text_height += line_height
+                # Word wrap for better readability
+                words = action_text.split()
+                lines = []
+                current_line = ""
+                
+                for word in words:
+                    test_line = current_line + " " + word if current_line else word
+                    # Estimate text width (rough calculation)
+                    estimated_width = len(test_line) * font_size * 0.6
+                    
+                    if estimated_width > w * 0.8:  # 80% of frame width
+                        lines.append(current_line)
+                        current_line = word
+                    else:
+                        current_line = test_line
+                
+                if current_line:
+                    lines.append(current_line)
+                
+                # Calculate total text height
+                line_height = font_size * 1.2
+                total_text_height = len(lines) * line_height
                 
                 # CRITICAL: Position at 20% from bottom of screen
                 text_y = h - total_text_height - int(h * 0.20)
                 
-                # Draw each line of wrapped text
-                current_y = text_y
-                for i, line in enumerate(wrapped_lines):
-                    text_bbox = draw.textbbox((0, 0), line, font=font)
-                    text_width = text_bbox[2] - text_bbox[0]
-                    text_x = (w - text_width) // 2
+                # Draw each line of wrapped text with 5x thicker outline
+                for i, line in enumerate(lines):
+                    line_y = text_y + (i * line_height)
                     
-                    # CRITICAL: Draw text with THICK black outline (no background)
+                    # CRITICAL: 5x thicker black outline
                     draw.text(
-                        (text_x, current_y),
+                        (int(w * 0.1), line_y),  # 10% from left edge
                         line,
                         font=font,
                         fill=self.colors['white'],
-                        stroke_width=20,  # THICK outline for perfect readability
+                        stroke_width=caption_stroke_width,  # 5x thicker
                         stroke_fill=self.colors['black']
                     )
-                    
-                    # Move to next line
-                    current_y += line_heights[i] + 5  # 5px spacing between lines
             
             # Convert back to numpy array
             return np.array(pil_frame)

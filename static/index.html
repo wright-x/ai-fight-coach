@@ -1941,37 +1941,24 @@
         }
 
         function downloadVideo() {
-            const video = document.getElementById('resultVideo');
-            if (video.src) {
+            const videoElement = document.getElementById('resultVideo');
+            if (videoElement && videoElement.src) {
+                // Create a temporary link to download the video
                 const a = document.createElement('a');
-                a.href = video.src;
-                a.download = `boxing_analysis_${currentJobId}.mp4`; // Suggest a filename
+                a.href = videoElement.src;
+                a.download = 'boxing_analysis.mp4';
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
                 alert('Video downloaded successfully!');
-                        } else {
+            } else {
                 alert('No video available to download.');
             }
         }
 
         function runAnotherAnalysis() {
-            showPage('uploadPage');
-            // Clear file input and file info
-            document.getElementById('videoFile').value = '';
-            document.getElementById('fileInfo').style.display = 'none';
-            document.querySelector('.analyze-btn').style.display = 'none';
-            // Reset analysis options to default
-            document.querySelectorAll('.analysis-option').forEach(option => option.classList.remove('selected'));
-            document.querySelector('.analysis-option[data-type="everything"]').classList.add('selected');
-            selectedAnalysisType = 'everything';
-            // Clear results and progress
-            document.getElementById('highlightsContainer').innerHTML = '';
-            document.getElementById('drillsContainer').innerHTML = '';
-            document.getElementById('youtubeContainer').innerHTML = '';
-            document.getElementById('progressFill').style.width = '0%';
-            document.getElementById('progressText').textContent = 'Initializing analysis...';
-            document.querySelectorAll('.loading-stages .stage').forEach(stage => stage.classList.remove('active', 'completed'));
+            // Redirect to main page instead of upload page
+            window.location.href = '/';
         }
 
         function setFeedbackRating(rating) {
@@ -2082,19 +2069,24 @@
             }
             
             // Fetch and display analysis data
-            console.log('[SHOWRESULTS] Fetching analysis data...');
+            console.log('[SHOWRESULTS] Fetching analysis data from:', `/analysis/${jobId}`);
             fetch(`/analysis/${jobId}`)
                 .then(response => {
                     console.log('[SHOWRESULTS] Analysis response status:', response.status);
+                    console.log('[SHOWRESULTS] Analysis response headers:', response.headers);
                     if (!response.ok) {
-                        throw new Error(`Analysis fetch failed: ${response.status}`);
+                        throw new Error(`Analysis fetch failed: ${response.status} ${response.statusText}`);
                     }
                     return response.json();
                 })
                 .then(data => {
                     console.log('[SHOWRESULTS] Analysis data received:', data);
+                    console.log('[SHOWRESULTS] Data type:', typeof data);
                     console.log('[SHOWRESULTS] Highlights count:', data.highlights ? data.highlights.length : 0);
-                    console.log('[SHOWRESULTS] First highlight:', data.highlights ? data.highlights[0] : 'No highlights');
+                    if (data.highlights && data.highlights.length > 0) {
+                        console.log('[SHOWRESULTS] First highlight:', data.highlights[0]);
+                        console.log('[SHOWRESULTS] First highlight fields:', Object.keys(data.highlights[0]));
+                    }
                     
                     // Display highlights
                     displayHighlights(data.highlights || []);
@@ -2107,6 +2099,7 @@
                 })
                 .catch(error => {
                     console.error('[SHOWRESULTS] Error loading analysis:', error);
+                    console.error('[SHOWRESULTS] Error details:', error.message);
                     // Show fallback content
                     displayHighlights([{
                         timestamp: "00:00",
