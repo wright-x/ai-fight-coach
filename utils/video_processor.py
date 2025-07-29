@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 import mediapipe as mp
-from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips, ImageSequenceClip, TextClip, ColorClip, CompositeVideoClip, CompositeAudioClip, ImageClip
+from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips, TextClip, ColorClip, CompositeVideoClip, ImageClip
 from PIL import Image, ImageDraw, ImageFont
 import base64
 import tempfile
@@ -171,16 +171,19 @@ class VideoProcessor:
                 try:
                     audio_clip = AudioFileClip(audio_path)
                     
-                    # CRITICAL: Create 1-second silence and prepend to TTS audio
+                    # Create 1-second silent lead-in so voice never starts abruptly
                     from moviepy.audio.AudioClip import AudioClip
-                    silence = AudioClip(make_frame=lambda t: [0, 0], duration=1, fps=44100)
+                    lead_in = AudioClip(lambda t: 0, duration=1)
                     
-                    # Prepend the silence to the TTS audio
-                    final_audio = CompositeAudioClip([silence, audio_clip.set_start(1)])
+                    # Join lead-in and audio sequentially
+                    from moviepy.editor import concatenate_audioclips
+                    combined_audio = concatenate_audioclips([lead_in, audio_clip])
                     
-                    # Set the new composite audio to the video
-                    final_clip = video_clip.set_audio(final_audio)
-                    print(f"✅ Audio attached to highlight clip with 1-second delay")
+                    # Set the combined audio to the video and sync duration
+                    final_clip = video_clip.set_audio(combined_audio)
+                    final_clip = final_clip.set_duration(combined_audio.duration)
+                    
+                    print(f"✅ Audio attached with 1-second lead-in")
                     return final_clip
                 except Exception as e:
                     print(f"⚠️ Audio attachment failed: {e}, returning silent clip")
@@ -195,7 +198,15 @@ class VideoProcessor:
             return self._create_fallback_clip(source_clip, highlight, source_fps)
 
     def _generate_highlight_tts(self, highlight, clip_id):
-        """Generate TTS audio for a single highlight with sentence-by-sentence pacing"""
+        """
+        CLEAN TTS SYSTEM: Generate speech for each highlight
+        - Take action_required text
+        - Break into sentences
+        - Generate TTS for each sentence
+        - Add 0.4s pause after each sentence
+        - Join sequentially (no overlap)
+        - Save as single WAV at 44.1kHz
+        """
         try:
             if not self.tts_client:
                 return None
@@ -205,11 +216,11 @@ class VideoProcessor:
             if not action_text:
                 return None
             
-            print(f"🔊 Generating paced TTS for: {action_text[:50]}...")
+            print(f"🔊 Generating clean TTS for: {action_text[:50]}...")
             
             # Create audio directory if it doesn't exist
             os.makedirs("output/audio", exist_ok=True)
-            audio_path = f"output/audio/{clip_id}.mp3"
+            audio_path = f"output/audio/{clip_id}.wav"  # Use WAV format
             
             # Split text into sentences for paced narration
             sentences = [s.strip() for s in action_text.split('.') if s.strip()]
@@ -240,12 +251,10 @@ class VideoProcessor:
                     sentence_clip = AudioFileClip(temp_audio_path)
                     audio_clips.append(sentence_clip)
                     
-                    # Add silence after each sentence (except the last one)
+                    # Add 0.4 seconds of silence after each sentence (except the last one)
                     if i < len(sentences) - 1:
-                        # Create 0.4 seconds of silence
-                        silence_duration = 0.4
-                        silence_clip = AudioFileClip(temp_audio_path).set_duration(silence_duration)
-                        silence_clip = silence_clip.volumex(0)  # Mute the audio to create silence
+                        from moviepy.audio.AudioClip import AudioClip
+                        silence_clip = AudioClip(lambda t: 0, duration=0.4)
                         audio_clips.append(silence_clip)
                     
                     # Clean up temp file
@@ -259,19 +268,20 @@ class VideoProcessor:
                 print("⚠️ No audio clips generated")
                 return None
             
-            # Concatenate all audio clips (speech + silence + speech + silence...)
-            print(f"🔊 Concatenating {len(audio_clips)} audio clips...")
-            final_audio = CompositeAudioClip(audio_clips)
+            # Join all clips sequentially (no overlap)
+            print(f"🔊 Joining {len(audio_clips)} audio clips sequentially...")
+            from moviepy.editor import concatenate_audioclips
+            final_audio = concatenate_audioclips(audio_clips, method="compose")
             
-            # Save final composite audio
-            final_audio.write_audiofile(audio_path, verbose=False, logger=None)
+            # Save final audio as WAV at 44.1kHz
+            final_audio.write_audiofile(audio_path, fps=44100, verbose=False, logger=None)
             
             # Clean up audio clips
             for clip in audio_clips:
                 clip.close()
             final_audio.close()
             
-            print(f"✅ Paced TTS generated: {audio_path}")
+            print(f"✅ Clean TTS generated: {audio_path}")
             return audio_path
             
         except Exception as e:

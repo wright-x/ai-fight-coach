@@ -1715,7 +1715,6 @@
 
     <script>
         let selectedAnalysisType = 'everything';
-        let currentJobId = null;
         let selectedFeedbackRating = null;
 
         // Analysis option selection
@@ -1739,443 +1738,194 @@
 
         function startAnalysis() {
             const fileInput = document.getElementById('videoFile');
-            const file = fileInput.files[0];
+            const analysisType = document.querySelector('input[name="analysisType"]:checked')?.value || 'general';
             
-            if (!file) {
+            if (!fileInput.files[0]) {
                 alert('Please select a video file first.');
                 return;
             }
-
-            // Show progress page
-            showPage('progressPage');
             
-            // Get user email from cookies or use default
-            const userEmail = getCookie('user_email') || 'guest@example.com';
+            // Start loading animation immediately
+            startLoadingAnimation();
             
+            // Upload video
+            uploadVideo(fileInput.files[0], analysisType);
+        }
+        
+        function uploadVideo(file, analysisType) {
             const formData = new FormData();
             formData.append('file', file);
+            formData.append('analysis_type', analysisType);
+            
+            // Get user email from cookies
+            const userEmail = getCookie('user_email') || 'guest@example.com';
             formData.append('email', userEmail);
-            formData.append('analysis_type', selectedAnalysisType);
-
+            
             fetch('/upload-video', {
                 method: 'POST',
                 body: formData
             })
             .then(response => response.json())
             .then(data => {
-                if (data.job_id) {
-                    currentJobId = data.job_id;
-                    // Start the 3-minute fake progress
-                    startFakeProgress(data.job_id);
+                if (data.success) {
+                    console.log('[UPLOAD] Success, job ID:', data.job_id);
+                    // Start real job polling with the actual job ID
+                    startRealJobPolling(data.job_id);
                 } else {
-                    alert('Upload failed: ' + (data.message || 'Unknown error'));
-                    showPage('uploadPage');
+                    console.error('[UPLOAD] Failed:', data.message);
+                    alert(`Upload failed: ${data.message}`);
+                    // Reset to upload page on failure
+                    document.getElementById('progressPage').style.display = 'none';
+                    document.getElementById('uploadPage').style.display = 'block';
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('[UPLOAD] Error:', error);
                 alert('Upload failed. Please try again.');
-                showPage('uploadPage');
+                // Reset to upload page on error
+                document.getElementById('progressPage').style.display = 'none';
+                document.getElementById('uploadPage').style.display = 'block';
             });
         }
 
-        // 3-MINUTE FAKE PROGRESS SYSTEM
-        let fakeProgressInterval;
-        let fakeProgressStartTime;
+        // NEW LOADING SYSTEM - Instant start with proper timing
+        let loadingInterval;
+        let startTime = null;
         
-        function startFakeProgress(jobId) {
-            console.log('[FAKE PROGRESS] Starting 3-minute fake progress for job:', jobId);
+        function startLoadingAnimation() {
+            console.log('[LOADING] Starting instant loading animation');
             
-            fakeProgressStartTime = Date.now();
-            const TOTAL_TIME = 180000; // 3 minutes
+            // Clear any existing timers
+            if (loadingInterval) {
+                clearInterval(loadingInterval);
+            }
             
-            // Define the exact timeline array as specified
-            const steps = [
-                [  0,   0,  "Initializing AI Coach…"           ],
-                [ 15,   5,  "Importing video file"             ],
-                [ 30,  15,  "Stabilizing frames"               ],
-                [ 45,  25,  "Detecting fighter pose"           ],
-                [ 60,  35,  "Tracking joint movement"          ],
-                [ 75,  45,  "Spotting form errors"             ],
-                [ 90,  55,  "Measuring angles & speed"         ],
-                [105,  65,  "Comparing with pro baseline"      ],
-                [120,  75,  "Scoring each round"               ],
-                [135,  85,  "Generating corrective tips"       ],
-                [150,  95,  "Adding voice-over & captions"     ],
-                [165, 100,  "Rendering final video"            ]   // bar full but no redirect yet
-            ];
+            // Start immediately with provisional jobId
+            currentJobId = 'pending';
+            startTime = Date.now();
             
-            fakeProgressInterval = setInterval(() => {
-                const elapsed = (Date.now() - fakeProgressStartTime) / 1000; // seconds
-                
-                // Find current step based on elapsed time
-                let currentStep = steps[0];
-                for (let i = steps.length - 1; i >= 0; i--) {
-                    if (elapsed >= steps[i][0]) {
-                        currentStep = steps[i];
-                        break;
-                    }
-                }
-                
-                // Update progress bar
-                const progressFill = document.getElementById('progressFill');
-                const progressText = document.getElementById('progressText');
-                
-                if (progressFill && progressText) {
-                    // Drive bar width with elapsed / TOTAL_TIME until 165s
-                    if (elapsed < 165) {
-                        const progressPercent = (elapsed / 180) * 100;
-                        progressFill.style.width = `${Math.min(progressPercent, currentStep[1])}%`;
-                    } else if (elapsed < 180) {
-                        // From 165s → 180s hold at 95%, then jump to 100% at 180s
-                        progressFill.style.width = elapsed >= 180 ? '100%' : '95%';
-                    }
-                    
-                    progressText.textContent = currentStep[2];
-                    updateLoadingStages(currentStep[1]);
-                }
-                
-                // Check if we've reached the end
-                if (elapsed >= 180) {
-                    console.log('[FAKE PROGRESS] 3 minutes completed, checking real status');
-                    clearInterval(fakeProgressInterval);
-                    
-                    // Check real status and show results
-                    checkRealStatus(jobId);
-                }
-                
-            }, 100); // Update every 100ms for smooth animation
+            // Show progress page immediately
+            showProgressPage();
+            
+            // Start the animation
+            loadingInterval = setInterval(updateLoadingProgress, 100);
         }
         
-        function checkRealStatus(jobId) {
-            console.log('[REAL STATUS] Checking actual job status for:', jobId);
+        function updateLoadingProgress() {
+            if (!startTime) return;
             
+            const elapsed = (Date.now() - startTime) / 1000; // seconds
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            
+            if (!progressFill || !progressText) return;
+            
+            // Fill-rate curve (total 3 minutes)
+            let progressPercent = 0;
+            
+            if (elapsed <= 30) {
+                // Segment A: 0 – 30s → 0 → 50% (linear)
+                progressPercent = (elapsed / 30) * 50;
+            } else if (elapsed <= 120) {
+                // Segment B: 30 – 120s → 50 → 75% (linear)
+                progressPercent = 50 + ((elapsed - 30) / 90) * 25;
+            } else if (elapsed <= 150) {
+                // Segment C: 120 – 150s → 75 → 90% (linear)
+                progressPercent = 75 + ((elapsed - 120) / 30) * 15;
+            } else {
+                // Hold: 150s → finish → stay at 90%
+                progressPercent = 90;
+            }
+            
+            // Update progress bar
+            progressFill.style.width = `${progressPercent}%`;
+            
+            // Update stage captions (6 labels)
+            updateLoadingStages(progressPercent);
+            
+            // Update text based on progress
+            if (progressPercent <= 15) {
+                progressText.textContent = 'Initializing AI Coach...';
+            } else if (progressPercent <= 30) {
+                progressText.textContent = 'Importing video file';
+            } else if (progressPercent <= 45) {
+                progressText.textContent = 'Detecting fighter pose';
+            } else if (progressPercent <= 60) {
+                progressText.textContent = 'Analyzing technique';
+            } else if (progressPercent <= 75) {
+                progressText.textContent = 'Generating highlights';
+            } else if (progressPercent <= 90) {
+                progressText.textContent = 'Adding voice-over & captions';
+            } else {
+                progressText.textContent = 'Finalizing analysis...';
+            }
+        }
+        
+        function updateLoadingStages(progress) {
+            const stages = document.querySelectorAll('.stage');
+            stages.forEach((stage, index) => {
+                const thresholds = [15, 30, 45, 60, 75, 90];
+                if (progress >= thresholds[index]) {
+                    stage.classList.add('active');
+                } else {
+                    stage.classList.remove('active');
+                }
+            });
+        }
+        
+        function startRealJobPolling(jobId) {
+            console.log('[LOADING] Starting real job polling for:', jobId);
+            
+            // Clear existing interval
+            if (loadingInterval) {
+                clearInterval(loadingInterval);
+            }
+            
+            // Update job ID
+            currentJobId = jobId;
+            
+            // Poll every 2 seconds
+            loadingInterval = setInterval(() => {
+                pollJobStatus(jobId);
+            }, 2000);
+        }
+        
+        function pollJobStatus(jobId) {
             fetch(`/status/${jobId}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Status check failed with status: ${response.status}`);
-                    }
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
-                    console.log('[REAL STATUS] Response:', data);
+                    console.log('[POLLING] Status:', data.status);
                     
                     if (data.status === 'completed') {
-                        console.log('[REAL STATUS] Job completed, showing results');
-                        // Early finish - immediately show results
+                        // Job finished - snap to 100% and redirect
                         const progressFill = document.getElementById('progressFill');
                         const progressText = document.getElementById('progressText');
+                        
                         if (progressFill) progressFill.style.width = '100%';
-                        if (progressText) progressText.textContent = 'Ready! Redirecting…';
-                        showResults(jobId);
-                    } else if (data.status === 'processing') {
-                        console.log('[REAL STATUS] Job still processing, continuing with +1% every 5s');
-                        // Late finish - continue with +1% every 5s until finished
-                        continueProgressUntilComplete(jobId);
-                    } else if (data.status === 'failed') {
-                        alert(`Analysis failed: ${data.message || 'An unknown error occurred.'}`);
-                        runAnotherAnalysis();
-                    } else {
-                        console.log('[REAL STATUS] Unknown status, continuing to poll');
-                        setTimeout(() => checkRealStatus(jobId), 5000);
+                        if (progressText) progressText.textContent = 'Ready! Redirecting...';
+                        
+                        // Clear polling
+                        if (loadingInterval) {
+                            clearInterval(loadingInterval);
+                        }
+                        
+                        // Redirect after 0.5s with absolute path
+                        setTimeout(() => {
+                            window.location.href = `${window.location.origin}/results/${jobId}`;
+                        }, 500);
                     }
+                    // If not completed, continue polling (bar stays at 90% after 150s)
                 })
                 .catch(error => {
-                    console.error('[REAL STATUS] Error:', error);
-                    // Keep trying
-                    setTimeout(() => checkRealStatus(jobId), 5000);
+                    console.error('[POLLING] Error:', error);
+                    // Continue polling on error
                 });
         }
         
-        function continueProgressUntilComplete(jobId) {
-            let additionalProgress = 0;
-            const progressInterval = setInterval(() => {
-                additionalProgress += 1;
-                const progressFill = document.getElementById('progressFill');
-                const progressText = document.getElementById('progressText');
-                
-                if (progressFill) {
-                    progressFill.style.width = `${Math.min(95 + additionalProgress, 99)}%`;
-                }
-                if (progressText) {
-                    progressText.textContent = 'Finalizing analysis...';
-                }
-                
-                // Check status every 5 seconds
-                fetch(`/status/${jobId}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'completed') {
-                            clearInterval(progressInterval);
-                            if (progressFill) progressFill.style.width = '100%';
-                            if (progressText) progressText.textContent = 'Ready! Redirecting…';
-                            showResults(jobId);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('[PROGRESS] Error checking status:', error);
-                    });
-            }, 5000); // +1% every 5 seconds
-        }
-
-        function updateLoadingStages(progress) {
-            const stages = [
-                { id: 'stage1', threshold: 0, text: '📹 Uploading video...' },
-                { id: 'stage2', threshold: 15, text: '🤖 AI analyzing footage...' },
-                { id: 'stage3', threshold: 30, text: '🎯 Detecting highlights...' },
-                { id: 'stage4', threshold: 50, text: '🎬 Processing video...' },
-                { id: 'stage5', threshold: 75, text: '🔊 Generating audio...' },
-                { id: 'stage6', threshold: 90, text: '✨ Finalizing results...' }
-            ];
-
-            stages.forEach((stage, index) => {
-                const stageElement = document.getElementById(stage.id);
-                if (stageElement) {
-                    // Remove all classes
-                    stageElement.classList.remove('active', 'completed');
-                    
-                    if (progress >= stage.threshold) {
-                        if (progress >= stage.threshold + 10 || progress >= 95) {
-                            stageElement.classList.add('completed');
-                        } else {
-                            stageElement.classList.add('active');
-                        }
-                    }
-                }
-            });
-        }
-
-        function getStageText(progress) {
-            if (progress < 10) return '📹 Uploading video...';
-            if (progress < 20) return '🤖 Initializing AI analysis...';
-            if (progress < 30) return '🔍 Analyzing video frames...';
-            if (progress < 40) return '📊 Processing movement data...';
-            if (progress < 50) return '🎯 Detecting key moments...';
-            if (progress < 60) return '⚡ Parsing technique data...';
-            if (progress < 70) return '📈 Calculating performance metrics...';
-            if (progress < 80) return '🎬 Processing video clips...';
-            if (progress < 90) return '🔊 Generating audio narration...';
-            if (progress < 95) return '🎨 Adding visual overlays...';
-            if (progress < 100) return '✨ Finalizing results...';
-            return '🎯 Analysis complete!';
-        }
-
-        function markAllStagesCompleted() {
-            for (let i = 1; i <= 6; i++) {
-                const stageElement = document.getElementById(`stage${i}`);
-                if (stageElement) {
-                    stageElement.classList.remove('active');
-                    stageElement.classList.add('completed');
-                }
-            }
-        }
-
-        // NEW ROBUST DISPLAY FUNCTIONS - FROM SCRATCH REWRITE
-        
-        function showResults(jobId) {
-            console.log('[SHOWRESULTS] Starting results display for job:', jobId);
-            
-            // Step 1: Show the results page
-            showPage('resultsPage');
-            
-            // Step 2: Set the video source
-            const videoElement = document.getElementById('resultVideo');
-            if (videoElement) {
-                videoElement.src = `/video/${jobId}`;
-                videoElement.load();
-                console.log('[SHOWRESULTS] Video src set to:', `/video/${jobId}`);
-            } else {
-                console.error('[SHOWRESULTS] Video element not found!');
-            }
-            
-            // Step 3: Fetch analysis data
-            console.log('[SHOWRESULTS] Fetching analysis data...');
-            fetch(`/analysis/${jobId}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Analysis fetch failed: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('[SHOWRESULTS] Analysis data received:', data);
-                    
-                    // Step 4: Call display functions with the data
-                    displayHighlights(data.highlights || []);
-                    displayDrills(data.recommended_drills || []);
-                    displayYouTube(data.youtube_recommendations || []);
-                })
-                .catch(error => {
-                    console.error('[SHOWRESULTS] Critical error:', error);
-                    // Show fallback content on error
-                    displayHighlights([{
-                        timestamp: "00:00",
-                        short_text: "Analysis completed",
-                        long_text: "Your video has been processed successfully. Please review the video above.",
-                        action_required: "Review your technique"
-                    }]);
-                    displayDrills([{
-                        drill_name: "Basic Technique Review",
-                        description: "Review your uploaded video to identify areas for improvement.",
-                        problem_it_fixes: "General technique improvement"
-                    }]);
-                    displayYouTube([]);
-                });
-        }
-
-        function displayHighlights(highlights) {
-            console.log('[DISPLAY] Rendering highlights:', highlights);
-            const container = document.getElementById('highlightsContainer');
-            
-            if (!container) {
-                console.error('[DISPLAY] Highlights container not found!');
-                return;
-            }
-            
-            // Clear container and add title
-            container.innerHTML = '<h2 class="section-title">Key Highlights</h2>';
-            
-            if (highlights && highlights.length > 0) {
-                highlights.forEach((highlight, index) => {
-                    const card = document.createElement('div');
-                    card.className = 'highlight-card';
-                    card.innerHTML = `
-                        <div class="highlight-title">Highlight ${index + 1} - ${highlight.timestamp || 'N/A'}</div>
-                        <div class="highlight-description">${highlight.long_text || highlight.short_text || 'No description available'}</div>
-                        <div class="highlight-action">Action Required: ${highlight.action_required || 'Continue practicing'}</div>
-                    `;
-                    container.appendChild(card);
-                });
-                console.log('[DISPLAY] Rendered', highlights.length, 'highlight cards');
-            } else {
-                // Fallback message
-                const fallbackCard = document.createElement('div');
-                fallbackCard.className = 'highlight-card';
-                fallbackCard.innerHTML = `
-                    <div class="highlight-title">Analysis Complete</div>
-                    <div class="highlight-description">Your video has been processed successfully. Review the video above to see your technique.</div>
-                    <div class="highlight-action">Action Required: Continue practicing and improving your technique</div>
-                `;
-                container.appendChild(fallbackCard);
-                console.log('[DISPLAY] Rendered fallback highlight card');
-            }
-        }
-
-        function displayDrills(drills) {
-            console.log('[DISPLAY] Rendering drills:', drills);
-            const container = document.getElementById('drillsContainer');
-            
-            if (!container) {
-                console.error('[DISPLAY] Drills container not found!');
-                return;
-            }
-            
-            // Clear container and add title
-            container.innerHTML = '<h2 class="section-title">Recommended Drills</h2>';
-            
-            if (drills && drills.length > 0) {
-                drills.forEach(drill => {
-                    const card = document.createElement('div');
-                    card.className = 'drill-card';
-                    card.innerHTML = `
-                        <div class="drill-name">${drill.drill_name || 'Recommended Drill'}</div>
-                        <div class="drill-description">${drill.description || 'No description available'}</div>
-                        <div class="drill-problem">Fixes: ${drill.problem_it_fixes || 'General technique improvement'}</div>
-                    `;
-                    container.appendChild(card);
-                });
-                console.log('[DISPLAY] Rendered', drills.length, 'drill cards');
-            } else {
-                // Fallback message
-                const fallbackCard = document.createElement('div');
-                fallbackCard.className = 'drill-card';
-                fallbackCard.innerHTML = `
-                    <div class="drill-name">Basic Technique Review</div>
-                    <div class="drill-description">Review your uploaded video to identify areas for improvement. Focus on your stance, guard position, and movement.</div>
-                    <div class="drill-problem">Fixes: General technique improvement and awareness</div>
-                `;
-                container.appendChild(fallbackCard);
-                console.log('[DISPLAY] Rendered fallback drill card');
-            }
-        }
-
-        function displayYouTube(videos) {
-            console.log('[DISPLAY] Rendering YouTube videos:', videos);
-            const container = document.getElementById('youtubeContainer');
-            
-            if (!container) {
-                console.error('[DISPLAY] YouTube container not found!');
-                return;
-            }
-            
-            // Clear container and add title
-            container.innerHTML = '<h2 class="section-title">YouTube Recommendations</h2>';
-            
-            if (videos && videos.length > 0) {
-                videos.forEach(video => {
-                    const card = document.createElement('div');
-                    card.className = 'youtube-card';
-                    
-                    // Extract YouTube video ID from URL
-                    const videoId = extractYouTubeId(video.url || video.youtube_url || '');
-                    
-                    if (videoId) {
-                        // Create embedded iframe
-                        card.innerHTML = `
-                            <div class="youtube-title-text">${video.title || 'Boxing Tutorial'}</div>
-                            <div class="youtube-problem">${video.problem_solved || video.problem_it_fixes || 'Learn boxing techniques'}</div>
-                            <div class="youtube-embed">
-                                <iframe width="100%" height="200" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-                            </div>
-                        `;
-                    } else {
-                        // Fallback to link if no valid video ID
-                        card.innerHTML = `
-                            <div class="youtube-title-text">${video.title || 'Boxing Tutorial'}</div>
-                            <div class="youtube-problem">${video.problem_solved || video.problem_it_fixes || 'Learn boxing techniques'}</div>
-                            <a href="${video.url || '#'}" target="_blank" class="youtube-link">Watch Video</a>
-                        `;
-                    }
-                    
-                    container.appendChild(card);
-                });
-                console.log('[DISPLAY] Rendered', videos.length, 'YouTube cards');
-            } else {
-                // Fallback message
-                const fallbackCard = document.createElement('div');
-                fallbackCard.className = 'youtube-card';
-                fallbackCard.innerHTML = `
-                    <div class="youtube-title-text">Boxing Technique Fundamentals</div>
-                    <div class="youtube-problem">Learn the basics of proper boxing stance, guard, and movement</div>
-                    <a href="https://www.youtube.com/results?search_query=boxing+technique+fundamentals" target="_blank" class="youtube-link">Search YouTube</a>
-                `;
-                container.appendChild(fallbackCard);
-                console.log('[DISPLAY] Rendered fallback YouTube card');
-            }
-        }
-
-        // Helper function to extract YouTube video ID
-        function extractYouTubeId(url) {
-            if (!url) return null;
-            
-            const patterns = [
-                /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-                /youtube\.com\/v\/([^&\n?#]+)/,
-                /youtube\.com\/watch\?.*v=([^&\n?#]+)/
-            ];
-            
-            for (const pattern of patterns) {
-                const match = url.match(pattern);
-                if (match) return match[1];
-            }
-            
-            return null;
-        }
-
-        function extractYouTubeId(url) {
-            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-            const match = url.match(regExp);
-            return (match && match[2].length === 11) ? match[2] : null;
+        function showProgressPage() {
+            document.getElementById('uploadPage').style.display = 'none';
+            document.getElementById('progressPage').style.display = 'block';
+            document.getElementById('resultsPage').style.display = 'none';
         }
 
         function showPage(pageId) {
@@ -2222,7 +1972,6 @@
             document.getElementById('progressFill').style.width = '0%';
             document.getElementById('progressText').textContent = 'Initializing analysis...';
             document.querySelectorAll('.loading-stages .stage').forEach(stage => stage.classList.remove('active', 'completed'));
-            currentJobId = null;
         }
 
         function setFeedbackRating(rating) {
@@ -2296,5 +2045,4 @@
         }
     </script>
 </body>
-</html> 
 </html> 
