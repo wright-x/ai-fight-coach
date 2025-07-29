@@ -474,11 +474,11 @@ class VideoProcessor:
             pil_frame = Image.fromarray(frame)
             draw = ImageDraw.Draw(pil_frame)
             
-            # CRITICAL: 3x bigger font sizes and 5x thicker outlines
-            label_font_size = max(780, int(w * 0.099))  # 3x bigger (was 260)
-            caption_font_size = max(390, int(w * 0.702))  # 3x bigger (was 130)
+            # CRITICAL: Much bigger font sizes based on reference code
+            label_font_size = max(1200, int(w * 0.15))  # Much bigger (was 780)
+            caption_font_size = max(600, int(w * 0.10))  # Much bigger (was 390)
             
-            # Load fonts with 3x bigger sizes
+            # Load fonts with much bigger sizes
             try:
                 label_font = ImageFont.truetype("arial.ttf", label_font_size)
                 caption_font = ImageFont.truetype("arial.ttf", caption_font_size)
@@ -487,41 +487,50 @@ class VideoProcessor:
                 label_font = ImageFont.load_default()
                 caption_font = ImageFont.load_default()
             
-            # CRITICAL: 5x thicker black outlines
-            label_stroke_width = 20  # 5x thicker (was 4)
-            caption_stroke_width = 50  # 5x thicker (was 10)
+            # CRITICAL: Much thicker black outlines based on reference code
+            label_stroke_width = 40  # Much thicker (was 20)
+            caption_stroke_width = 80  # Much thicker (was 50)
             
             # Head position detection
             head_pos = self._detect_head_position(frame, pose)
             
-            # Draw head pointer label (3x bigger text, 5x thicker outline)
+            # Draw head pointer label (much bigger text, much thicker outline)
             if head_pos:
                 x, y = head_pos
                 label_text = f"{user_name}"
                 
-                # CRITICAL: 5x thicker black outline
+                # Calculate text size for proper centering
+                text_bbox = draw.textbbox((0, 0), label_text, font=label_font)
+                text_width = text_bbox[2] - text_bbox[0]
+                text_height = text_bbox[3] - text_bbox[1]
+                
+                # Position text centered above arrow
+                text_x = x - text_width // 2
+                text_y = y - 150  # Move text higher above arrow
+                
+                # CRITICAL: Much thicker black outline
                 draw.text(
-                    (x - 50, y - 100),
+                    (text_x, text_y),
                     label_text,
                     font=label_font,
                     fill=self.colors['white'],
-                    stroke_width=label_stroke_width,  # 5x thicker
+                    stroke_width=label_stroke_width,  # Much thicker
                     stroke_fill=self.colors['black']
                 )
                 
-                # Draw red downward-pointing triangle arrow
-                arrow_size = 30
+                # Draw red downward-pointing triangle arrow (bigger)
+                arrow_size = 50  # Bigger arrow (was 30)
                 arrow_points = [
-                    (x, y - 50),  # Top point
-                    (x - arrow_size//2, y - 50 - arrow_size),  # Bottom left
-                    (x + arrow_size//2, y - 50 - arrow_size)   # Bottom right
+                    (x, y - 80),  # Top point (moved higher)
+                    (x - arrow_size//2, y - 80 - arrow_size),  # Bottom left
+                    (x + arrow_size//2, y - 80 - arrow_size)   # Bottom right
                 ]
                 draw.polygon(arrow_points, fill=self.colors['red'])
             
-            # Draw action text caption (3x bigger text, 5x thicker outline)
+            # Draw action text caption (much bigger text, much thicker outline)
             if action_text:
-                # CRITICAL: 3x bigger font size
-                font_size = max(390, int(w * 0.702))  # 3x bigger (was 130)
+                # CRITICAL: Much bigger font size
+                font_size = max(600, int(w * 0.10))  # Much bigger (was 390)
                 
                 try:
                     font = ImageFont.truetype("arial.ttf", font_size)
@@ -548,23 +557,28 @@ class VideoProcessor:
                     lines.append(current_line)
                 
                 # Calculate total text height
-                line_height = font_size * 1.2
+                line_height = font_size * 1.3  # Increased spacing
                 total_text_height = len(lines) * line_height
                 
-                # CRITICAL: Position at 20% from bottom of screen
-                text_y = h - total_text_height - int(h * 0.20)
+                # CRITICAL: Position at 15% from bottom of screen (moved up)
+                text_y = h - total_text_height - int(h * 0.15)
                 
-                # Draw each line of wrapped text with 5x thicker outline
+                # Draw each line of wrapped text with much thicker outline
                 for i, line in enumerate(lines):
                     line_y = text_y + (i * line_height)
                     
-                    # CRITICAL: 5x thicker black outline
+                    # Calculate text width for centering
+                    text_bbox = draw.textbbox((0, 0), line, font=font)
+                    text_width = text_bbox[2] - text_bbox[0]
+                    text_x = (w - text_width) // 2  # Center the text
+                    
+                    # CRITICAL: Much thicker black outline
                     draw.text(
-                        (int(w * 0.1), line_y),  # 10% from left edge
+                        (text_x, line_y),
                         line,
                         font=font,
                         fill=self.colors['white'],
-                        stroke_width=caption_stroke_width,  # 5x thicker
+                        stroke_width=caption_stroke_width,  # Much thicker
                         stroke_fill=self.colors['black']
                     )
             

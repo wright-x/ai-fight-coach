@@ -1667,10 +1667,16 @@
 
                 <!-- Action Buttons Section -->
                 <div id="actionButtonsContainer" class="action-buttons-section">
-                            <button class="download-btn" onclick="downloadVideo()">Download Video</button>
-                            <button class="analyze-again-btn" onclick="runAnotherAnalysis()">Run Another Analysis</button>
-                    </div>
-                    
+                    <button class="download-btn" onclick="downloadVideo()">Download Video</button>
+                    <button class="analyze-again-btn" onclick="runAnotherAnalysis()">Run Another Analysis</button>
+                </div>
+
+                <!-- YouTube Recommendations Section -->
+                <div id="youtubeContainer" class="youtube-section">
+                    <h2 class="section-title">YouTube Recommendations</h2>
+                    <!-- YouTube videos will be dynamically generated here -->
+                </div>
+
                 <!-- Key Highlights Section -->
                 <div id="highlightsContainer" class="highlights-section">
                     <h2 class="section-title">Key Highlights</h2>
@@ -1681,12 +1687,6 @@
                 <div id="drillsContainer" class="drills-section">
                     <h2 class="section-title">Recommended Drills</h2>
                     <!-- Drills will be dynamically generated here -->
-                </div>
-
-                <!-- YouTube Recommendations Section -->
-                <div id="youtubeContainer" class="youtube-section">
-                    <h2 class="section-title">YouTube Recommendations</h2>
-                    <!-- YouTube videos will be dynamically generated here -->
                 </div>
 
                 <!-- Feedback Section -->
@@ -1951,7 +1951,7 @@
                 a.click();
                 document.body.removeChild(a);
                 alert('Video downloaded successfully!');
-            } else {
+                        } else {
                 alert('No video available to download.');
             }
         }
@@ -2071,15 +2071,15 @@
             // Fetch and display analysis data
             console.log('[SHOWRESULTS] Fetching analysis data from:', `/analysis/${jobId}`);
             fetch(`/analysis/${jobId}`)
-                .then(response => {
+            .then(response => {
                     console.log('[SHOWRESULTS] Analysis response status:', response.status);
                     console.log('[SHOWRESULTS] Analysis response headers:', response.headers);
                     if (!response.ok) {
                         throw new Error(`Analysis fetch failed: ${response.status} ${response.statusText}`);
                     }
-                    return response.json();
-                })
-                .then(data => {
+                return response.json();
+            })
+            .then(data => {
                     console.log('[SHOWRESULTS] Analysis data received:', data);
                     console.log('[SHOWRESULTS] Data type:', typeof data);
                     console.log('[SHOWRESULTS] Highlights count:', data.highlights ? data.highlights.length : 0);
@@ -2089,15 +2089,15 @@
                     }
                     
                     // Display highlights
-                    displayHighlights(data.highlights || []);
+                displayHighlights(data.highlights || []);
                     
                     // Display drills
-                    displayDrills(data.recommended_drills || []);
+                displayDrills(data.recommended_drills || []);
                     
                     // Display YouTube recommendations
-                    displayYouTube(data.youtube_recommendations || []);
-                })
-                .catch(error => {
+                displayYouTube(data.youtube_recommendations || []);
+            })
+            .catch(error => {
                     console.error('[SHOWRESULTS] Error loading analysis:', error);
                     console.error('[SHOWRESULTS] Error details:', error.message);
                     // Show fallback content
@@ -2130,7 +2130,7 @@
             container.innerHTML = '<h2 class="section-title">Key Highlights</h2>';
             
             if (highlights && highlights.length > 0) {
-                highlights.forEach((highlight, index) => {
+            highlights.forEach((highlight, index) => {
                     console.log('[DISPLAY] Processing highlight:', highlight);
                     console.log('[DISPLAY] Highlight fields:', Object.keys(highlight));
                     
@@ -2143,15 +2143,15 @@
                     // Get action required
                     const actionRequired = highlight.action_required || 'Continue practicing';
                     
-                    const card = document.createElement('div');
-                    card.className = 'highlight-card';
-                    card.innerHTML = `
+                const card = document.createElement('div');
+                card.className = 'highlight-card';
+                card.innerHTML = `
                         <div class="highlight-title">Highlight ${index + 1} - ${timestamp}</div>
                         <div class="highlight-description">${description}</div>
                         <div class="highlight-action">Action Required: ${actionRequired}</div>
-                    `;
-                    container.appendChild(card);
-                });
+                `;
+                container.appendChild(card);
+            });
                 console.log('[DISPLAY] Rendered', highlights.length, 'highlight cards');
             } else {
                 // Fallback message
@@ -2203,15 +2203,15 @@
                     console.log('[DISPLAY] Processing drill:', drill);
                     console.log('[DISPLAY] Drill fields:', Object.keys(drill));
                     
-                    const card = document.createElement('div');
-                    card.className = 'drill-card';
-                    card.innerHTML = `
+                const card = document.createElement('div');
+                card.className = 'drill-card';
+                card.innerHTML = `
                         <div class="drill-name">${drill.drill_name || drill.name || 'Recommended Drill'}</div>
                         <div class="drill-description">${drill.description || drill.drill_description || 'No description available'}</div>
                         <div class="drill-problem">Fixes: ${drill.problem_it_fixes || drill.fixes || 'General technique improvement'}</div>
-                    `;
-                    container.appendChild(card);
-                });
+                `;
+                container.appendChild(card);
+            });
                 console.log('[DISPLAY] Rendered', drills.length, 'drill cards');
             } else {
                 // Fallback message
@@ -2244,15 +2244,15 @@
                     console.log('[DISPLAY] Processing YouTube video:', video);
                     console.log('[DISPLAY] Video fields:', Object.keys(video));
                     
-                    const card = document.createElement('div');
-                    card.className = 'youtube-card';
+                const card = document.createElement('div');
+                card.className = 'youtube-card';
                     
                     // Extract YouTube video ID from URL
                     const videoId = extractYouTubeId(video.url || video.youtube_url || video.link || '');
                     
                     if (videoId) {
                         // Create embedded iframe
-                        card.innerHTML = `
+                card.innerHTML = `
                             <div class="youtube-title-text">${video.title || video.name || 'Boxing Tutorial'}</div>
                             <div class="youtube-problem">${video.problem_solved || video.problem_it_fixes || video.description || 'Learn boxing techniques'}</div>
                             <div class="youtube-embed">
