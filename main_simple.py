@@ -416,10 +416,9 @@ async def admin_jobs(db: Session = Depends(get_db), _: bool = Depends(verify_adm
 # Video upload endpoint
 @app.post("/upload-video")
 async def upload_video(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     email: str = Form(...),
-    analysis_type: str = Form(...),
+    analysis_type: str = Form("general"),
     db: Session = Depends(get_db)
 ):
     """Upload and process video"""
@@ -496,9 +495,14 @@ async def upload_video(
             "analysis_type": analysis_type
         }
         
-        # Start background processing
-        background_tasks.add_task(process_video_analysis, job.id, db)
-        logger.info(f"Background task started for job {job.id}")
+        # Start background processing (synchronous for now)
+        logger.info(f"Starting video processing for job {job.id}")
+        try:
+            await process_video_analysis(job.id, db)
+            logger.info(f"Video processing completed for job {job.id}")
+        except Exception as e:
+            logger.error(f"Video processing failed: {e}")
+            # Don't fail the upload, just log the error
         
         logger.info(f"Job {job.id} created successfully for user {email}")
         
