@@ -570,17 +570,21 @@ async def get_analysis(job_id: str):
 async def get_results(job_id: str, db: Session = Depends(get_db)):
     """Show results page"""
     try:
-        # Validate job_id - don't record views for invalid IDs like style.css
-        if job_id and not job_id.startswith('style.') and len(job_id) > 10:
-            # Record view only for valid job IDs
-            db_service = DatabaseService(db)
-            db_service.record_job_view(job_id)
+        # Validate job_id is not a static file request
+        if job_id.startswith('style.css') or job_id.startswith('static/') or '.' in job_id:
+            # This is a static file request, not a job ID
+            return FileResponse("static/index.html")
+        
+        # Record view only for valid job IDs
+        db_service = DatabaseService(db)
+        db_service.record_job_view(job_id)
         
         return FileResponse("static/index.html")
         
     except Exception as e:
         logger.error(f"Results error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # Return the page anyway, just don't record the view
+        return FileResponse("static/index.html")
 
 # Video processing
 async def process_video_analysis(job_id: str, db: Session):
@@ -631,7 +635,7 @@ async def process_video_analysis(job_id: str, db: Session):
             except Exception as video_error:
                 logger.error(f"Video creation failed for job {job_id}: {video_error}")
         else:
-            logger.warning(f"No highlights found for job {job_id}")  # Fixed syntax
+            logger.warning(f"No highlights found for job {job_id}")
                 
         # Update job status
         video_url = f"/video/{job_id}" if os.path.exists(output_video_path) else None
