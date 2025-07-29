@@ -349,7 +349,7 @@ class VideoProcessor:
             action_text = highlight.get('action_required', 'Analysis failed')
             text_clip = TextClip(
                 action_text,
-                fontsize=int(width * 0.30),
+                fontsize=int(width * 30),
                 color='white',
                 font='Arial-Bold'
             ).set_position('center').set_duration(2.0)
@@ -414,7 +414,7 @@ class VideoProcessor:
             print(f"✅ Background card created: {card.size}")
             
             # Calculate dynamic font size
-            font_size = int(width * 0.40)  # 40% of frame width
+            font_size = int(width * 1.0)  # 40% of frame width
             print(f"📝 Using font size: {font_size}")
             
             # Create text clip with neon purple color
@@ -500,7 +500,7 @@ class VideoProcessor:
                     label_text,
                     font=label_font,
                     fill=self.colors['white'],
-                    stroke_width=20,
+                    stroke_width=30,
                     stroke_fill=self.colors['black']
                 )
                 
@@ -527,7 +527,7 @@ class VideoProcessor:
                 wrapped_lines = textwrap.wrap(action_text, width=30)
                 
                 # Calculate font size (7% of frame width - 30% bigger than before)
-                font_size = max(100, int(w * 2.27))
+                font_size = max(200, int(w * 2.27))
                 
                 try:
                     # Try to use Montserrat Semi-Bold font
@@ -549,7 +549,7 @@ class VideoProcessor:
                     total_text_height += line_height
                 
                 # CRITICAL: Position at 30% from bottom of screen
-                text_y = h - total_text_height - int(h * 0.30)
+                text_y = h - total_text_height - int(h * 0.20)
                 
                 # Draw each line of wrapped text
                 current_y = text_y

@@ -359,9 +359,11 @@ body {
     background: white;
     border-radius: 10px;
     padding: 20px;
-    margin: 15px 0;
+    margin: 15px auto;  /* Center the cards */
+    max-width: 800px;   /* Limit width for better readability */
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
+    text-align: left;   /* Keep text left-aligned within cards */
 }
 
 .highlight-card:hover, .drill-card:hover, .youtube-card:hover {
@@ -390,11 +392,13 @@ body {
 
 .youtube-embed {
     margin-top: 15px;
+    text-align: center;  /* Center the YouTube embed */
 }
 
 .youtube-embed iframe {
     border-radius: 8px;
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    max-width: 100%;    /* Ensure iframe doesn't overflow */
 }
 
 .youtube-link {
@@ -406,6 +410,7 @@ body {
     text-decoration: none;
     margin-top: 10px;
     transition: all 0.3s ease;
+    text-align: center;  /* Center the button text */
 }
 
 .youtube-link:hover {
