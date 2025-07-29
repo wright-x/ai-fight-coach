@@ -529,8 +529,8 @@ class VideoProcessor:
                 # Draw black outline first
                 outline_points = [
                     (x, y - 80),  # Top point
-                    (x - (arrow_size+6)//2, y - 80 - (arrow_size+6)),  # Bottom left
-                    (x + (arrow_size+6)//2, y - 80 - (arrow_size+6))   # Bottom right
+                    (x - (arrow_size+6)//2, y - 80 - (arrow_size+3)),  # Bottom left
+                    (x + (arrow_size+6)//2, y - 80 - (arrow_size+3))   # Bottom right
                 ]
                 draw.polygon(outline_points, fill=self.colors['black'])
                 
