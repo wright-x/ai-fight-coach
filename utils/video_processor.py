@@ -474,9 +474,9 @@ class VideoProcessor:
             pil_frame = Image.fromarray(frame)
             draw = ImageDraw.Draw(pil_frame)
             
-            # CRITICAL: Much bigger font sizes based on reference code
-            label_font_size = max(1200, int(w * 0.15))  # Much bigger (was 780)
-            caption_font_size = max(600, int(w * 0.10))  # Much bigger (was 390)
+            # CRITICAL: Use reference code approach - much bigger fonts
+            label_font_size = max(2000, int(w * 0.25))  # Much bigger like reference
+            caption_font_size = max(1500, int(w * 0.20))  # Much bigger like reference
             
             # Load fonts with much bigger sizes
             try:
@@ -487,9 +487,9 @@ class VideoProcessor:
                 label_font = ImageFont.load_default()
                 caption_font = ImageFont.load_default()
             
-            # CRITICAL: Much thicker black outlines based on reference code
-            label_stroke_width = 40  # Much thicker (was 20)
-            caption_stroke_width = 80  # Much thicker (was 50)
+            # CRITICAL: Much thicker black outlines like reference code
+            label_stroke_width = 60  # Much thicker like reference
+            caption_stroke_width = 100  # Much thicker like reference
             
             # Head position detection
             head_pos = self._detect_head_position(frame, pose)
@@ -499,16 +499,16 @@ class VideoProcessor:
                 x, y = head_pos
                 label_text = f"{user_name}"
                 
-                # Calculate text size for proper centering
+                # Calculate text size for proper centering like reference code
                 text_bbox = draw.textbbox((0, 0), label_text, font=label_font)
                 text_width = text_bbox[2] - text_bbox[0]
                 text_height = text_bbox[3] - text_bbox[1]
                 
-                # Position text centered above arrow
+                # Position text centered above arrow like reference
                 text_x = x - text_width // 2
-                text_y = y - 150  # Move text higher above arrow
+                text_y = y - 200  # Move text much higher above arrow
                 
-                # CRITICAL: Much thicker black outline
+                # CRITICAL: Much thicker black outline like reference
                 draw.text(
                     (text_x, text_y),
                     label_text,
@@ -519,36 +519,38 @@ class VideoProcessor:
                 )
                 
                 # Draw red downward-pointing triangle arrow (bigger)
-                arrow_size = 50  # Bigger arrow (was 30)
+                arrow_size = 80  # Much bigger arrow
                 arrow_points = [
-                    (x, y - 80),  # Top point (moved higher)
-                    (x - arrow_size//2, y - 80 - arrow_size),  # Bottom left
-                    (x + arrow_size//2, y - 80 - arrow_size)   # Bottom right
+                    (x, y - 120),  # Top point (moved higher)
+                    (x - arrow_size//2, y - 120 - arrow_size),  # Bottom left
+                    (x + arrow_size//2, y - 120 - arrow_size)   # Bottom right
                 ]
                 draw.polygon(arrow_points, fill=self.colors['red'])
             
             # Draw action text caption (much bigger text, much thicker outline)
             if action_text:
-                # CRITICAL: Much bigger font size
-                font_size = max(600, int(w * 0.10))  # Much bigger (was 390)
+                # CRITICAL: Much bigger font size like reference
+                font_size = max(1500, int(w * 0.20))  # Much bigger like reference
                 
                 try:
                     font = ImageFont.truetype("arial.ttf", font_size)
                 except:
                     font = ImageFont.load_default()
                 
-                # Word wrap for better readability
+                # CRITICAL: Proper text wrapping like reference code
                 words = action_text.split()
                 lines = []
                 current_line = ""
+                max_width = int(w * 0.8)  # 80% of frame width like reference
                 
                 for word in words:
                     test_line = current_line + " " + word if current_line else word
                     # Estimate text width (rough calculation)
                     estimated_width = len(test_line) * font_size * 0.6
                     
-                    if estimated_width > w * 0.8:  # 80% of frame width
-                        lines.append(current_line)
+                    if estimated_width > max_width:
+                        if current_line:
+                            lines.append(current_line)
                         current_line = word
                     else:
                         current_line = test_line
@@ -557,22 +559,22 @@ class VideoProcessor:
                     lines.append(current_line)
                 
                 # Calculate total text height
-                line_height = font_size * 1.3  # Increased spacing
+                line_height = font_size * 1.4  # Increased spacing like reference
                 total_text_height = len(lines) * line_height
                 
-                # CRITICAL: Position at 15% from bottom of screen (moved up)
-                text_y = h - total_text_height - int(h * 0.15)
+                # CRITICAL: Position at bottom like reference code
+                text_y = h - 150 - total_text_height  # 150px from bottom like reference
                 
                 # Draw each line of wrapped text with much thicker outline
                 for i, line in enumerate(lines):
                     line_y = text_y + (i * line_height)
                     
-                    # Calculate text width for centering
+                    # Calculate text width for centering like reference
                     text_bbox = draw.textbbox((0, 0), line, font=font)
                     text_width = text_bbox[2] - text_bbox[0]
-                    text_x = (w - text_width) // 2  # Center the text
+                    text_x = (w - text_width) // 2  # Center the text like reference
                     
-                    # CRITICAL: Much thicker black outline
+                    # CRITICAL: Much thicker black outline like reference
                     draw.text(
                         (text_x, line_y),
                         line,
