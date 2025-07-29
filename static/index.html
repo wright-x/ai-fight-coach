@@ -1779,89 +1779,40 @@
             });
         }
 
-        // Auto-start loader when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            // Check if we're on a results page with job ID
-            const urlPath = window.location.pathname;
-            const jobIdMatch = urlPath.match(/\/results\/([a-f0-9-]+)/);
-            
-            if (jobIdMatch) {
-                const jobId = jobIdMatch[1];
-                console.log('[AUTO-START] Starting loader for job:', jobId);
-                startFakeProgress(jobId);
-            }
-        });
-        
         // 3-MINUTE FAKE PROGRESS SYSTEM
         let fakeProgressInterval;
         let fakeProgressStartTime;
-        let jobFinished = false;
-        let alreadyRedirected = false;
-        
-        async function pollJob(jobId) {
-            const res = await fetch(`/status/${jobId}`);
-            if (!res.ok) return;                       // keep silent if network blip
-            const json = await res.json();
-            const state = json.status?.toLowerCase();  // backend returns e.g. "finished"
-
-            if (["finished","completed","done","success"].includes(state)) {
-                jobFinished = true;       // global flag
-            }
-        }
         
         function startFakeProgress(jobId) {
             console.log('[FAKE PROGRESS] Starting 3-minute fake progress for job:', jobId);
             
-            fakeProgressStartTime = performance.now(); // Use performance.now() for precise timing
+            fakeProgressStartTime = Date.now();
             const TOTAL_TIME = 180000; // 3 minutes
             
-            // Define piece-wise linear segments
-            const segments = [
-                { start:   0, end:  30, from:  0, to: 50 },
-                { start:  30, end: 120, from: 50, to: 75 },
-                { start: 120, end: 150, from: 75, to: 90 },
+            // Define the exact timeline array as specified
+            const steps = [
+                [  0,   0,  "Initializing AI Coach…"           ],
+                [ 15,   5,  "Importing video file"             ],
+                [ 30,  15,  "Stabilizing frames"               ],
+                [ 45,  25,  "Detecting fighter pose"           ],
+                [ 60,  35,  "Tracking joint movement"          ],
+                [ 75,  45,  "Spotting form errors"             ],
+                [ 90,  55,  "Measuring angles & speed"         ],
+                [105,  65,  "Comparing with pro baseline"      ],
+                [120,  75,  "Scoring each round"               ],
+                [135,  85,  "Generating corrective tips"       ],
+                [150,  95,  "Adding voice-over & captions"     ],
+                [165, 100,  "Rendering final video"            ]   // bar full but no redirect yet
             ];
-            
-            // Keep the 12 messages for captions
-            const progressSteps = [
-                { time: 0, text: 'Initializing AI Coach…' },
-                { time: 7, text: 'Importing video file' },
-                { time: 15, text: 'Stabilizing frames' },
-                { time: 25, text: 'Detecting fighter pose' },
-                { time: 35, text: 'Tracking joint movement' },
-                { time: 45, text: 'Spotting form errors' },
-                { time: 55, text: 'Measuring angles & speed' },
-                { time: 65, text: 'Comparing with pro baseline' },
-                { time: 75, text: 'Scoring each round' },
-                { time: 85, text: 'Generating corrective tips' },
-                { time: 95, text: 'Adding voice-over & captions' },
-                { time: 105, text: 'Rendering final video' }
-            ];
-            
-            // Start polling every 2s
-            const pollInterval = setInterval(pollJob, 2000, jobId);
             
             fakeProgressInterval = setInterval(() => {
-                const elapsed = (performance.now() - fakeProgressStartTime) / 1000; // seconds
+                const elapsed = (Date.now() - fakeProgressStartTime) / 1000; // seconds
                 
-                // Early exit if job is finished
-                if (jobFinished && !alreadyRedirected) {
-                    const progressFill = document.getElementById('progressFill');
-                    const progressText = document.getElementById('progressText');
-                    if (progressFill) progressFill.style.width = "100%";
-                    if (progressText) progressText.textContent = "Ready! Redirecting…";
-                    alreadyRedirected = true;
-                    clearInterval(fakeProgressInterval);
-                    clearInterval(pollInterval);
-                    setTimeout(() => window.location.href = `/results/${jobId}`, 500);
-                    return;                        // skip further calc
-                }
-                
-                // Calculate progress using piece-wise linear segments
-                let pct = 90; // default hold at 90%
-                for (const s of segments) {
-                    if (elapsed < s.end) {
-                        pct = s.from + (s.to - s.from) * ((elapsed - s.start) / (s.end - s.start));
+                // Find current step based on elapsed time
+                let currentStep = steps[0];
+                for (let i = steps.length - 1; i >= 0; i--) {
+                    if (elapsed >= steps[i][0]) {
+                        currentStep = steps[i];
                         break;
                     }
                 }
@@ -1871,40 +1822,125 @@
                 const progressText = document.getElementById('progressText');
                 
                 if (progressFill && progressText) {
-                    progressFill.style.width = `${pct}%`;
-                    
-                    // Update caption text based on nearest step
-                    let currentStep = progressSteps[0];
-                    for (let i = progressSteps.length - 1; i >= 0; i--) {
-                        if (elapsed >= progressSteps[i].time) {
-                            currentStep = progressSteps[i];
-                            break;
-                        }
+                    // Drive bar width with elapsed / TOTAL_TIME until 165s
+                    if (elapsed < 165) {
+                        const progressPercent = (elapsed / 180) * 100;
+                        progressFill.style.width = `${Math.min(progressPercent, currentStep[1])}%`;
+                    } else if (elapsed < 180) {
+                        // From 165s → 180s hold at 95%, then jump to 100% at 180s
+                        progressFill.style.width = elapsed >= 180 ? '100%' : '95%';
                     }
-                    progressText.textContent = currentStep.text;
-                    updateLoadingStages(pct);
+                    
+                    progressText.textContent = currentStep[2];
+                    updateLoadingStages(currentStep[1]);
                 }
                 
                 // Check if we've reached the end
                 if (elapsed >= 180) {
-                    console.log('[FAKE PROGRESS] 3 minutes completed, continuing to poll');
+                    console.log('[FAKE PROGRESS] 3 minutes completed, checking real status');
                     clearInterval(fakeProgressInterval);
-                    // Keep polling but don't redirect - let pollJob handle it
+                    
+                    // Check real status and show results
+                    checkRealStatus(jobId);
                 }
                 
             }, 100); // Update every 100ms for smooth animation
         }
         
-
+        function checkRealStatus(jobId) {
+            console.log('[REAL STATUS] Checking actual job status for:', jobId);
+            
+            fetch(`/status/${jobId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Status check failed with status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('[REAL STATUS] Response:', data);
+                    
+                    if (data.status === 'completed') {
+                        console.log('[REAL STATUS] Job completed, showing results');
+                        // Early finish - immediately show results
+                        const progressFill = document.getElementById('progressFill');
+                        const progressText = document.getElementById('progressText');
+                        if (progressFill) progressFill.style.width = '100%';
+                        if (progressText) progressText.textContent = 'Ready! Redirecting…';
+                        showResults(jobId);
+                    } else if (data.status === 'processing') {
+                        console.log('[REAL STATUS] Job still processing, continuing with +1% every 5s');
+                        // Late finish - continue with +1% every 5s until finished
+                        continueProgressUntilComplete(jobId);
+                    } else if (data.status === 'failed') {
+                        alert(`Analysis failed: ${data.message || 'An unknown error occurred.'}`);
+                        runAnotherAnalysis();
+                    } else {
+                        console.log('[REAL STATUS] Unknown status, continuing to poll');
+                        setTimeout(() => checkRealStatus(jobId), 5000);
+                    }
+                })
+                .catch(error => {
+                    console.error('[REAL STATUS] Error:', error);
+                    // Keep trying
+                    setTimeout(() => checkRealStatus(jobId), 5000);
+                });
+        }
+        
+        function continueProgressUntilComplete(jobId) {
+            let additionalProgress = 0;
+            const progressInterval = setInterval(() => {
+                additionalProgress += 1;
+                const progressFill = document.getElementById('progressFill');
+                const progressText = document.getElementById('progressText');
+                
+                if (progressFill) {
+                    progressFill.style.width = `${Math.min(95 + additionalProgress, 99)}%`;
+                }
+                if (progressText) {
+                    progressText.textContent = 'Finalizing analysis...';
+                }
+                
+                // Check status every 5 seconds
+                fetch(`/status/${jobId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'completed') {
+                            clearInterval(progressInterval);
+                            if (progressFill) progressFill.style.width = '100%';
+                            if (progressText) progressText.textContent = 'Ready! Redirecting…';
+                            showResults(jobId);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('[PROGRESS] Error checking status:', error);
+                    });
+            }, 5000); // +1% every 5 seconds
+        }
 
         function updateLoadingStages(progress) {
-            const stages = document.querySelectorAll('.stage');
+            const stages = [
+                { id: 'stage1', threshold: 0, text: '📹 Uploading video...' },
+                { id: 'stage2', threshold: 15, text: '🤖 AI analyzing footage...' },
+                { id: 'stage3', threshold: 30, text: '🎯 Detecting highlights...' },
+                { id: 'stage4', threshold: 50, text: '🎬 Processing video...' },
+                { id: 'stage5', threshold: 75, text: '🔊 Generating audio...' },
+                { id: 'stage6', threshold: 90, text: '✨ Finalizing results...' }
+            ];
+
             stages.forEach((stage, index) => {
-                const stageProgress = (index + 1) * 25; // 4 stages, each 25%
-                if (progress >= stageProgress) {
-                    stage.classList.add('active');
-                } else {
-                    stage.classList.remove('active');
+                const stageElement = document.getElementById(stage.id);
+                if (stageElement) {
+                    // Remove all classes
+                    stageElement.classList.remove('active', 'completed');
+                    
+                    if (progress >= stage.threshold) {
+                        if (progress >= stage.threshold + 10 || progress >= 95) {
+                            stageElement.classList.add('completed');
+                        } else {
+                            stageElement.classList.add('active');
+                        }
+                    }
                 }
             });
         }
