@@ -253,7 +253,7 @@ class VideoProcessor:
             # Concatenate all clips linearly
             print(f"🔊 Concatenating {len(clips)} audio clips...")
             from moviepy.editor import concatenate_audioclips
-            final = concatenate_audioclips(clips, method="compose")
+            final = concatenate_audioclips(clips)  # Remove method="compose"
             
             # Save to output path
             highlight_id = f"highlight_{hash(str(highlight))}"
@@ -410,7 +410,7 @@ class VideoProcessor:
                     fontsize=font_size,
                     color='white',
                     stroke_color='black',
-                    stroke_width=10,  # Thick black outline
+                    stroke_width=20,  # Thick black outline
                     font='Montserrat-SemiBold.ttf'  
                 ).set_position('center').set_duration(duration)
                 print(f"✅ Text clip created: {text_clip.size}")
@@ -422,7 +422,7 @@ class VideoProcessor:
                     fontsize=font_size,
                     color='white',
                     stroke_color='black',
-                    stroke_width=4  # Thick black outline
+                    stroke_width=20  # Thick black outline
                 ).set_position('center').set_duration(duration)
                 print(f"✅ Text clip created with fallback font: {text_clip.size}")
             
@@ -486,7 +486,7 @@ class VideoProcessor:
                     label_text,
                     font=label_font,
                     fill=self.colors['white'],
-                    stroke_width=4,  # Thick black outline
+                    stroke_width=20,  # Thick black outline
                     stroke_fill=self.colors['black']
                 )
                 
@@ -550,7 +550,7 @@ class VideoProcessor:
                         line,
                         font=font,
                         fill=self.colors['white'],
-                        stroke_width=10,  # THICK outline for perfect readability (increased from 8)
+                        stroke_width=20,  # THICK outline for perfect readability (increased from 8)
                         stroke_fill=self.colors['black']
                     )
                     

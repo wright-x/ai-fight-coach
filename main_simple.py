@@ -15,6 +15,7 @@ from fastapi import FastAPI, File, UploadFile, Form, Request, BackgroundTasks, H
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text, ForeignKey, text
 from sqlalchemy.orm import sessionmaker, Session, declarative_base, relationship
 from pydantic import BaseModel
@@ -187,6 +188,15 @@ app = FastAPI(title="AI Fight Coach", version="1.0.0")
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Templates
 templates = Jinja2Templates(directory="templates")
@@ -566,7 +576,7 @@ async def get_analysis(job_id: str):
         raise HTTPException(status_code=404, detail="Analysis not found")
 
 # Results page
-@app.get("/results/{job_id}", response_class=HTMLResponse)
+@app.get("/results/{job_id:uuid}", response_class=HTMLResponse)
 async def get_results(job_id: str, db: Session = Depends(get_db)):
     """Show results page"""
     try:

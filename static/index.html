@@ -1779,6 +1779,19 @@
             });
         }
 
+        // Auto-start loader when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if we're on a results page with job ID
+            const urlPath = window.location.pathname;
+            const jobIdMatch = urlPath.match(/\/results\/([a-f0-9-]+)/);
+            
+            if (jobIdMatch) {
+                const jobId = jobIdMatch[1];
+                console.log('[AUTO-START] Starting loader for job:', jobId);
+                startFakeProgress(jobId);
+            }
+        });
+        
         // 3-MINUTE FAKE PROGRESS SYSTEM
         let fakeProgressInterval;
         let fakeProgressStartTime;
@@ -1799,7 +1812,7 @@
         function startFakeProgress(jobId) {
             console.log('[FAKE PROGRESS] Starting 3-minute fake progress for job:', jobId);
             
-            fakeProgressStartTime = Date.now();
+            fakeProgressStartTime = performance.now(); // Use performance.now() for precise timing
             const TOTAL_TIME = 180000; // 3 minutes
             
             // Define piece-wise linear segments
@@ -1829,7 +1842,7 @@
             const pollInterval = setInterval(pollJob, 2000, jobId);
             
             fakeProgressInterval = setInterval(() => {
-                const elapsed = (Date.now() - fakeProgressStartTime) / 1000; // seconds
+                const elapsed = (performance.now() - fakeProgressStartTime) / 1000; // seconds
                 
                 // Early exit if job is finished
                 if (jobFinished && !alreadyRedirected) {
