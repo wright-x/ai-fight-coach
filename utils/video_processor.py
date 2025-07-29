@@ -406,18 +406,18 @@ class VideoProcessor:
             card = ColorClip(size=(width, height), color=bg_color, duration=duration)
             print(f"✅ Background card created: {card.size}")
             
-            # Calculate dynamic font size
-            font_size = int(width * 0.08)  # 8% of frame width
+            # Calculate dynamic font size - 30% bigger
+            font_size = int(width * 0.104)  # 30% bigger (was 0.08, now 0.104)
             print(f"📝 Using font size: {font_size}")
             
-            # Create text clip with neon purple color
+            # Create text clip with white color and black outline
             try:
                 text_clip = TextClip(
                     text,
                     fontsize=font_size,
                     color='white',
-                    stroke_color='red',
-                    stroke_width=3,
+                    stroke_color='black',
+                    stroke_width=4,  # Thick black outline
                     font='Montserrat-SemiBold.ttf'
                 ).set_position('center').set_duration(duration)
                 print(f"✅ Text clip created: {text_clip.size}")
@@ -428,8 +428,8 @@ class VideoProcessor:
                     text,
                     fontsize=font_size,
                     color='white',
-                    stroke_color='red',
-                    stroke_width=3
+                    stroke_color='black',
+                    stroke_width=4  # Thick black outline
                 ).set_position('center').set_duration(duration)
                 print(f"✅ Text clip created with fallback font: {text_clip.size}")
             
@@ -472,9 +472,9 @@ class VideoProcessor:
             if head_pos:
                 x, y = head_pos
                 
-                # Draw "FIGHTER" label above the pointer
+                # Draw "FIGHTER" label above the pointer - 30% bigger
                 label_text = user_name
-                label_font_size = max(200, int(w * 0.025))  # Dynamic font size
+                label_font_size = max(260, int(w * 0.033))  # 30% bigger (was 200, now 260)
                 try:
                     label_font = ImageFont.truetype("arial.ttf", label_font_size)
                 except:
@@ -487,13 +487,13 @@ class VideoProcessor:
                 label_x = x - label_width // 2
                 label_y = y - int(h * 0.1)  # 10% of frame height above pointer
                 
-                # Draw label with outline
+                # Draw label with black outline
                 draw.text(
                     (label_x, label_y),
                     label_text,
                     font=label_font,
                     fill=self.colors['white'],
-                    stroke_width=2,
+                    stroke_width=4,  # Thick black outline
                     stroke_fill=self.colors['black']
                 )
                 
@@ -519,8 +519,8 @@ class VideoProcessor:
                 # CRITICAL: Text wrapping to prevent spilling
                 wrapped_lines = textwrap.wrap(action_text, width=30)
                 
-                # Calculate font size (7% of frame width - 30% bigger than before)
-                font_size = max(100, int(w * 0.07))
+                # Calculate font size (30% bigger than before)
+                font_size = max(130, int(w * 0.234))  # 30% bigger (was 0.18, now 0.234)
                 
                 try:
                     # Try to use Montserrat Semi-Bold font
@@ -557,7 +557,7 @@ class VideoProcessor:
                         line,
                         font=font,
                         fill=self.colors['white'],
-                        stroke_width=8,  # THICK outline for perfect readability
+                        stroke_width=10,  # THICK outline for perfect readability (increased from 8)
                         stroke_fill=self.colors['black']
                     )
                     
