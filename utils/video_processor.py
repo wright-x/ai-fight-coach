@@ -548,7 +548,7 @@ class VideoProcessor:
                     line_heights.append(line_height)
                     total_text_height += line_height
                 
-                # CRITICAL: Position at 30% from bottom of screen
+                # CRITICAL: Position at 20% from bottom of screen
                 text_y = h - total_text_height - int(h * 0.20)
                 
                 # Draw each line of wrapped text
@@ -604,7 +604,20 @@ class VideoProcessor:
         Convert timestamp string to seconds - handle multiple formats
         """
         try:
-            print(f"🔍 Parsing timestamp: '{timestamp_str}'")
+            print(f"🔍 Parsing timestamp: '{timestamp_str}' (type: {type(timestamp_str)})")
+            
+            if timestamp_str is None:
+                print("⚠️ None timestamp, using 0")
+                return 0
+                
+            # Convert to string if it's a number
+            if isinstance(timestamp_str, (int, float)):
+                result = float(timestamp_str)
+                print(f"✅ Parsed numeric timestamp: {timestamp_str} = {result}s")
+                return result
+                
+            # Convert to string for processing
+            timestamp_str = str(timestamp_str).strip()
             
             if not timestamp_str:
                 print("⚠️ Empty timestamp, using 0")

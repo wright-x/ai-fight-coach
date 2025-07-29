@@ -2148,10 +2148,10 @@
                     const formattedTime = formatTimestamp(timestamp);
                     console.log(`[DISPLAY] Timestamp: '${timestamp}' -> '${formattedTime}'`);
                     
-                    // Use the correct Gemini response fields (in order of preference)
-                    const description = highlight.long_text || 
+                    // Use the correct Gemini response fields (detailed_feedback is the main field)
+                    const description = highlight.detailed_feedback || 
+                                     highlight.long_text || 
                                      highlight.short_text || 
-                                     highlight.detailed_feedback ||
                                      highlight.description ||
                                      'Analysis completed successfully. Review the video above.';
                     
