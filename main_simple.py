@@ -606,9 +606,9 @@ async def process_video_analysis(job_id: str, db: Session):
         
         os.makedirs("output", exist_ok=True)
         
-        # Analyze video
+        # Analyze video with Gemini
         analysis_result = gemini_client.analyze_video(video_path, analysis_type)
-                logger.info(json.dumps(analysis_result, indent=2))
+        logger.info(json.dumps(analysis_result, indent=2))
         
         # Save analysis results
         with open(output_analysis_path, 'w') as f:
@@ -628,7 +628,7 @@ async def process_video_analysis(job_id: str, db: Session):
                 logger.info(f"Highlight video created successfully: {output_video_path}")
             except Exception as video_error:
                 logger.error(f"Video creation failed for job {job_id}: {video_error}")
-                else:
+        else:
             logger.warning(f"No highlights found for job {job_id}")
                 
         # Update job status
