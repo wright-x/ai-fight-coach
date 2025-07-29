@@ -20,7 +20,7 @@
         * {
             color-scheme: dark;
         }
-        
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 25%, #404040 50%, #2d2d2d 75%, #1a1a1a 100%) !important;
@@ -1525,29 +1525,29 @@
                         <div class="analysis-option" data-type="everything">
                             <span class="analysis-option-icon">🥊</span>
                             <div class="analysis-option-content">
-                                <h3>Complete Analysis</h3>
-                                <p>Everything - Defense, Punches, Footwork</p>
+                            <h3>Complete Analysis</h3>
+                            <p>Everything - Defense, Punches, Footwork</p>
                             </div>
                         </div>
                         <div class="analysis-option" data-type="head_movement">
                             <span class="analysis-option-icon">🛡️</span>
                             <div class="analysis-option-content">
-                                <h3>Defense</h3>
-                                <p>Guard, Blocks, Slips, Rolls</p>
+                            <h3>Defense</h3>
+                            <p>Guard, Blocks, Slips, Rolls</p>
                             </div>
                         </div>
                         <div class="analysis-option" data-type="punch_techniques">
                             <span class="analysis-option-icon">👊</span>
                             <div class="analysis-option-content">
-                                <h3>Punch Techniques</h3>
-                                <p>Power & Mechanics</p>
+                            <h3>Punch Techniques</h3>
+                            <p>Power & Mechanics</p>
                             </div>
                         </div>
                         <div class="analysis-option" data-type="footwork">
                             <span class="analysis-option-icon">👟</span>
                             <div class="analysis-option-content">
-                                <h3>Footwork</h3>
-                                <p>Movement & Angles</p>
+                            <h3>Footwork</h3>
+                            <p>Movement & Angles</p>
                             </div>
                         </div>
                     </div>
@@ -1667,10 +1667,10 @@
 
                 <!-- Action Buttons Section -->
                 <div id="actionButtonsContainer" class="action-buttons-section">
-                    <button class="download-btn" onclick="downloadVideo()">Download Video</button>
-                    <button class="analyze-again-btn" onclick="runAnotherAnalysis()">Run Another Analysis</button>
-                </div>
-
+                            <button class="download-btn" onclick="downloadVideo()">Download Video</button>
+                            <button class="analyze-again-btn" onclick="runAnotherAnalysis()">Run Another Analysis</button>
+                    </div>
+                    
                 <!-- Key Highlights Section -->
                 <div id="highlightsContainer" class="highlights-section">
                     <h2 class="section-title">Key Highlights</h2>
@@ -1699,11 +1699,11 @@
                             <form id="feedbackForm" onsubmit="submitFeedback(event)">
                                 <input type="email" id="feedbackEmail" placeholder="Enter your email (optional)" class="feedback-input">
                                 <textarea id="feedbackText" placeholder="Tell us what you think about the analysis, what worked well, and what could be improved..." rows="4" class="feedback-textarea"></textarea>
-                                <div class="feedback-buttons">
+                            <div class="feedback-buttons">
                                     <button type="button" class="feedback-btn positive" onclick="setFeedbackRating('positive')">👍 Great!</button>
                                     <button type="button" class="feedback-btn neutral" onclick="setFeedbackRating('neutral')">😐 Okay</button>
                                     <button type="button" class="feedback-btn negative" onclick="setFeedbackRating('negative')">👎 Needs Work</button>
-                                </div>
+                            </div>
                                 <button type="submit" class="submit-feedback-btn">Send Feedback</button>
                             </form>
                         </div>
@@ -1744,7 +1744,7 @@
                 alert('Please select a video file first.');
                 return;
             }
-            
+
             // Start loading animation immediately
             startLoadingAnimation();
             
@@ -1760,7 +1760,7 @@
             // Get user email from cookies
             const userEmail = getCookie('user_email') || 'guest@example.com';
             formData.append('email', userEmail);
-            
+
             fetch('/upload-video', {
                 method: 'POST',
                 body: formData
@@ -1815,9 +1815,9 @@
             if (!startTime) return;
             
             const elapsed = (Date.now() - startTime) / 1000; // seconds
-            const progressFill = document.getElementById('progressFill');
-            const progressText = document.getElementById('progressText');
-            
+                const progressFill = document.getElementById('progressFill');
+                const progressText = document.getElementById('progressText');
+                
             if (!progressFill || !progressText) return;
             
             // Fill-rate curve (total 3 minutes)
@@ -1856,7 +1856,7 @@
                 progressText.textContent = 'Generating highlights';
             } else if (progressPercent <= 90) {
                 progressText.textContent = 'Adding voice-over & captions';
-            } else {
+                } else {
                 progressText.textContent = 'Finalizing analysis...';
             }
         }
@@ -1899,7 +1899,7 @@
                     if (data.status === 'completed') {
                         // Job finished - snap to 100% and redirect
                         const progressFill = document.getElementById('progressFill');
-                        const progressText = document.getElementById('progressText');
+                    const progressText = document.getElementById('progressText');
                         
                         if (progressFill) progressFill.style.width = '100%';
                         if (progressText) progressText.textContent = 'Ready! Redirecting...';
@@ -1950,7 +1950,7 @@
                 a.click();
                 document.body.removeChild(a);
                 alert('Video downloaded successfully!');
-            } else {
+                        } else {
                 alert('No video available to download.');
             }
         }
@@ -2057,8 +2057,8 @@
                 console.log('[INIT] Results page detected, job ID:', jobId);
                 
                 // Show results page
-                showPage('resultsPage');
-                
+            showPage('resultsPage');
+            
                 // Load and display results
                 showResults(jobId);
             } else {
@@ -2084,25 +2084,25 @@
             // Fetch and display analysis data
             console.log('[SHOWRESULTS] Fetching analysis data...');
             fetch(`/analysis/${jobId}`)
-                .then(response => {
+            .then(response => {
                     if (!response.ok) {
                         throw new Error(`Analysis fetch failed: ${response.status}`);
                     }
-                    return response.json();
-                })
-                .then(data => {
+                return response.json();
+            })
+            .then(data => {
                     console.log('[SHOWRESULTS] Analysis data received:', data);
                     
                     // Display highlights
-                    displayHighlights(data.highlights || []);
+                displayHighlights(data.highlights || []);
                     
                     // Display drills
-                    displayDrills(data.recommended_drills || []);
+                displayDrills(data.recommended_drills || []);
                     
                     // Display YouTube recommendations
-                    displayYouTube(data.youtube_recommendations || []);
-                })
-                .catch(error => {
+                displayYouTube(data.youtube_recommendations || []);
+            })
+            .catch(error => {
                     console.error('[SHOWRESULTS] Error loading analysis:', error);
                     // Show fallback content
                     displayHighlights([{
@@ -2137,10 +2137,26 @@
                 highlights.forEach((highlight, index) => {
                     const card = document.createElement('div');
                     card.className = 'highlight-card';
+                    
+                    // Format timestamp properly
+                    const timestamp = highlight.timestamp || highlight.time || '00:00';
+                    const formattedTime = formatTimestamp(timestamp);
+                    
+                    // Use the correct Gemini response fields
+                    const description = highlight.detailed_feedback || 
+                                     highlight.long_text || 
+                                     highlight.short_text || 
+                                     highlight.description ||
+                                     'Analysis completed successfully. Review the video above.';
+                    
+                    const action = highlight.action_required || 
+                                 highlight.action || 
+                                 'Continue practicing and improving your technique';
+                    
                     card.innerHTML = `
-                        <div class="highlight-title">Highlight ${index + 1} - ${highlight.timestamp || 'N/A'}</div>
-                        <div class="highlight-description">${highlight.long_text || highlight.short_text || 'No description available'}</div>
-                        <div class="highlight-action">Action Required: ${highlight.action_required || 'Continue practicing'}</div>
+                        <div class="highlight-title">Highlight ${index + 1} - ${formattedTime}</div>
+                        <div class="highlight-description">${description}</div>
+                        <div class="highlight-action">Action Required: ${action}</div>
                     `;
                     container.appendChild(card);
                 });
@@ -2159,6 +2175,27 @@
             }
         }
         
+        // Helper function to format timestamp as (M:SS)
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return '(0:00)';
+            
+            // If it's already in MM:SS format, just add parentheses
+            if (timestamp.includes(':')) {
+                return `(${timestamp})`;
+            }
+            
+            // If it's a number (seconds), convert to MM:SS
+            const seconds = parseFloat(timestamp);
+            if (!isNaN(seconds)) {
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = Math.floor(seconds % 60);
+                return `(${minutes}:${remainingSeconds.toString().padStart(2, '0')})`;
+            }
+            
+            // Fallback
+            return `(${timestamp})`;
+        }
+
         function displayDrills(drills) {
             console.log('[DISPLAY] Rendering drills:', drills);
             const container = document.getElementById('drillsContainer');
@@ -2172,16 +2209,16 @@
             container.innerHTML = '<h2 class="section-title">Recommended Drills</h2>';
             
             if (drills && drills.length > 0) {
-                drills.forEach(drill => {
-                    const card = document.createElement('div');
-                    card.className = 'drill-card';
-                    card.innerHTML = `
+            drills.forEach(drill => {
+                const card = document.createElement('div');
+                card.className = 'drill-card';
+                card.innerHTML = `
                         <div class="drill-name">${drill.drill_name || 'Recommended Drill'}</div>
-                        <div class="drill-description">${drill.description || 'No description available'}</div>
+                    <div class="drill-description">${drill.description || 'No description available'}</div>
                         <div class="drill-problem">Fixes: ${drill.problem_it_fixes || 'General technique improvement'}</div>
-                    `;
-                    container.appendChild(card);
-                });
+                `;
+                container.appendChild(card);
+            });
                 console.log('[DISPLAY] Rendered', drills.length, 'drill cards');
             } else {
                 // Fallback message
@@ -2196,7 +2233,7 @@
                 console.log('[DISPLAY] Rendered fallback drill card');
             }
         }
-        
+
         function displayYouTube(videos) {
             console.log('[DISPLAY] Rendering YouTube videos:', videos);
             const container = document.getElementById('youtubeContainer');
@@ -2210,16 +2247,16 @@
             container.innerHTML = '<h2 class="section-title">YouTube Recommendations</h2>';
             
             if (videos && videos.length > 0) {
-                videos.forEach(video => {
-                    const card = document.createElement('div');
-                    card.className = 'youtube-card';
+            videos.forEach(video => {
+                const card = document.createElement('div');
+                card.className = 'youtube-card';
                     
                     // Extract YouTube video ID from URL
                     const videoId = extractYouTubeId(video.url || video.youtube_url || '');
                     
                     if (videoId) {
                         // Create embedded iframe
-                        card.innerHTML = `
+                card.innerHTML = `
                             <div class="youtube-title-text">${video.title || 'Boxing Tutorial'}</div>
                             <div class="youtube-problem">${video.problem_solved || video.problem_it_fixes || 'Learn boxing techniques'}</div>
                             <div class="youtube-embed">
@@ -2231,8 +2268,8 @@
                         card.innerHTML = `
                             <div class="youtube-title-text">${video.title || 'Boxing Tutorial'}</div>
                             <div class="youtube-problem">${video.problem_solved || video.problem_it_fixes || 'Learn boxing techniques'}</div>
-                            <a href="${video.url || '#'}" target="_blank" class="youtube-link">Watch Video</a>
-                        `;
+                    <a href="${video.url || '#'}" target="_blank" class="youtube-link">Watch Video</a>
+                `;
                     }
                     
                     container.appendChild(card);

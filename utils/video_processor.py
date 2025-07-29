@@ -349,7 +349,7 @@ class VideoProcessor:
             action_text = highlight.get('action_required', 'Analysis failed')
             text_clip = TextClip(
                 action_text,
-                fontsize=int(width * 0.03),
+                fontsize=int(width * 0.30),
                 color='white',
                 font='Arial-Bold'
             ).set_position('center').set_duration(2.0)
@@ -414,7 +414,7 @@ class VideoProcessor:
             print(f"✅ Background card created: {card.size}")
             
             # Calculate dynamic font size
-            font_size = int(width * 0.08)  # 8% of frame width
+            font_size = int(width * 0.40)  # 40% of frame width
             print(f"📝 Using font size: {font_size}")
             
             # Create text clip with neon purple color
@@ -481,7 +481,7 @@ class VideoProcessor:
                 
                 # Draw "FIGHTER" label above the pointer
                 label_text = user_name
-                label_font_size = max(200, int(w * 0.25))  # Dynamic font size
+                label_font_size = max(200, int(w * 2.25))  # Dynamic font size
                 try:
                     label_font = ImageFont.truetype("arial.ttf", label_font_size)
                 except:
@@ -527,7 +527,7 @@ class VideoProcessor:
                 wrapped_lines = textwrap.wrap(action_text, width=30)
                 
                 # Calculate font size (7% of frame width - 30% bigger than before)
-                font_size = max(100, int(w * 0.27))
+                font_size = max(100, int(w * 2.27))
                 
                 try:
                     # Try to use Montserrat Semi-Bold font
@@ -601,19 +601,40 @@ class VideoProcessor:
 
     def _parse_timestamp(self, timestamp_str):
         """
-        Convert timestamp string (MM:SS) to seconds
+        Convert timestamp string to seconds - handle multiple formats
         """
         try:
+            print(f"🔍 Parsing timestamp: '{timestamp_str}'")
+            
+            if not timestamp_str:
+                print("⚠️ Empty timestamp, using 0")
+                return 0
+                
+            # Handle MM:SS format
             if ':' in timestamp_str:
                 parts = timestamp_str.split(':')
                 if len(parts) == 2:
                     minutes, seconds = map(int, parts)
-                    return minutes * 60 + seconds
+                    result = minutes * 60 + seconds
+                    print(f"✅ Parsed MM:SS format: {minutes}:{seconds:02d} = {result}s")
+                    return result
                 elif len(parts) == 3:
                     hours, minutes, seconds = map(int, parts)
-                    return hours * 3600 + minutes * 60 + seconds
-            return 0
-        except:
+                    result = hours * 3600 + minutes * 60 + seconds
+                    print(f"✅ Parsed HH:MM:SS format: {hours}:{minutes:02d}:{seconds:02d} = {result}s")
+                    return result
+            
+            # Handle plain number (seconds)
+            try:
+                result = float(timestamp_str)
+                print(f"✅ Parsed as seconds: {result}s")
+                return result
+            except ValueError:
+                print(f"⚠️ Could not parse timestamp '{timestamp_str}', using 0")
+                return 0
+                
+        except Exception as e:
+            print(f"❌ Timestamp parsing error: {e}")
             return 0
 
     def add_audio_to_video(self, video_path: str, audio_path: str, output_path: str) -> str:
