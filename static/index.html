@@ -1749,8 +1749,12 @@
             // Show progress page
             showPage('progressPage');
             
+            // Get user email from cookies or use default
+            const userEmail = getCookie('user_email') || 'guest@example.com';
+            
             const formData = new FormData();
             formData.append('file', file);
+            formData.append('email', userEmail);
             formData.append('analysis_type', selectedAnalysisType);
 
             fetch('/upload-video', {
@@ -2185,6 +2189,14 @@
                 console.error('Error submitting feedback:', error);
                 alert('Failed to submit feedback. Please try again.');
             });
+        }
+
+        // Helper function to get cookies
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
         }
     </script>
 </body>
