@@ -1782,6 +1782,19 @@
         // 3-MINUTE FAKE PROGRESS SYSTEM
         let fakeProgressInterval;
         let fakeProgressStartTime;
+        let jobFinished = false;
+        let alreadyRedirected = false;
+        
+        async function pollJob(jobId) {
+            const res = await fetch(`/status/${jobId}`);
+            if (!res.ok) return;                       // keep silent if network blip
+            const json = await res.json();
+            const state = json.status?.toLowerCase();  // backend returns e.g. "finished"
+
+            if (["finished","completed","done","success"].includes(state)) {
+                jobFinished = true;       // global flag
+            }
+        }
         
         function startFakeProgress(jobId) {
             console.log('[FAKE PROGRESS] Starting 3-minute fake progress for job:', jobId);
@@ -1812,8 +1825,24 @@
                 { time: 105, text: 'Rendering final video' }
             ];
             
+            // Start polling every 2s
+            const pollInterval = setInterval(pollJob, 2000, jobId);
+            
             fakeProgressInterval = setInterval(() => {
                 const elapsed = (Date.now() - fakeProgressStartTime) / 1000; // seconds
+                
+                // Early exit if job is finished
+                if (jobFinished && !alreadyRedirected) {
+                    const progressFill = document.getElementById('progressFill');
+                    const progressText = document.getElementById('progressText');
+                    if (progressFill) progressFill.style.width = "100%";
+                    if (progressText) progressText.textContent = "Ready! Redirecting…";
+                    alreadyRedirected = true;
+                    clearInterval(fakeProgressInterval);
+                    clearInterval(pollInterval);
+                    setTimeout(() => window.location.href = `/results/${jobId}`, 500);
+                    return;                        // skip further calc
+                }
                 
                 // Calculate progress using piece-wise linear segments
                 let pct = 90; // default hold at 90%
@@ -1845,110 +1874,24 @@
                 
                 // Check if we've reached the end
                 if (elapsed >= 180) {
-                    console.log('[FAKE PROGRESS] 3 minutes completed, checking real status');
+                    console.log('[FAKE PROGRESS] 3 minutes completed, continuing to poll');
                     clearInterval(fakeProgressInterval);
-                    
-                    // Check real status and show results
-                    checkRealStatus(jobId);
+                    // Keep polling but don't redirect - let pollJob handle it
                 }
                 
             }, 100); // Update every 100ms for smooth animation
         }
         
-        function checkRealStatus(jobId) {
-            console.log('[REAL STATUS] Checking actual job status for:', jobId);
-            
-            fetch(`/status/${jobId}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Status check failed with status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('[REAL STATUS] Response:', data);
-                    
-                    if (data.status === 'completed') {
-                        console.log('[REAL STATUS] Job completed, showing results');
-                        // Early finish - immediately show results
-                        const progressFill = document.getElementById('progressFill');
-                        const progressText = document.getElementById('progressText');
-                        if (progressFill) progressFill.style.width = '100%';
-                        if (progressText) progressText.textContent = 'Ready! Redirecting…';
-                        showResults(jobId);
-                    } else if (data.status === 'processing') {
-                        console.log('[REAL STATUS] Job still processing, continuing with +1% every 5s');
-                        // Late finish - continue with +1% every 5s until finished
-                        continueProgressUntilComplete(jobId);
-                    } else if (data.status === 'failed') {
-                        alert(`Analysis failed: ${data.message || 'An unknown error occurred.'}`);
-                        runAnotherAnalysis();
-                    } else {
-                        console.log('[REAL STATUS] Unknown status, continuing to poll');
-                        setTimeout(() => checkRealStatus(jobId), 3000); // Poll every 3s
-                    }
-                })
-                .catch(error => {
-                    console.error('[REAL STATUS] Error:', error);
-                    // Keep trying
-                    setTimeout(() => checkRealStatus(jobId), 3000);
-                });
-        }
-        
-        function continueProgressUntilComplete(jobId) {
-            let additionalProgress = 0;
-            const progressInterval = setInterval(() => {
-                additionalProgress += 1;
-                const progressFill = document.getElementById('progressFill');
-                const progressText = document.getElementById('progressText');
-                
-                if (progressFill) {
-                    progressFill.style.width = `${Math.min(95 + additionalProgress, 99)}%`;
-                }
-                if (progressText) {
-                    progressText.textContent = 'Finalizing analysis...';
-                }
-                
-                // Check status every 5 seconds
-                fetch(`/status/${jobId}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'completed') {
-                            clearInterval(progressInterval);
-                            if (progressFill) progressFill.style.width = '100%';
-                            if (progressText) progressText.textContent = 'Ready! Redirecting…';
-                            showResults(jobId);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('[PROGRESS] Error checking status:', error);
-                    });
-            }, 5000); // +1% every 5 seconds
-        }
+
 
         function updateLoadingStages(progress) {
-            const stages = [
-                { id: 'stage1', threshold: 0, text: '📹 Uploading video...' },
-                { id: 'stage2', threshold: 15, text: '🤖 AI analyzing footage...' },
-                { id: 'stage3', threshold: 30, text: '🎯 Detecting highlights...' },
-                { id: 'stage4', threshold: 50, text: '🎬 Processing video...' },
-                { id: 'stage5', threshold: 75, text: '🔊 Generating audio...' },
-                { id: 'stage6', threshold: 90, text: '✨ Finalizing results...' }
-            ];
-
+            const stages = document.querySelectorAll('.stage');
             stages.forEach((stage, index) => {
-                const stageElement = document.getElementById(stage.id);
-                if (stageElement) {
-                    // Remove all classes
-                    stageElement.classList.remove('active', 'completed');
-                    
-                    if (progress >= stage.threshold) {
-                        if (progress >= stage.threshold + 10 || progress >= 95) {
-                            stageElement.classList.add('completed');
-                        } else {
-                            stageElement.classList.add('active');
-                        }
-                    }
+                const stageProgress = (index + 1) * 25; // 4 stages, each 25%
+                if (progress >= stageProgress) {
+                    stage.classList.add('active');
+                } else {
+                    stage.classList.remove('active');
                 }
             });
         }

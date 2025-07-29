@@ -169,11 +169,23 @@ class VideoProcessor:
             # Step 3: Attach audio to video if available with 1-second delay
             if audio_path and os.path.exists(audio_path):
                 try:
-                    audio = AudioFileClip(audio_path)  # already 44.1kHz
-                    clip = video_clip.set_audio(audio)
-                    clip = clip.set_duration(audio.duration)  # keep sync
-                    print(f"✅ Audio attached to highlight clip with sync")
-                    return clip
+                    # Create 1-second lead-in silence
+                    from moviepy.audio.AudioClip import AudioClip
+                    silence = AudioClip(lambda t: 0, duration=1, fps=44100)  # 1-s lead-in
+                    
+                    # Load TTS audio
+                    from moviepy.editor import AudioFileClip
+                    tts_audio = AudioFileClip(audio_path)
+                    
+                    # Concatenate silence and TTS audio
+                    from moviepy.editor import concatenate_audioclips
+                    synced = concatenate_audioclips([silence, tts_audio])
+                    
+                    # Set audio to video and sync duration
+                    clip_with = video_clip.set_audio(synced).set_duration(synced.duration)
+                    
+                    print(f"✅ Audio attached to highlight clip with 1-second lead-in")
+                    return clip_with
                 except Exception as e:
                     print(f"⚠️ Audio attachment failed: {e}, returning silent clip")
                     return video_clip
@@ -212,19 +224,27 @@ class VideoProcessor:
             for i, sentence in enumerate(sentences):
                 print(f"🔊 Generating TTS for sentence {i+1}/{len(sentences)}: {sentence[:30]}...")
                 
-                # Generate TTS clip
-                audio_clip = self.tts_client.synth(sentence)
-                if audio_clip:
-                    clips.append(audio_clip)
-                    
-                    # Add silence after each sentence (except the last one)
-                    if i < len(sentences) - 1:
-                        from moviepy.audio.AudioClip import AudioClip
-                        silence_clip = AudioClip(lambda t: 0, duration=0.4).set_fps(44100)
-                        clips.append(silence_clip)
-                else:
-                    print(f"⚠️ TTS generation failed for sentence {i+1}")
-                    continue
+                # Generate TTS using ElevenLabs
+                audio = self.tts_client["generate"](
+                    text=sentence,
+                    voice="21m00Tcm4TlvDq8ikWAM",
+                    model="eleven_monolingual_v1"
+                )
+                
+                # Save to WAV file
+                tmp_path = f"/tmp/tts_{hash(sentence)}.wav"
+                self.tts_client["save"](audio, tmp_path)
+                
+                # Load as AudioFileClip
+                from moviepy.editor import AudioFileClip
+                audio_clip = AudioFileClip(tmp_path)
+                clips.append(audio_clip)
+                
+                # Add silence after each sentence (except the last one)
+                if i < len(sentences) - 1:
+                    from moviepy.audio.AudioClip import AudioClip
+                    silence_clip = AudioClip(lambda t: 0, duration=0.4).set_fps(44100)
+                    clips.append(silence_clip)
             
             if not clips:
                 print("⚠️ No audio clips generated")
