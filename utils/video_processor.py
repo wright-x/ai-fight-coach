@@ -161,7 +161,7 @@ class VideoProcessor:
             # Step 1: Generate TTS for this specific highlight
             audio_path = None
             if self.tts_client:
-                audio_path = self._generate_highlight_tts(highlight, f"highlight_{hash(str(highlight))}")
+                audio_path = self._generate_highlight_tts(highlight, "output/audio")
             
             # Step 2: Generate video with overlays (silent)
             video_clip = self._generate_highlight_video(source_clip, highlight, user_name, source_fps)
@@ -169,22 +169,11 @@ class VideoProcessor:
             # Step 3: Attach audio to video if available with 1-second delay
             if audio_path and os.path.exists(audio_path):
                 try:
-                    audio_clip = AudioFileClip(audio_path)
-                    
-                    # CRITICAL: Create 1-second silence and prepend to TTS audio
-                    from moviepy.audio.AudioClip import AudioClip
-                    silence = AudioClip(lambda t: 0, duration=1).set_fps(44100)
-                    
-                    # Concatenate silence and audio cleanly
-                    from moviepy.editor import concatenate_audioclips
-                    combined = concatenate_audioclips([silence, audio_clip])
-                    
-                    # Set the combined audio to the video and sync duration
-                    final_clip = video_clip.set_audio(combined)
-                    final_clip = final_clip.set_duration(combined.duration)
-                    
-                    print(f"✅ Audio attached to highlight clip with 1-second delay")
-                    return final_clip
+                    audio = AudioFileClip(audio_path)  # already 44.1kHz
+                    clip = video_clip.set_audio(audio)
+                    clip = clip.set_duration(audio.duration)  # keep sync
+                    print(f"✅ Audio attached to highlight clip with sync")
+                    return clip
                 except Exception as e:
                     print(f"⚠️ Audio attachment failed: {e}, returning silent clip")
                     return video_clip
@@ -197,8 +186,8 @@ class VideoProcessor:
             # Return a simple fallback clip
             return self._create_fallback_clip(source_clip, highlight, source_fps)
 
-    def _generate_highlight_tts(self, highlight, clip_id):
-        """Generate TTS audio for a single highlight with sentence-by-sentence pacing"""
+    def _generate_highlight_tts(self, highlight, tmp_dir):
+        """Generate TTS audio for a single highlight with linear concatenation"""
         try:
             if not self.tts_client:
                 return None
@@ -210,72 +199,56 @@ class VideoProcessor:
             
             print(f"🔊 Generating paced TTS for: {action_text[:50]}...")
             
-            # Create audio directory if it doesn't exist
-            os.makedirs("output/audio", exist_ok=True)
-            audio_path = f"output/audio/{clip_id}.mp3"
-            
-            # Split text into sentences for paced narration
+            # Split text into sentences
             sentences = [s.strip() for s in action_text.split('.') if s.strip()]
             
             if not sentences:
                 return None
             
-            # Create empty list for audio clips
-            audio_clips = []
+            # Create clips list
+            clips = []
             
-            # Generate TTS for each sentence individually
+            # Generate TTS for each sentence
             for i, sentence in enumerate(sentences):
                 print(f"🔊 Generating TTS for sentence {i+1}/{len(sentences)}: {sentence[:30]}...")
                 
-                try:
-                    # Generate TTS for this sentence
-                    audio = self.tts_client["generate"](
-                        text=sentence,
-                        voice="21m00Tcm4TlvDq8ikWAM",
-                        model="eleven_monolingual_v1"
-                    )
-                    
-                    # Save individual sentence audio temporarily
-                    temp_audio_path = f"output/audio/{clip_id}_sentence_{i}.mp3"
-                    self.tts_client["save"](audio, temp_audio_path)
-                    
-                    # Load as AudioFileClip
-                    sentence_clip = AudioFileClip(temp_audio_path)
-                    audio_clips.append(sentence_clip)
+                # Generate TTS clip
+                audio_clip = self.tts_client.synth(sentence)
+                if audio_clip:
+                    clips.append(audio_clip)
                     
                     # Add silence after each sentence (except the last one)
                     if i < len(sentences) - 1:
-                        # Create 0.4 seconds of silence using MoviePy's built-in
                         from moviepy.audio.AudioClip import AudioClip
                         silence_clip = AudioClip(lambda t: 0, duration=0.4).set_fps(44100)
-                        audio_clips.append(silence_clip)
-                    
-                    # Clean up temp file
-                    os.remove(temp_audio_path)
-                    
-                except Exception as e:
-                    print(f"⚠️ TTS generation failed for sentence {i+1}: {e}")
+                        clips.append(silence_clip)
+                else:
+                    print(f"⚠️ TTS generation failed for sentence {i+1}")
                     continue
             
-            if not audio_clips:
+            if not clips:
                 print("⚠️ No audio clips generated")
                 return None
             
-            # Concatenate all audio clips using concatenate_audioclips
-            print(f"🔊 Concatenating {len(audio_clips)} audio clips...")
+            # Concatenate all clips linearly
+            print(f"🔊 Concatenating {len(clips)} audio clips...")
             from moviepy.editor import concatenate_audioclips
-            final_audio = concatenate_audioclips(audio_clips, method="compose")
+            final = concatenate_audioclips(clips, method="compose")
             
-            # Save final composite audio
-            final_audio.write_audiofile(audio_path, fps=44100, verbose=False, logger=None)
+            # Save to output path
+            highlight_id = f"highlight_{hash(str(highlight))}"
+            out_path = f"{tmp_dir}/{highlight_id}.wav"
             
-            # Clean up audio clips
-            for clip in audio_clips:
+            # Write audio file with 44.1kHz
+            final.write_audiofile(out_path, fps=44100, verbose=False, logger=None)
+            
+            # Clean up clips
+            for clip in clips:
                 clip.close()
-            final_audio.close()
+            final.close()
             
-            print(f"✅ Paced TTS generated: {audio_path}")
-            return audio_path
+            print(f"✅ Paced TTS generated: {out_path}")
+            return out_path
             
         except Exception as e:
             print(f"⚠️ TTS generation failed: {e}")
@@ -417,8 +390,8 @@ class VideoProcessor:
                     fontsize=font_size,
                     color='white',
                     stroke_color='black',
-                    stroke_width=4,  # Thick black outline
-                    font='Montserrat-SemiBold.ttf'
+                    stroke_width=10,  # Thick black outline
+                    font='Montserrat-SemiBold.ttf'  
                 ).set_position('center').set_duration(duration)
                 print(f"✅ Text clip created: {text_clip.size}")
             except Exception as text_error:
