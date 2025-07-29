@@ -628,8 +628,8 @@ async def process_video_analysis(job_id: str, db: Session):
                 logger.info(f"Highlight video created successfully: {output_video_path}")
             except Exception as video_error:
                 logger.error(f"Video creation failed for job {job_id}: {video_error}")
-                else:
-            logger.warning(f"No highlights found for job {job_id}")
+        else:
+            logger.warning(f"No highlights found for job {job_id}")  # Fixed syntax
                 
         # Update job status
         video_url = f"/video/{job_id}" if os.path.exists(output_video_path) else None

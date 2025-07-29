@@ -89,7 +89,7 @@ class VideoProcessor:
                 )
                 final_clips.append(highlight_clip)
                 print(f"✅ Highlight clip {i+1} added to final_clips")
-            
+                
                 # Add 1.5 second gap between highlights (except after the last one)
                 if i < len(highlights) - 1:
                     print(f"⏸️ Adding 1.5s gap after highlight {i+1}...")
@@ -173,16 +173,13 @@ class VideoProcessor:
                     
                     # CRITICAL: Create 1-second silence and prepend to TTS audio
                     from moviepy.audio.AudioClip import AudioClip
-                    silence = AudioClip(lambda t: 0, duration=1).set_fps(44100)
+                    silence = AudioClip(make_frame=lambda t: [0, 0], duration=1, fps=44100)
                     
-                    # Concatenate silence and audio cleanly
-                    from moviepy.editor import concatenate_audioclips
-                    combined = concatenate_audioclips([silence, audio_clip])
+                    # Prepend the silence to the TTS audio
+                    final_audio = CompositeAudioClip([silence, audio_clip.set_start(1)])
                     
-                    # Set the combined audio to the video and sync duration
-                    final_clip = video_clip.set_audio(combined)
-                    final_clip = final_clip.set_duration(combined.duration)
-                    
+                    # Set the new composite audio to the video
+                    final_clip = video_clip.set_audio(final_audio)
                     print(f"✅ Audio attached to highlight clip with 1-second delay")
                     return final_clip
                 except Exception as e:
@@ -229,12 +226,12 @@ class VideoProcessor:
                 
                 try:
                     # Generate TTS for this sentence
-            audio = self.tts_client["generate"](
+                    audio = self.tts_client["generate"](
                         text=sentence,
-                voice="21m00Tcm4TlvDq8ikWAM",
-                model="eleven_monolingual_v1"
-            )
-            
+                        voice="21m00Tcm4TlvDq8ikWAM",
+                        model="eleven_monolingual_v1"
+                    )
+                    
                     # Save individual sentence audio temporarily
                     temp_audio_path = f"output/audio/{clip_id}_sentence_{i}.mp3"
                     self.tts_client["save"](audio, temp_audio_path)
@@ -245,9 +242,10 @@ class VideoProcessor:
                     
                     # Add silence after each sentence (except the last one)
                     if i < len(sentences) - 1:
-                        # Create 0.4 seconds of silence using MoviePy's built-in
-                        from moviepy.audio.AudioClip import AudioClip
-                        silence_clip = AudioClip(lambda t: 0, duration=0.4).set_fps(44100)
+                        # Create 0.4 seconds of silence
+                        silence_duration = 0.4
+                        silence_clip = AudioFileClip(temp_audio_path).set_duration(silence_duration)
+                        silence_clip = silence_clip.volumex(0)  # Mute the audio to create silence
                         audio_clips.append(silence_clip)
                     
                     # Clean up temp file
@@ -261,13 +259,12 @@ class VideoProcessor:
                 print("⚠️ No audio clips generated")
                 return None
             
-            # Concatenate all audio clips using concatenate_audioclips
+            # Concatenate all audio clips (speech + silence + speech + silence...)
             print(f"🔊 Concatenating {len(audio_clips)} audio clips...")
-            from moviepy.editor import concatenate_audioclips
-            final_audio = concatenate_audioclips(audio_clips, method="compose")
+            final_audio = CompositeAudioClip(audio_clips)
             
             # Save final composite audio
-            final_audio.write_audiofile(audio_path, fps=44100, verbose=False, logger=None)
+            final_audio.write_audiofile(audio_path, verbose=False, logger=None)
             
             # Clean up audio clips
             for clip in audio_clips:
@@ -406,31 +403,31 @@ class VideoProcessor:
             card = ColorClip(size=(width, height), color=bg_color, duration=duration)
             print(f"✅ Background card created: {card.size}")
             
-            # Calculate dynamic font size - 30% bigger
-            font_size = int(width * 0.104)  # 30% bigger (was 0.08, now 0.104)
+            # Calculate dynamic font size
+            font_size = int(width * 0.08)  # 8% of frame width
             print(f"📝 Using font size: {font_size}")
             
-            # Create text clip with white color and black outline
+            # Create text clip with neon purple color
             try:
                 text_clip = TextClip(
                     text,
                     fontsize=font_size,
                     color='white',
-                    stroke_color='black',
-                    stroke_width=10,  # Thick black outline
-                    font='Montserrat-SemiBold.ttf'  
+                    stroke_color='red',
+                    stroke_width=20,
+                    font='Montserrat-SemiBold.ttf'
                 ).set_position('center').set_duration(duration)
                 print(f"✅ Text clip created: {text_clip.size}")
             except Exception as text_error:
                 print(f"⚠️ Text clip creation failed: {text_error}")
                 # Fallback to default font
-            text_clip = TextClip(
-                text,
+                text_clip = TextClip(
+                    text,
                     fontsize=font_size,
-                color='white',
-                    stroke_color='black',
-                    stroke_width=4  # Thick black outline
-            ).set_position('center').set_duration(duration)
+                    color='white',
+                    stroke_color='red',
+                    stroke_width=20
+                ).set_position('center').set_duration(duration)
                 print(f"✅ Text clip created with fallback font: {text_clip.size}")
             
             # CRITICAL: Return proper CompositeVideoClip
@@ -472,9 +469,9 @@ class VideoProcessor:
             if head_pos:
                 x, y = head_pos
                 
-                # Draw "FIGHTER" label above the pointer - 30% bigger
+                # Draw "FIGHTER" label above the pointer
                 label_text = user_name
-                label_font_size = max(260, int(w * 0.033))  # 30% bigger (was 200, now 260)
+                label_font_size = max(200, int(w * 0.25))  # Dynamic font size
                 try:
                     label_font = ImageFont.truetype("arial.ttf", label_font_size)
                 except:
@@ -487,13 +484,13 @@ class VideoProcessor:
                 label_x = x - label_width // 2
                 label_y = y - int(h * 0.1)  # 10% of frame height above pointer
                 
-                # Draw label with black outline
+                # Draw label with outline
                 draw.text(
                     (label_x, label_y),
                     label_text,
                     font=label_font,
                     fill=self.colors['white'],
-                    stroke_width=4,  # Thick black outline
+                    stroke_width=20,
                     stroke_fill=self.colors['black']
                 )
                 
@@ -519,8 +516,8 @@ class VideoProcessor:
                 # CRITICAL: Text wrapping to prevent spilling
                 wrapped_lines = textwrap.wrap(action_text, width=30)
                 
-                # Calculate font size (30% bigger than before)
-                font_size = max(130, int(w * 0.234))  # 30% bigger (was 0.18, now 0.234)
+                # Calculate font size (7% of frame width - 30% bigger than before)
+                font_size = max(100, int(w * 0.27))
                 
                 try:
                     # Try to use Montserrat Semi-Bold font
@@ -557,7 +554,7 @@ class VideoProcessor:
                         line,
                         font=font,
                         fill=self.colors['white'],
-                        stroke_width=10,  # THICK outline for perfect readability (increased from 8)
+                        stroke_width=20,  # THICK outline for perfect readability
                         stroke_fill=self.colors['black']
                     )
                     
