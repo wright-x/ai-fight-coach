@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 import mediapipe as mp
-from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips, TextClip, ColorClip, CompositeVideoClip, ImageClip
+from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips, TextClip, ColorClip, CompositeVideoClip, ImageClip, ImageSequenceClip
 from PIL import Image, ImageDraw, ImageFont
 import base64
 import tempfile
@@ -271,7 +271,7 @@ class VideoProcessor:
             # Join all clips sequentially (no overlap)
             print(f"🔊 Joining {len(audio_clips)} audio clips sequentially...")
             from moviepy.editor import concatenate_audioclips
-            final_audio = concatenate_audioclips(audio_clips, method="compose")
+            final_audio = concatenate_audioclips(audio_clips)
             
             # Save final audio as WAV at 44.1kHz
             final_audio.write_audiofile(audio_path, fps=44100, verbose=False, logger=None)

@@ -570,9 +570,11 @@ async def get_analysis(job_id: str):
 async def get_results(job_id: str, db: Session = Depends(get_db)):
     """Show results page"""
     try:
-        # Record view
-        db_service = DatabaseService(db)
-        db_service.record_job_view(job_id)
+        # Validate job_id - don't record views for invalid IDs like style.css
+        if job_id and not job_id.startswith('style.') and len(job_id) > 10:
+            # Record view only for valid job IDs
+            db_service = DatabaseService(db)
+            db_service.record_job_view(job_id)
         
         return FileResponse("static/index.html")
         
