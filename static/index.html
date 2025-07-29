@@ -2131,40 +2131,29 @@
             
             if (highlights && highlights.length > 0) {
                 highlights.forEach((highlight, index) => {
-                    console.log(`[DISPLAY] Processing highlight ${index + 1}:`, highlight);
+                    console.log('[DISPLAY] Processing highlight:', highlight);
+                    console.log('[DISPLAY] Highlight fields:', Object.keys(highlight));
+                    
+                    // Format timestamp properly
+                    const timestamp = highlight.timestamp ? formatTimestamp(highlight.timestamp) : 'N/A';
+                    
+                    // Get the best available description
+                    const description = highlight.long_text || highlight.short_text || highlight.detailed_feedback || 'No description available';
+                    
+                    // Get action required
+                    const actionRequired = highlight.action_required || 'Continue practicing';
                     
                     const card = document.createElement('div');
                     card.className = 'highlight-card';
-                    
-                    // Format timestamp properly
-                    const timestamp = highlight.timestamp || highlight.time || '00:00';
-                    const formattedTime = formatTimestamp(timestamp);
-                    console.log(`[DISPLAY] Timestamp: '${timestamp}' -> '${formattedTime}'`);
-                    
-                    // Use the correct Gemini response fields (detailed_feedback is the main field)
-                    const description = highlight.detailed_feedback || 
-                                     highlight.long_text || 
-                                     highlight.short_text || 
-                                     highlight.description ||
-                                     'Analysis completed successfully. Review the video above.';
-                    
-                    const action = highlight.action_required || 
-                                 highlight.action || 
-                                 'Continue practicing and improving your technique';
-                    
-                    console.log(`[DISPLAY] Description: ${description.substring(0, 100)}...`);
-                    console.log(`[DISPLAY] Action: ${action}`);
-                    
                     card.innerHTML = `
-                        <div class="highlight-title">Highlight ${index + 1} - ${formattedTime}</div>
+                        <div class="highlight-title">Highlight ${index + 1} - ${timestamp}</div>
                         <div class="highlight-description">${description}</div>
-                        <div class="highlight-action">Action Required: ${action}</div>
+                        <div class="highlight-action">Action Required: ${actionRequired}</div>
                     `;
                     container.appendChild(card);
                 });
                 console.log('[DISPLAY] Rendered', highlights.length, 'highlight cards');
             } else {
-                console.log('[DISPLAY] No highlights found, showing fallback');
                 // Fallback message
                 const fallbackCard = document.createElement('div');
                 fallbackCard.className = 'highlight-card';
@@ -2177,26 +2166,24 @@
                 console.log('[DISPLAY] Rendered fallback highlight card');
             }
         }
-        
-        // Helper function to format timestamp as (M:SS)
+
         function formatTimestamp(timestamp) {
-            if (!timestamp) return '(0:00)';
+            if (!timestamp) return 'N/A';
             
-            // If it's already in MM:SS format, just add parentheses
-            if (timestamp.includes(':')) {
-                return `(${timestamp})`;
+            // If it's already a formatted string like "00:03", return as is
+            if (typeof timestamp === 'string' && timestamp.includes(':')) {
+                return timestamp;
             }
             
-            // If it's a number (seconds), convert to MM:SS
-            const seconds = parseFloat(timestamp);
+            // If it's a number (seconds), convert to MM:SS format
+            const seconds = parseInt(timestamp);
             if (!isNaN(seconds)) {
                 const minutes = Math.floor(seconds / 60);
-                const remainingSeconds = Math.floor(seconds % 60);
+                const remainingSeconds = seconds % 60;
                 return `(${minutes}:${remainingSeconds.toString().padStart(2, '0')})`;
             }
             
-            // Fallback
-            return `(${timestamp})`;
+            return timestamp.toString();
         }
 
         function displayDrills(drills) {
@@ -2212,16 +2199,19 @@
             container.innerHTML = '<h2 class="section-title">Recommended Drills</h2>';
             
             if (drills && drills.length > 0) {
-            drills.forEach(drill => {
-                const card = document.createElement('div');
-                card.className = 'drill-card';
-                card.innerHTML = `
-                        <div class="drill-name">${drill.drill_name || 'Recommended Drill'}</div>
-                    <div class="drill-description">${drill.description || 'No description available'}</div>
-                        <div class="drill-problem">Fixes: ${drill.problem_it_fixes || 'General technique improvement'}</div>
-                `;
-                container.appendChild(card);
-            });
+                drills.forEach((drill, index) => {
+                    console.log('[DISPLAY] Processing drill:', drill);
+                    console.log('[DISPLAY] Drill fields:', Object.keys(drill));
+                    
+                    const card = document.createElement('div');
+                    card.className = 'drill-card';
+                    card.innerHTML = `
+                        <div class="drill-name">${drill.drill_name || drill.name || 'Recommended Drill'}</div>
+                        <div class="drill-description">${drill.description || drill.drill_description || 'No description available'}</div>
+                        <div class="drill-problem">Fixes: ${drill.problem_it_fixes || drill.fixes || 'General technique improvement'}</div>
+                    `;
+                    container.appendChild(card);
+                });
                 console.log('[DISPLAY] Rendered', drills.length, 'drill cards');
             } else {
                 // Fallback message
@@ -2250,18 +2240,21 @@
             container.innerHTML = '<h2 class="section-title">YouTube Recommendations</h2>';
             
             if (videos && videos.length > 0) {
-            videos.forEach(video => {
-                const card = document.createElement('div');
-                card.className = 'youtube-card';
+                videos.forEach((video, index) => {
+                    console.log('[DISPLAY] Processing YouTube video:', video);
+                    console.log('[DISPLAY] Video fields:', Object.keys(video));
+                    
+                    const card = document.createElement('div');
+                    card.className = 'youtube-card';
                     
                     // Extract YouTube video ID from URL
-                    const videoId = extractYouTubeId(video.url || video.youtube_url || '');
+                    const videoId = extractYouTubeId(video.url || video.youtube_url || video.link || '');
                     
                     if (videoId) {
                         // Create embedded iframe
-                card.innerHTML = `
-                            <div class="youtube-title-text">${video.title || 'Boxing Tutorial'}</div>
-                            <div class="youtube-problem">${video.problem_solved || video.problem_it_fixes || 'Learn boxing techniques'}</div>
+                        card.innerHTML = `
+                            <div class="youtube-title-text">${video.title || video.name || 'Boxing Tutorial'}</div>
+                            <div class="youtube-problem">${video.problem_solved || video.problem_it_fixes || video.description || 'Learn boxing techniques'}</div>
                             <div class="youtube-embed">
                                 <iframe width="100%" height="200" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
                             </div>
@@ -2269,10 +2262,10 @@
                     } else {
                         // Fallback to link if no valid video ID
                         card.innerHTML = `
-                            <div class="youtube-title-text">${video.title || 'Boxing Tutorial'}</div>
-                            <div class="youtube-problem">${video.problem_solved || video.problem_it_fixes || 'Learn boxing techniques'}</div>
-                    <a href="${video.url || '#'}" target="_blank" class="youtube-link">Watch Video</a>
-                `;
+                            <div class="youtube-title-text">${video.title || video.name || 'Boxing Tutorial'}</div>
+                            <div class="youtube-problem">${video.problem_solved || video.problem_it_fixes || video.description || 'Learn boxing techniques'}</div>
+                            <a href="${video.url || video.youtube_url || video.link || '#'}" target="_blank" class="youtube-link">Watch Video</a>
+                        `;
                     }
                     
                     container.appendChild(card);

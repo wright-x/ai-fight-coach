@@ -508,6 +508,15 @@ class VideoProcessor:
                     stroke_width=label_stroke_width,  # 5x thicker
                     stroke_fill=self.colors['black']
                 )
+                
+                # Draw red downward-pointing triangle arrow
+                arrow_size = 30
+                arrow_points = [
+                    (x, y - 50),  # Top point
+                    (x - arrow_size//2, y - 50 - arrow_size),  # Bottom left
+                    (x + arrow_size//2, y - 50 - arrow_size)   # Bottom right
+                ]
+                draw.polygon(arrow_points, fill=self.colors['red'])
             
             # Draw action text caption (3x bigger text, 5x thicker outline)
             if action_text:
