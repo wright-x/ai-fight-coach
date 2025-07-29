@@ -173,13 +173,16 @@ class VideoProcessor:
                     
                     # CRITICAL: Create 1-second silence and prepend to TTS audio
                     from moviepy.audio.AudioClip import AudioClip
-                    silence = AudioClip(make_frame=lambda t: [0, 0], duration=1, fps=44100)
+                    silence = AudioClip(lambda t: 0, duration=1).set_fps(44100)
                     
-                    # Prepend the silence to the TTS audio
-                    final_audio = CompositeAudioClip([silence, audio_clip.set_start(1)])
+                    # Concatenate silence and audio cleanly
+                    from moviepy.editor import concatenate_audioclips
+                    combined = concatenate_audioclips([silence, audio_clip])
                     
-                    # Set the new composite audio to the video
-                    final_clip = video_clip.set_audio(final_audio)
+                    # Set the combined audio to the video and sync duration
+                    final_clip = video_clip.set_audio(combined)
+                    final_clip = final_clip.set_duration(combined.duration)
+                    
                     print(f"✅ Audio attached to highlight clip with 1-second delay")
                     return final_clip
                 except Exception as e:
@@ -242,9 +245,9 @@ class VideoProcessor:
                     
                     # Add silence after each sentence (except the last one)
                     if i < len(sentences) - 1:
-                        # Create 0.4 seconds of silence using a silent audio clip
+                        # Create 0.4 seconds of silence using MoviePy's built-in
                         from moviepy.audio.AudioClip import AudioClip
-                        silence_clip = AudioClip(lambda t: 0, duration=0.4)
+                        silence_clip = AudioClip(lambda t: 0, duration=0.4).set_fps(44100)
                         audio_clips.append(silence_clip)
                     
                     # Clean up temp file
@@ -258,12 +261,13 @@ class VideoProcessor:
                 print("⚠️ No audio clips generated")
                 return None
             
-            # Concatenate all audio clips (speech + silence + speech + silence...)
+            # Concatenate all audio clips using concatenate_audioclips
             print(f"🔊 Concatenating {len(audio_clips)} audio clips...")
-            final_audio = CompositeAudioClip(audio_clips)
+            from moviepy.editor import concatenate_audioclips
+            final_audio = concatenate_audioclips(audio_clips, method="compose")
             
-            # Save final composite audio - use the correct method
-            final_audio.write_audiofile(audio_path, verbose=False, logger=None, fps=22050)
+            # Save final composite audio
+            final_audio.write_audiofile(audio_path, fps=44100, verbose=False, logger=None)
             
             # Clean up audio clips
             for clip in audio_clips:
