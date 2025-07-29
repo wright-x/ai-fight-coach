@@ -242,10 +242,9 @@ class VideoProcessor:
                     
                     # Add silence after each sentence (except the last one)
                     if i < len(sentences) - 1:
-                        # Create 0.4 seconds of silence
-                        silence_duration = 0.4
-                        silence_clip = AudioFileClip(temp_audio_path).set_duration(silence_duration)
-                        silence_clip = silence_clip.volumex(0)  # Mute the audio to create silence
+                        # Create 0.4 seconds of silence using a silent audio clip
+                        from moviepy.audio.AudioClip import AudioClip
+                        silence_clip = AudioClip(lambda t: 0, duration=0.4)
                         audio_clips.append(silence_clip)
                     
                     # Clean up temp file
@@ -263,8 +262,8 @@ class VideoProcessor:
             print(f"🔊 Concatenating {len(audio_clips)} audio clips...")
             final_audio = CompositeAudioClip(audio_clips)
             
-            # Save final composite audio
-            final_audio.write_audiofile(audio_path, verbose=False, logger=None)
+            # Save final composite audio - use the correct method
+            final_audio.write_audiofile(audio_path, verbose=False, logger=None, fps=22050)
             
             # Clean up audio clips
             for clip in audio_clips:
@@ -471,7 +470,7 @@ class VideoProcessor:
                 
                 # Draw "FIGHTER" label above the pointer
                 label_text = user_name
-                label_font_size = max(20, int(w * 0.025))  # Dynamic font size
+                label_font_size = max(200, int(w * 0.025))  # Dynamic font size
                 try:
                     label_font = ImageFont.truetype("arial.ttf", label_font_size)
                 except:
@@ -517,7 +516,7 @@ class VideoProcessor:
                 wrapped_lines = textwrap.wrap(action_text, width=30)
                 
                 # Calculate font size (7% of frame width - 30% bigger than before)
-                font_size = max(26, int(w * 0.07))
+                font_size = max(100, int(w * 0.07))
                 
                 try:
                     # Try to use Montserrat Semi-Bold font

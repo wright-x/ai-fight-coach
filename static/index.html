@@ -1765,8 +1765,8 @@
             .then(data => {
                 if (data.job_id) {
                     currentJobId = data.job_id;
-                    // Start the new unified polling function
-                    pollAndShowResults(data.job_id);
+                    // Start the 3-minute fake progress
+                    startFakeProgress(data.job_id);
                 } else {
                     alert('Upload failed: ' + (data.message || 'Unknown error'));
                     showPage('uploadPage');
@@ -1779,46 +1779,109 @@
             });
         }
 
-        // NEW UNIFIED FUNCTION - replaces both pollStatus and showResults
-        function pollAndShowResults(jobId) {
-            console.log(`[POLL] Checking status for job: ${jobId}`);
+        // 3-MINUTE FAKE PROGRESS SYSTEM
+        let fakeProgressInterval;
+        let fakeProgressStartTime;
+        
+        function startFakeProgress(jobId) {
+            console.log('[FAKE PROGRESS] Starting 3-minute fake progress for job:', jobId);
+            
+            fakeProgressStartTime = Date.now();
+            const totalDuration = 180000; // 3 minutes in milliseconds
+            
+            // Define the exact timing as specified by user
+            const progressSteps = [
+                { time: 0, percent: 0, text: 'Initializing AI Coach…' },
+                { time: 15, percent: 5, text: 'Importing video file' },
+                { time: 30, percent: 15, text: 'Stabilizing frames' },
+                { time: 45, percent: 25, text: 'Detecting fighter pose' },
+                { time: 60, percent: 35, text: 'Tracking joint movement' },
+                { time: 75, percent: 45, text: 'Spotting form errors' },
+                { time: 90, percent: 55, text: 'Measuring angles & speed' },
+                { time: 105, percent: 65, text: 'Comparing with pro baseline' },
+                { time: 120, percent: 75, text: 'Scoring each round' },
+                { time: 135, percent: 85, text: 'Generating corrective tips' },
+                { time: 150, percent: 95, text: 'Adding voice-over & captions' },
+                { time: 165, percent: 100, text: 'Rendering final video' },
+                { time: 180, percent: 100, text: 'Ready! Click to watch your analysis.' }
+            ];
+            
+            let currentStepIndex = 0;
+            
+            fakeProgressInterval = setInterval(() => {
+                const elapsed = (Date.now() - fakeProgressStartTime) / 1000; // seconds
+                const elapsedMs = Date.now() - fakeProgressStartTime;
+                
+                // Find current step based on elapsed time
+                let currentStep = progressSteps[0];
+                for (let i = progressSteps.length - 1; i >= 0; i--) {
+                    if (elapsed >= progressSteps[i].time) {
+                        currentStep = progressSteps[i];
+                        break;
+                    }
+                }
+                
+                // Update progress bar
+                const progressFill = document.getElementById('progressFill');
+                const progressText = document.getElementById('progressText');
+                
+                if (progressFill && progressText) {
+                    progressFill.style.width = `${currentStep.percent}%`;
+                    progressText.textContent = currentStep.text;
+                    
+                    // Update loading stages
+                    updateLoadingStages(currentStep.percent);
+                }
+                
+                // Check if we've reached the end
+                if (elapsed >= 180) {
+                    console.log('[FAKE PROGRESS] 3 minutes completed, checking real status');
+                    clearInterval(fakeProgressInterval);
+                    
+                    // Check real status and show results
+                    checkRealStatus(jobId);
+                }
+                
+                // Update step transitions every 15 seconds
+                if (elapsed >= progressSteps[currentStepIndex].time && currentStepIndex < progressSteps.length - 1) {
+                    currentStepIndex++;
+                }
+                
+            }, 100); // Update every 100ms for smooth animation
+        }
+        
+        function checkRealStatus(jobId) {
+            console.log('[REAL STATUS] Checking actual job status for:', jobId);
             
             fetch(`/status/${jobId}`)
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error(`Polling failed with status: ${response.status}`);
+                        throw new Error(`Status check failed with status: ${response.status}`);
                     }
                     return response.json();
                 })
                 .then(data => {
-                    console.log('[POLL] Status response:', data);
+                    console.log('[REAL STATUS] Response:', data);
                     
                     if (data.status === 'completed') {
-                        console.log("[POLL] SUCCESS: Job is complete. Rendering results now.");
-                        
-                        // Call the new showResults function
+                        console.log('[REAL STATUS] Job completed, showing results');
                         showResults(jobId);
-
                     } else if (data.status === 'processing') {
-                        // Update progress and poll again
-                        const progress = data.progress || 0;
-                        document.getElementById('progressFill').style.width = `${progress}%`;
-                        document.getElementById('progressText').textContent = getStageText(progress);
-                        updateLoadingStages(progress);
-                        setTimeout(() => pollAndShowResults(jobId), 2500); // Continue polling
+                        console.log('[REAL STATUS] Job still processing, continuing to poll');
+                        // Continue polling every 5 seconds
+                        setTimeout(() => checkRealStatus(jobId), 5000);
                     } else if (data.status === 'failed') {
                         alert(`Analysis failed: ${data.message || 'An unknown error occurred.'}`);
                         runAnotherAnalysis();
                     } else {
-                        console.log('[POLL] Unknown status:', data.status);
-                        // Continue polling for unknown status
-                        setTimeout(() => pollAndShowResults(jobId), 3000);
+                        console.log('[REAL STATUS] Unknown status, continuing to poll');
+                        setTimeout(() => checkRealStatus(jobId), 5000);
                     }
                 })
                 .catch(error => {
-                    console.error("[POLL] CRITICAL ERROR during polling:", error);
-                    // Keep trying a few more times before giving up
-                    setTimeout(() => pollAndShowResults(jobId), 5000);
+                    console.error('[REAL STATUS] Error:', error);
+                    // Keep trying
+                    setTimeout(() => checkRealStatus(jobId), 5000);
                 });
         }
 
