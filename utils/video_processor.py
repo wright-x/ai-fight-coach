@@ -519,25 +519,25 @@ class VideoProcessor:
                 )
                 
                 # Draw red downward-pointing triangle arrow (smaller with black outline)
-                arrow_size = 30  # Smaller arrow
+                arrow_size = 20  # Much smaller arrow (was 30)
                 arrow_points = [
-                    (x, y - 80),  # Top point
-                    (x - arrow_size//2, y - 80 - arrow_size),  # Bottom left
-                    (x + arrow_size//2, y - 80 - arrow_size)   # Bottom right
+                    (x, y - 60),  # Top point
+                    (x - arrow_size//2, y - 60 - arrow_size),  # Bottom left
+                    (x + arrow_size//2, y - 60 - arrow_size)   # Bottom right
                 ]
                 
                 # Draw black outline first
                 outline_points = [
-                    (x, y - 80),  # Top point
-                    (x - (arrow_size+6)//2, y - 80 - (arrow_size+3)),  # Bottom left
-                    (x + (arrow_size+6)//2, y - 80 - (arrow_size+3))   # Bottom right
+                    (x, y - 60),  # Top point
+                    (x - (arrow_size+4)//2, y - 60 - (arrow_size+4)),  # Bottom left
+                    (x + (arrow_size+4)//2, y - 60 - (arrow_size+4))   # Bottom right
                 ]
                 draw.polygon(outline_points, fill=self.colors['black'])
                 
                 # Draw red arrow on top
                 draw.polygon(arrow_points, fill=self.colors['red'])
             
-            # CRITICAL: Draw action text caption ONLY at the bottom
+            # CRITICAL: Draw action text caption ONLY at the bottom - COMPLETE REWRITE
             if action_text:
                 # Much bigger font size
                 font_size = max(150, int(w * 0.06))  # Much bigger font
@@ -547,33 +547,32 @@ class VideoProcessor:
                 except:
                     font = ImageFont.load_default()
                 
-                # CRITICAL: Simple text wrapping for bottom caption only
+                # CRITICAL: SIMPLE TEXT WRAPPING - NO SCATTERING
+                # Split into words and create lines that fit
                 words = action_text.split()
                 lines = []
                 current_line = ""
-                max_width = int(w * 0.85)  # 85% of frame width
+                
+                # Use a simple approach - fit as many words as possible per line
+                max_chars_per_line = 40  # Simple character limit
                 
                 for word in words:
-                    test_line = current_line + " " + word if current_line else word
-                    # Estimate text width (rough calculation)
-                    estimated_width = len(test_line) * font_size * 0.6
-                    
-                    if estimated_width > max_width:
+                    if len(current_line + " " + word) <= max_chars_per_line:
+                        current_line = current_line + " " + word if current_line else word
+                    else:
                         if current_line:
                             lines.append(current_line)
                         current_line = word
-                    else:
-                        current_line = test_line
                 
                 if current_line:
                     lines.append(current_line)
                 
-                # Calculate total text height
-                line_height = font_size * 1.3  # Good spacing
+                # CRITICAL: Tighter line spacing
+                line_height = font_size * 1.1  # Tighter spacing
                 total_text_height = len(lines) * line_height
                 
                 # CRITICAL: Position ONLY at bottom of screen
-                text_y = h - 80 - total_text_height  # 80px from bottom
+                text_y = h - 100 - total_text_height  # 100px from bottom
                 
                 # Draw each line of wrapped text at bottom only
                 for i, line in enumerate(lines):
