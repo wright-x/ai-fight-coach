@@ -101,7 +101,7 @@ class DatabaseService:
             
             logger.info(f"Created new user: {user.id}")
             return user
-    except Exception as e:
+        except Exception as e:
             logger.error(f"Error creating user: {e}")
             self.db.rollback()
             return None
@@ -120,7 +120,7 @@ class DatabaseService:
             self.db.commit()
             self.db.refresh(job)
             return job
-    except Exception as e:
+        except Exception as e:
             logger.error(f"Error creating job: {e}")
             self.db.rollback()
             raise
@@ -184,8 +184,8 @@ try:
     logger.info(f"   - VideoProcessor: {type(video_processor)}")
     logger.info(f"   - GeminiClient: {type(gemini_client)}")
     logger.info(f"   - TTSClient: {type(tts_client)}")
-        
-    except Exception as e:
+    
+except Exception as e:
     logger.error(f"❌ Component initialization failed: {e}")
     raise
 
@@ -444,7 +444,7 @@ async def upload_video(
         if not job:
             logger.error(f"Upload failed: Could not create job for user {user.id}")
             return JSONResponse({
-            "success": False,
+                "success": False,
                 "message": "Job creation failed"
             }, status_code=500)
         
@@ -477,7 +477,7 @@ async def upload_video(
         try:
             await process_video_analysis(job.id, db)
             logger.info(f"Video processing completed for job {job.id}")
-    except Exception as e:
+        except Exception as e:
             logger.error(f"Video processing failed: {e}")
             # Don't fail the upload, just log the error
         
@@ -557,7 +557,7 @@ async def get_results(job_id: str, db: Session = Depends(get_db)):
         
         return FileResponse("static/index.html")
         
-            except Exception as e:
+    except Exception as e:
         logger.error(f"Results error: {e}")
         # Return the page anyway, just don't record the view
         return FileResponse("static/index.html")
@@ -610,7 +610,7 @@ async def process_video_analysis(job_id: str, db: Session):
                 logger.info(f"Highlight video created successfully: {output_video_path}")
             except Exception as video_error:
                 logger.error(f"Video creation failed for job {job_id}: {video_error}")
-            else:
+        else:
             logger.warning(f"No highlights found for job {job_id}")
                 
         # Update job status
@@ -630,7 +630,7 @@ async def process_video_analysis(job_id: str, db: Session):
             db_service.update_job_status(job_id, "failed")
         except:
             pass
-        
+
 @app.post("/api/track-page-view")
 async def track_page_view(request: Request):
     """Track page views for analytics"""

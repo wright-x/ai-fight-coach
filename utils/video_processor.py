@@ -237,12 +237,12 @@ class VideoProcessor:
                 
                 try:
                     # Generate TTS for this sentence
-                    audio = self.tts_client["generate"](
+            audio = self.tts_client["generate"](
                         text=sentence,
-                        voice="21m00Tcm4TlvDq8ikWAM",
-                        model="eleven_monolingual_v1"
-                    )
-                    
+                voice="21m00Tcm4TlvDq8ikWAM",
+                model="eleven_monolingual_v1"
+            )
+            
                     # Save individual sentence audio temporarily
                     temp_audio_path = f"output/audio/{clip_id}_sentence_{i}.mp3"
                     self.tts_client["save"](audio, temp_audio_path)
@@ -424,7 +424,8 @@ class VideoProcessor:
                     fontsize=font_size,
                     color='white',
                     stroke_color='red',
-                    stroke_width=20
+                    stroke_width=20,
+                    font='Montserrat-SemiBold.ttf'
                 ).set_position('center').set_duration(duration)
                 print(f"✅ Text clip created: {text_clip.size}")
             except Exception as text_error:
@@ -432,12 +433,12 @@ class VideoProcessor:
                 # Fallback to default font
             text_clip = TextClip(
                 text,
-                fontsize=font_size,
+                    fontsize=font_size,
                 color='white',
-                stroke_color='red',
-                stroke_width=20
+                    stroke_color='red',
+                    stroke_width=20
             ).set_position('center').set_duration(duration)
-            print(f"✅ Text clip created with fallback font: {text_clip.size}")
+                print(f"✅ Text clip created with fallback font: {text_clip.size}")
             
             # CRITICAL: Return proper CompositeVideoClip
             final_card = CompositeVideoClip([card, text_clip])
@@ -563,8 +564,8 @@ class VideoProcessor:
                 if current_line:
                     lines.append(current_line)
                 
-                # CRITICAL: Much tighter line spacing
-                line_height = font_size * 0.9  # Even tighter spacing
+                # CRITICAL: Much tighter line spacing to prevent scattering
+                line_height = font_size * 0.8  # Much tighter spacing
                 total_text_height = len(lines) * line_height
                 
                 # CRITICAL: Position ONLY at bottom of screen
@@ -579,7 +580,7 @@ class VideoProcessor:
                     text_width = text_bbox[2] - text_bbox[0]
                     text_x = (w - text_width) // 2  # Center the text
                     
-                    # CRITICAL: Draw caption at bottom only
+                    # CRITICAL: Draw caption at bottom only with tight spacing
                     draw.text(
                         (text_x, line_y),
                         line,
