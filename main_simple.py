@@ -229,6 +229,25 @@ async def upload_page():
 async def admin_page():
     return FileResponse("static/admin.html")
 
+def create_user(db: Session, email: str, name: str = None):
+    """Create or get existing user"""
+    try:
+        # Check if user exists
+        existing_user = db.query(User).filter(User.email == email).first()
+        if existing_user:
+            return existing_user
+        
+        # Create new user
+        new_user = User(email=email)
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        return new_user
+    except Exception as e:
+        db.rollback()
+        print(f"Error creating user: {e}")
+        raise e
+
 @app.post("/api/register")
 async def register_user(request: Request):
     try:
@@ -240,7 +259,7 @@ async def register_user(request: Request):
             return JSONResponse({"success": False, "message": "Name and email required"})
         
         # Create or update user in database
-        db = get_db()
+        db = next(get_db())
         user = create_user(db, email, name)
         
         return JSONResponse({
