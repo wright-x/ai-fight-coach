@@ -237,12 +237,12 @@ class VideoProcessor:
                 
                 try:
                     # Generate TTS for this sentence
-            audio = self.tts_client["generate"](
+                    audio = self.tts_client["generate"](
                         text=sentence,
-                voice="21m00Tcm4TlvDq8ikWAM",
-                model="eleven_monolingual_v1"
-            )
-            
+                        voice="21m00Tcm4TlvDq8ikWAM",
+                        model="eleven_monolingual_v1"
+                    )
+                    
                     # Save individual sentence audio temporarily
                     temp_audio_path = f"output/audio/{clip_id}_sentence_{i}.mp3"
                     self.tts_client["save"](audio, temp_audio_path)
@@ -433,12 +433,12 @@ class VideoProcessor:
                 # Fallback to default font
             text_clip = TextClip(
                 text,
-                    fontsize=font_size,
+                fontsize=font_size,
                 color='white',
-                    stroke_color='red',
-                    stroke_width=20
+                stroke_color='red',
+                stroke_width=20
             ).set_position('center').set_duration(duration)
-                print(f"✅ Text clip created with fallback font: {text_clip.size}")
+            print(f"✅ Text clip created with fallback font: {text_clip.size}")
             
             # CRITICAL: Return proper CompositeVideoClip
             final_card = CompositeVideoClip([card, text_clip])
