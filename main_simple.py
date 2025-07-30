@@ -217,94 +217,40 @@ def verify_admin_token(request: Request):
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
-# Root page - Registration
-@app.get("/", response_class=HTMLResponse)
-async def read_root():
-    return FileResponse("static/register.html")
-
-# Main upload page
-@app.get("/main", response_class=HTMLResponse)
-async def main_page():
+@app.get("/")
+async def root():
     return FileResponse("static/index.html")
 
-# Registration endpoint
-@app.post("/register")
-async def register_user(request: Request, db: Session = Depends(get_db)):
-    """Register a new user"""
+@app.get("/upload")
+async def upload_page():
+    return FileResponse("static/index.html")
+
+@app.get("/admin")
+async def admin_page():
+    return FileResponse("static/admin.html")
+
+@app.post("/api/register")
+async def register_user(request: Request):
     try:
-        logger.info("Registration attempt started")
-        
         body = await request.json()
-        name = body.get("name", "Anonymous")  # Default name since column doesn't exist
+        name = body.get("name")
         email = body.get("email")
         
-        logger.info(f"Registration data: name={name}, email={email}")
+        if not name or not email:
+            return JSONResponse({"success": False, "message": "Name and email required"})
         
-        if not email:
-            logger.error("Registration failed: Missing email")
-            raise HTTPException(status_code=400, detail="Email is required")
+        # Create or update user in database
+        db = get_db()
+        user = create_user(db, email, name)
         
-        # Test database connection
-        try:
-            db.execute(text("SELECT 1"))
-            logger.info("Database connection successful")
-        except Exception as db_error:
-            logger.error(f"Database connection failed: {db_error}")
-            return JSONResponse({
-                "success": False,
-                "message": "Database connection failed. Please try again."
-            })
-        
-        db_service = DatabaseService(db)
-        user = db_service.create_user(email=email, name=name)
-        
-        if not user:
-            logger.error(f"User creation failed for email: {email}")
-            return JSONResponse({
-                "success": False,
-                "message": "Database error. Please try again."
-            })
-        
-        logger.info(f"User processed successfully: {user.id}")
-        
-        # Set cookies for 30 days (for both new and existing users)
-        response = JSONResponse({
-            "success": True,
-            "message": f"Welcome {name}! Your account is ready."
-        })
-        
-        response.set_cookie(
-            key="user_email",
-            value=email,
-            max_age=2592000,  # 30 days
-            path="/"
-        )
-        response.set_cookie(
-            key="user_name", 
-            value=name,
-            max_age=2592000,
-            path="/"
-        )
-        response.set_cookie(
-            key="user_registered",
-            value="true",
-            max_age=2592000,
-            path="/"
-        )
-        
-        logger.info("Registration completed successfully")
-        return response
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Registration error: {e}")
-        import traceback
-        logger.error(f"Full traceback: {traceback.format_exc()}")
         return JSONResponse({
-            "success": False,
-            "message": "Registration failed. Please try again."
+            "success": True, 
+            "message": "Registration successful",
+            "user_id": user.id
         })
+    except Exception as e:
+        print(f"Registration error: {e}")
+        return JSONResponse({"success": False, "message": str(e)})
 
 # Admin dashboard
 @app.get("/admin", response_class=HTMLResponse)

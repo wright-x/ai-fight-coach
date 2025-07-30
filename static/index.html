@@ -1724,9 +1724,118 @@
         </div>
     </div>
 
+    <!-- Registration Modal -->
+    <div id="registrationModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Complete Your Registration</h3>
+            <p>Please enter your details to view your analysis results:</p>
+            <form id="registrationForm">
+                <input type="text" id="userName" placeholder="Your Name" required>
+                <input type="email" id="userEmail" placeholder="Your Email" required>
+                <button type="submit">Submit</button>
+            </form>
+        </div>
+    </div>
+
+    <style>
+        /* Registration Modal Styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid rgba(220, 20, 60, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            color: white;
+        }
+
+        .modal-content h3 {
+            color: #dc143c;
+            margin-bottom: 15px;
+        }
+
+        .modal-content p {
+            margin-bottom: 20px;
+            color: #cccccc;
+        }
+
+        .modal-content input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid rgba(220, 20, 60, 0.3);
+            border-radius: 8px;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: white;
+            font-size: 1rem;
+        }
+
+        .modal-content input::placeholder {
+            color: #cccccc;
+        }
+
+        .modal-content button {
+            background: linear-gradient(135deg, #dc143c 0%, #8b0000 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin-top: 15px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .modal-content button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(220, 20, 60, 0.5);
+        }
+    </style>
+
     <script>
         let selectedAnalysisType = 'everything';
+        let currentJobId = null;
         let selectedFeedbackRating = null;
+
+        // Cookie helper functions
+        function setCookie(name, value, days) {
+            const expires = new Date();
+            expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+            document.cookie = name + "=" + value + ";expires=" + expires.toUTCString() + ";path=/";
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for(let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+
+        // Check for existing registration on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const userRegistered = getCookie("userRegistered");
+            if (userRegistered) {
+                console.log("User already registered");
+            }
+        });
 
         // Analysis option selection
         document.querySelectorAll('.analysis-option').forEach(option => {
@@ -1995,7 +2104,7 @@
         }
 
         function runAnotherAnalysis() {
-            // Redirect to main page instead of upload page
+            // Redirect to root page instead of upload page
             window.location.href = '/';
         }
 
@@ -2094,6 +2203,58 @@
         
         // Function to show results (called from initialization or redirect)
         function showResults(jobId) {
+            // Check if user is registered
+            const userRegistered = getCookie("userRegistered");
+            
+            if (!userRegistered) {
+                // Show registration modal
+                showRegistrationModal(jobId);
+                return;
+            }
+            
+            // Proceed with normal results display
+            displayResults(jobId);
+        }
+
+        function showRegistrationModal(jobId) {
+            const modal = document.getElementById("registrationModal");
+            modal.style.display = "flex";
+            
+            // Handle form submission
+            document.getElementById("registrationForm").onsubmit = async (e) => {
+                e.preventDefault();
+                
+                const name = document.getElementById("userName").value;
+                const email = document.getElementById("userEmail").value;
+                
+                try {
+                    const response = await fetch("/api/register", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({name, email})
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Set cookie for 1 year
+                        setCookie("userRegistered", "true", 365);
+                        setCookie("userName", name, 365);
+                        setCookie("userEmail", email, 365);
+                        
+                        // Hide modal and show results
+                        modal.style.display = "none";
+                        displayResults(jobId);
+                    } else {
+                        alert("Registration failed: " + data.message);
+                    }
+                } catch (error) {
+                    alert("Registration failed. Please try again.");
+                }
+            };
+        }
+
+        function displayResults(jobId) {
             console.log('[SHOWRESULTS] Starting results display for job:', jobId);
             
             // Set the video source
@@ -2109,15 +2270,15 @@
             // Fetch and display analysis data
             console.log('[SHOWRESULTS] Fetching analysis data from:', `/analysis/${jobId}`);
             fetch(`/analysis/${jobId}`)
-            .then(response => {
+                .then(response => {
                     console.log('[SHOWRESULTS] Analysis response status:', response.status);
                     console.log('[SHOWRESULTS] Analysis response headers:', response.headers);
                     if (!response.ok) {
                         throw new Error(`Analysis fetch failed: ${response.status} ${response.statusText}`);
                     }
-                return response.json();
-            })
-            .then(data => {
+                    return response.json();
+                })
+                .then(data => {
                     console.log('[SHOWRESULTS] Analysis data received:', data);
                     console.log('[SHOWRESULTS] Data type:', typeof data);
                     console.log('[SHOWRESULTS] Highlights count:', data.highlights ? data.highlights.length : 0);
@@ -2127,15 +2288,15 @@
                     }
                     
                     // Display highlights
-                displayHighlights(data.highlights || []);
+                    displayHighlights(data.highlights || []);
                     
                     // Display drills
-                displayDrills(data.recommended_drills || []);
+                    displayDrills(data.recommended_drills || []);
                     
                     // Display YouTube recommendations
-                displayYouTube(data.youtube_recommendations || []);
-            })
-            .catch(error => {
+                    displayYouTube(data.youtube_recommendations || []);
+                })
+                .catch(error => {
                     console.error('[SHOWRESULTS] Error loading analysis:', error);
                     console.error('[SHOWRESULTS] Error details:', error.message);
                     // Show fallback content
