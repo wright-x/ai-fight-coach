@@ -1928,6 +1928,30 @@
             document.getElementById('resultsPage').style.display = 'none';
         }
 
+        // Function to track page views
+        function trackPageView(pageName) {
+            const userEmail = getCookie('user_email') || 'anonymous';
+            
+            fetch('/api/track-page-view', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    page_name: pageName,
+                    user_email: userEmail
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Page view tracked:', data);
+            })
+            .catch(error => {
+                console.error('Error tracking page view:', error);
+            });
+        }
+
+        // Track page views when pages are shown
         function showPage(pageId) {
             console.log('showPage called with pageId:', pageId);
             document.querySelectorAll('.page').forEach(page => {
@@ -1938,6 +1962,9 @@
             console.log('Target page element:', targetPage);
             targetPage.classList.add('active');
             console.log('Added active to page:', pageId);
+            
+            // Track page view
+            trackPageView(pageId);
         }
 
         function downloadVideo() {

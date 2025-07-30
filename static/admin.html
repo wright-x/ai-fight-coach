@@ -182,6 +182,50 @@
             color: #fca5a5;
         }
 
+        .analytics-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .analytics-section h3 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #fca5a5;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .analytics-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .analytics-card h4 {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: #fca5a5;
+        }
+
+        .stats-content {
+            font-size: 1.1rem;
+            opacity: 0.8;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -283,6 +327,31 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Page Analytics Section -->
+            <div class="analytics-section">
+                <h3>📊 Page Analytics</h3>
+                <div class="analytics-grid">
+                    <div class="analytics-card">
+                        <h4>Page Views</h4>
+                        <div id="pageViewsStats" class="stats-content">
+                            <p>Loading...</p>
+                        </div>
+                    </div>
+                    <div class="analytics-card">
+                        <h4>Conversion Rates</h4>
+                        <div id="conversionRates" class="stats-content">
+                            <p>Loading...</p>
+                        </div>
+                    </div>
+                    <div class="analytics-card">
+                        <h4>Recent Activity (24h)</h4>
+                        <div id="recentViews" class="stats-content">
+                            <p>Loading...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -312,7 +381,8 @@
             await Promise.all([
                 loadStats(),
                 loadUsers(),
-                loadJobs()
+                loadJobs(),
+                loadPageAnalytics() // Load page analytics
             ]);
         }
 
@@ -381,6 +451,87 @@
                 document.getElementById('jobsLoading').style.display = 'none';
                 document.getElementById('jobsError').textContent = 'Failed to load jobs';
                 document.getElementById('jobsError').style.display = 'block';
+            }
+        }
+
+        // Load page analytics
+        async function loadPageAnalytics() {
+            try {
+                const response = await fetch('/api/admin/page-analytics', {
+                    headers: {
+                        'Authorization': adminToken
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load page analytics');
+                }
+                
+                const data = await response.json();
+                
+                // Display page views stats
+                const pageViewsStats = document.getElementById('pageViewsStats');
+                if (data.page_stats && data.page_stats.length > 0) {
+                    let pageViewsHtml = '';
+                    data.page_stats.forEach(page => {
+                        pageViewsHtml += `
+                            <div style="margin-bottom: 10px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 5px;">
+                                <strong>${page.page_name}</strong><br>
+                                Views: ${page.views} | Users: ${page.unique_users} | IPs: ${page.unique_ips}
+                            </div>
+                        `;
+                    });
+                    pageViewsStats.innerHTML = pageViewsHtml;
+                } else {
+                    pageViewsStats.innerHTML = '<p>No page views recorded yet</p>';
+                }
+                
+                // Display conversion rates
+                const conversionRates = document.getElementById('conversionRates');
+                if (data.conversion_rates) {
+                    const rates = data.conversion_rates;
+                    conversionRates.innerHTML = `
+                        <div style="margin-bottom: 10px;">
+                            <strong>Total Views:</strong> ${rates.total_views}
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <strong>Total Signups:</strong> ${rates.total_signups}
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <strong>Total Uploads:</strong> ${rates.total_uploads}
+                        </div>
+                        <div style="margin-bottom: 10px; color: #fca5a5;">
+                            <strong>Signup Rate:</strong> ${rates.signup_rate}%
+                        </div>
+                        <div style="margin-bottom: 10px; color: #fca5a5;">
+                            <strong>Upload Rate:</strong> ${rates.upload_rate}%
+                        </div>
+                    `;
+                } else {
+                    conversionRates.innerHTML = '<p>No conversion data available</p>';
+                }
+                
+                // Display recent views
+                const recentViews = document.getElementById('recentViews');
+                if (data.recent_views && data.recent_views.length > 0) {
+                    let recentHtml = '';
+                    data.recent_views.forEach(page => {
+                        recentHtml += `
+                            <div style="margin-bottom: 8px; padding: 5px; background: rgba(255,255,255,0.1); border-radius: 3px;">
+                                <strong>${page.page_name}</strong>: ${page.views} views
+                            </div>
+                        `;
+                    });
+                    recentViews.innerHTML = recentHtml;
+                } else {
+                    recentViews.innerHTML = '<p>No recent activity</p>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading page analytics:', error);
+                document.getElementById('pageViewsStats').innerHTML = '<p>Failed to load page analytics</p>';
+                document.getElementById('conversionRates').innerHTML = '<p>Failed to load conversion rates</p>';
+                document.getElementById('recentViews').innerHTML = '<p>Failed to load recent views</p>';
             }
         }
 

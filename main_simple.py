@@ -58,6 +58,16 @@ class JobView(Base):
     user_agent = Column(String, nullable=True)
     # job = relationship("Job", back_populates="views")  # Temporarily disabled - relationship error
 
+class PageView(Base):
+    __tablename__ = "page_views"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    page_name = Column(String, nullable=False)
+    user_email = Column(String, nullable=False)
+    ip_address = Column(String, nullable=False)
+    user_agent = Column(String, nullable=False)
+    viewed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
 # Create tables
 Base.metadata.create_all(bind=engine)
 
@@ -654,6 +664,107 @@ async def process_video_analysis(job_id: str, db: Session):
             db_service.update_job_status(job_id, "failed")
         except:
             pass
+
+@app.post("/api/track-page-view")
+async def track_page_view(request: Request):
+    """Track page views for analytics"""
+    try:
+        # Get page name from request body
+        body = await request.json()
+        page_name = body.get("page_name", "unknown")
+        user_email = body.get("user_email", "anonymous")
+        
+        # Get client IP and user agent
+        client_ip = request.client.host
+        user_agent = request.headers.get("user-agent", "unknown")
+        
+        # Insert page view into database
+        db = get_db()
+        db.execute(text("""
+            INSERT INTO page_views (page_name, user_email, ip_address, user_agent, viewed_at)
+            VALUES (:page_name, :user_email, :ip_address, :user_agent, NOW())
+        """), {
+            "page_name": page_name,
+            "user_email": user_email,
+            "ip_address": client_ip,
+            "user_agent": user_agent
+        })
+        db.commit()
+        
+        return {"success": True, "message": "Page view tracked"}
+        
+    except Exception as e:
+        print(f"Error tracking page view: {e}")
+        return {"success": False, "message": "Failed to track page view"}
+
+@app.get("/api/admin/page-analytics")
+async def get_page_analytics(request: Request):
+    """Get page view analytics for admin dashboard"""
+    try:
+        # Verify admin token
+        token = request.headers.get("Authorization")
+        if not verify_admin_token(token):
+            return {"error": "Unauthorized"}
+        
+        db = get_db()
+        
+        # Get page view statistics
+        page_stats = db.execute(text("""
+            SELECT 
+                page_name,
+                COUNT(*) as views,
+                COUNT(DISTINCT user_email) as unique_users,
+                COUNT(DISTINCT ip_address) as unique_ips
+            FROM page_views 
+            GROUP BY page_name
+            ORDER BY views DESC
+        """)).fetchall()
+        
+        # Get conversion rates
+        total_views = db.execute(text("SELECT COUNT(*) FROM page_views")).scalar()
+        total_signups = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
+        total_uploads = db.execute(text("SELECT COUNT(*) FROM jobs")).scalar()
+        
+        # Calculate conversion rates
+        signup_rate = (total_signups / total_views * 100) if total_views > 0 else 0
+        upload_rate = (total_uploads / total_views * 100) if total_views > 0 else 0
+        
+        # Get recent page views (last 24 hours)
+        recent_views = db.execute(text("""
+            SELECT page_name, COUNT(*) as views
+            FROM page_views 
+            WHERE viewed_at > NOW() - INTERVAL '24 hours'
+            GROUP BY page_name
+            ORDER BY views DESC
+        """)).fetchall()
+        
+        return {
+            "page_stats": [
+                {
+                    "page_name": row.page_name,
+                    "views": row.views,
+                    "unique_users": row.unique_users,
+                    "unique_ips": row.unique_ips
+                } for row in page_stats
+            ],
+            "conversion_rates": {
+                "total_views": total_views,
+                "total_signups": total_signups,
+                "total_uploads": total_uploads,
+                "signup_rate": round(signup_rate, 2),
+                "upload_rate": round(upload_rate, 2)
+            },
+            "recent_views": [
+                {
+                    "page_name": row.page_name,
+                    "views": row.views
+                } for row in recent_views
+            ]
+        }
+        
+    except Exception as e:
+        print(f"Error getting page analytics: {e}")
+        return {"error": "Failed to get analytics"}
 
 if __name__ == "__main__":
     import uvicorn
