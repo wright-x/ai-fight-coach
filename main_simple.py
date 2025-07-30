@@ -258,9 +258,10 @@ async def register_user(request: Request):
         if not name or not email:
             return JSONResponse({"success": False, "message": "Name and email required"})
         
-        # Create or update user in database
+        # Create or update user in database using DatabaseService
         db = next(get_db())
-        user = create_user(db, email, name)
+        db_service = DatabaseService(db)
+        user = db_service.create_user(email=email, name=name)
         
         return JSONResponse({
             "success": True, 
