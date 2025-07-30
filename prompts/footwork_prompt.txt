@@ -53,15 +53,6 @@ RULES:
    - Use the exact title and URL from the database
 
 AVAILABLE VIDEOS (Choose 2-3 that best fit the problems identified):
-- "LEARN Boxing Footwork (In 7 Minutes!!)" - https://www.youtube.com/watch?v=DD9w2ZDdGN4
-- "Boxing Footwork Drills | Basic‑Intermediate‑Advanced" - https://www.youtube.com/watch?v=gb8PmOsTRfk
-- "The Pivot Drill – Create Angles in All Directions" - https://www.youtube.com/watch?v=YHF-u7YlEag
-- "How Vasyl Lomachenko Creates Angles in Boxing" - https://www.youtube.com/watch?v=PvxuT6DDic4
-- "Beginner Footwork Drills for Boxing" - https://www.youtube.com/watch?v=VP5Ng9zAWGI
-- "Shift Drill – Create Angles & Balance" - https://www.youtube.com/watch?v=inm9XaTwlRc
-- "#1 Boxing Footwork Drill for Beginners" - https://www.youtube.com/watch?v=v0y86288Wt0
-- "Agility‑Ladder Footwork & Mittwork Drills" - https://www.youtube.com/watch?v=tdYRCl-3Ohk
-- "Create Angles – Partner Drill" - https://www.youtube.com/watch?v=G8UkR55LJSA
 - "Vasyl Lomachenko Footwork – Creating Angles" - https://www.youtube.com/watch?v=W5a5VZ10uwE
 - "Advanced Boxing Footwork | Shift & Create Angles" - https://www.youtube.com/watch?v=o4e7HTjYS3o
 - "Step Forward & Back – Beginner Friendly" - https://www.youtube.com/watch?v=b4MewFdpwoA

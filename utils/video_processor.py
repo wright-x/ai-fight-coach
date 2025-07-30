@@ -89,7 +89,7 @@ class VideoProcessor:
                 )
                 final_clips.append(highlight_clip)
                 print(f"✅ Highlight clip {i+1} added to final_clips")
-                
+            
                 # Add 1.5 second gap between highlights (except after the last one)
                 if i < len(highlights) - 1:
                     print(f"⏸️ Adding 1.5s gap after highlight {i+1}...")
@@ -424,21 +424,20 @@ class VideoProcessor:
                     fontsize=font_size,
                     color='white',
                     stroke_color='red',
-                    stroke_width=20,
-                    font='Montserrat-SemiBold.ttf'
+                    stroke_width=20
                 ).set_position('center').set_duration(duration)
                 print(f"✅ Text clip created: {text_clip.size}")
             except Exception as text_error:
                 print(f"⚠️ Text clip creation failed: {text_error}")
                 # Fallback to default font
-                text_clip = TextClip(
-                    text,
-                    fontsize=font_size,
-                    color='white',
-                    stroke_color='red',
-                    stroke_width=20
-                ).set_position('center').set_duration(duration)
-                print(f"✅ Text clip created with fallback font: {text_clip.size}")
+            text_clip = TextClip(
+                text,
+                fontsize=font_size,
+                color='white',
+                stroke_color='red',
+                stroke_width=20
+            ).set_position('center').set_duration(duration)
+            print(f"✅ Text clip created with fallback font: {text_clip.size}")
             
             # CRITICAL: Return proper CompositeVideoClip
             final_card = CompositeVideoClip([card, text_clip])
@@ -544,11 +543,8 @@ class VideoProcessor:
                 
                 try:
                     font = ImageFont.truetype("arial.ttf", font_size)
-                except:
+                except Exception:
                     font = ImageFont.load_default()
-                
-                # CRITICAL: SIMPLE TEXT WRAPPING - NO SCATTERING
-                # Split into words and create lines that fit
                 words = action_text.split()
                 lines = []
                 current_line = ""
@@ -567,12 +563,12 @@ class VideoProcessor:
                 if current_line:
                     lines.append(current_line)
                 
-                # CRITICAL: Tighter line spacing
-                line_height = font_size * 1.1  # Tighter spacing
+                # CRITICAL: Much tighter line spacing
+                line_height = font_size * 0.9  # Even tighter spacing
                 total_text_height = len(lines) * line_height
                 
                 # CRITICAL: Position ONLY at bottom of screen
-                text_y = h - 100 - total_text_height  # 100px from bottom
+                text_y = h - 80 - total_text_height  # 80px from bottom
                 
                 # Draw each line of wrapped text at bottom only
                 for i, line in enumerate(lines):
@@ -666,7 +662,7 @@ class VideoProcessor:
                 return result
             except ValueError:
                 print(f"⚠️ Could not parse timestamp '{timestamp_str}', using 0")
-                return 0
+            return 0
                 
         except Exception as e:
             print(f"❌ Timestamp parsing error: {e}")

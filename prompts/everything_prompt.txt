@@ -50,33 +50,6 @@ CRITICAL: For each highlight, provide both:
 
 Choose 2-3 videos from this curated database that specifically address the fighter's main problems:
 
-**Everything/General Videos:**
-1. https://www.youtube.com/watch?v=OggpZ2-2vWY - Complete Boxing Fundamentals
-2. https://www.youtube.com/watch?v=JKOF54zXHJU - Boxing Basics for Beginners
-3. https://www.youtube.com/watch?v=CTKFqfG7ESs - Advanced Boxing Techniques
-4. https://www.youtube.com/watch?v=tz7mN3smj8o - Boxing Footwork Masterclass
-5. https://www.youtube.com/watch?v=melissadinwiddie.com/video-subtitles/ - Boxing Defense Techniques
-
-**Defense/Head Movement Videos:**
-6. https://www.youtube.com/watch?v=defense1 - Head Movement Drills
-7. https://www.youtube.com/watch?v=defense2 - Guard Position Training
-8. https://www.youtube.com/watch?v=defense3 - Defensive Footwork
-9. https://www.youtube.com/watch?v=defense4 - Blocking Techniques
-10. https://www.youtube.com/watch?v=defense5 - Slipping and Rolling
-
-**Punch Techniques Videos:**
-11. https://www.youtube.com/watch?v=punch1 - Jab Technique
-12. https://www.youtube.com/watch?v=punch2 - Cross Punch
-13. https://www.youtube.com/watch?v=punch3 - Hook Punch
-14. https://www.youtube.com/watch?v=punch4 - Uppercut Technique
-15. https://www.youtube.com/watch?v=punch5 - Combination Punches
-
-**Footwork Videos:**
-16. https://www.youtube.com/watch?v=footwork1 - Basic Footwork
-17. https://www.youtube.com/watch?v=footwork2 - Advanced Movement
-18. https://www.youtube.com/watch?v=footwork3 - Pivot Techniques
-19. https://www.youtube.com/watch?v=footwork4 - Lateral Movement
-20. https://www.youtube.com/watch?v=footwork5 - Ring Generalship
 
 
   {"title": "Slip, Jab, Slip … wrong way?! #boxingtraining #boxing #shorts", "url": "https://www.youtube.com/watch?v=ejx5YEx2PUk"},

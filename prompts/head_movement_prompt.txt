@@ -53,28 +53,7 @@ RULES:
    - Use the exact title and URL from the database
 
 AVAILABLE VIDEOS (Choose 2-3 that best fit the problems identified):
-- "SALBOX BOXING: 10 DEFENCE DRILLS" - https://www.youtube.com/watch?v=uAJMaA-1Ues
-- "Most Important Boxing Defense and Footwork Drill You Need" - https://www.youtube.com/watch?v=7CrfZs072AM
-- "Parry Blocks For Straight Punches | FightCamp" - https://www.youtube.com/watch?v=LkwuBRPX0jM
-- "Learn How to Slip Punches (Beginner Friendly)" - https://www.youtube.com/watch?v=i17tNtv8N2I
-- "Boxing Defensive Drills (Partner)" - https://www.youtube.com/watch?v=xM1y54QnfGA
-- "MIKE TYSON SLIP BAG DRILL | BOXING DRILLS" - https://www.youtube.com/watch?v=o4_53lQS3Pk
-- "Boxing Tips – How to Parry a Jab | Jeff Mayweather" - https://www.youtube.com/watch?v=7i8chGjr-h4
-- "Slip Line | Improve Head Movement and Boxing Technique" - https://www.youtube.com/watch?v=k2M_aDFbFOw
-- "5 BOXING DEFENSES FOR BEGINNERS" - https://www.youtube.com/watch?v=YX7o-fYL7zo
-- "How To Slip Punches | Beginner Boxing Defense Training" - https://www.youtube.com/watch?v=-cfSa-gBxtc
-- "Boxing Defense Drill | Improve Reaction & Focus" - https://www.youtube.com/watch?v=SlJIsVUMgiU
-- "Common Boxing Defense Mistakes" - https://www.youtube.com/watch?v=iwIUX_b9gog
-- "The Four Types of Parrying Techniques" - https://www.youtube.com/watch?v=bB41KDUTPjI
-- "How To Block Punches In Boxing | Step‑by‑Step" - https://www.youtube.com/watch?v=_wlSoYWIrbI
-- "Heavy‑Bag Drill for Head Movement" - https://www.youtube.com/watch?v=q5bIDXwrgEA
-- "5 Common Boxing Defense Mistakes You Need to Fix" - https://www.youtube.com/watch?v=fkjlufTqJIs
-- "How To SLIP Punches FASTER in BOXING" - https://www.youtube.com/watch?v=DOWc7NMSuEQ
-- "Blocking & Parrying Masterclass – Anthony Crolla" - https://www.youtube.com/watch?v=-ENwP_Ypsyw
-- "How To Block A Punch | Defensive Blocking Drill" - https://www.youtube.com/watch?v=x4LzZ3BxP7k
-- "Head‑Movement & Pivot Shadowboxing Drill" - https://www.youtube.com/watch?v=D-ZSdz1C5jk
-- "5 Common Boxing DEFENSE Mistakes (World Class Boxing)" - https://www.youtube.com/watch?v=6-mMsvNh3WY
-- "Amazing Boxing Drill for Slipping Punches" - https://www.youtube.com/watch?v=lZNQqVFKwOM
+
 - "Uncommon Ways to Parry Punches" - https://www.youtube.com/watch?v=buIxGxHhzDs
 - "Best Time to Use Each Boxing Defense" - https://www.youtube.com/watch?v=67rhB2RdQI4
 - "Partner Drill – Parry, Weave, Roll, Block & Slip" - https://www.youtube.com/watch?v=bdJU76Wtj8A
