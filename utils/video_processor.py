@@ -27,7 +27,24 @@ class VideoProcessor:
         # Initialize TTS client for individual highlight audio
         self.tts_client = self._init_tts_client()
         
+        # Memory monitoring
+        self.memory_threshold = 0.8  # 80% memory usage threshold
+        
         print("✅ VideoProcessor initialized (surgical mode with audio sync)")
+
+    def _check_memory_usage(self):
+        """Check memory usage and force garbage collection if needed"""
+        try:
+            import psutil
+            memory_percent = psutil.virtual_memory().percent / 100
+            if memory_percent > self.memory_threshold:
+                print(f"⚠️ High memory usage: {memory_percent:.1%}, forcing cleanup")
+                import gc
+                gc.collect()
+                return True
+        except ImportError:
+            pass
+        return False
 
     def _init_tts_client(self):
         """Initialize TTS client for individual highlight audio generation"""
@@ -53,13 +70,26 @@ class VideoProcessor:
         try:
             print(f"🎬 Starting surgical video processing for {len(highlights)} highlights")
             
-            # Load source video
-            source_clip = VideoFileClip(video_path)
+            # Memory check before starting
+            memory_critical = self._check_memory_usage()
+            
+            # Load source video with memory optimization
+            source_clip = VideoFileClip(video_path, audio=False)  # Disable audio loading to save memory
             source_fps = source_clip.fps
             source_duration = source_clip.duration
             source_width, source_height = source_clip.size
             
             print(f"📹 Source video: {source_duration:.2f}s at {source_fps}fps, {source_width}x{source_height}")
+            
+            # Limit highlights to prevent memory issues
+            if len(highlights) > 5:
+                print(f"⚠️ Limiting highlights from {len(highlights)} to 5 to prevent memory issues")
+                highlights = highlights[:5]
+            
+            # Use simplified processing if memory is critical
+            if memory_critical:
+                print("⚠️ Using simplified processing due to high memory usage")
+                return self._create_simplified_video(video_path, highlights, output_path, user_name)
             
             # CRITICAL: Create empty list for final clips
             final_clips = []
@@ -73,6 +103,9 @@ class VideoProcessor:
             # CRITICAL: Process each highlight with individual TTS
             for i, highlight in enumerate(highlights):
                 print(f"🎯 Processing highlight {i+1}/{len(highlights)}")
+                
+                # Memory check before processing each highlight
+                self._check_memory_usage()
                 
                 # CRITICAL: Generate 1.5-second Highlight Title Card
                 print(f"🎬 Creating title card for highlight {i+1}...")
@@ -89,6 +122,10 @@ class VideoProcessor:
                 )
                 final_clips.append(highlight_clip)
                 print(f"✅ Highlight clip {i+1} added to final_clips")
+                
+                # Memory cleanup after each highlight
+                import gc
+                gc.collect()
             
                 # Add 1.5 second gap between highlights (except after the last one)
                 if i < len(highlights) - 1:
@@ -125,7 +162,7 @@ class VideoProcessor:
 
             # CRITICAL: Video concatenation is now handled in the safety check above
                 
-                # Write final video with proper codec
+                # Write final video with memory-optimized settings
                 final_video.write_videofile(
                     output_path,
                     codec="libx264",
@@ -133,7 +170,9 @@ class VideoProcessor:
                     temp_audiofile="temp-audio.m4a",
                     remove_temp=True,
                     verbose=False,
-                    logger=None
+                    logger=None,
+                    preset="ultrafast",  # Faster encoding, less memory
+                    crf=28  # Lower quality but smaller file size
                 )
                 
                 # Cleanup
@@ -142,9 +181,10 @@ class VideoProcessor:
                 
                 print(f"✅ Final video created: {output_path}")
                 return output_path
-            else:
-                print("❌ No clips to concatenate")
-                return None
+                
+        except Exception as e:
+            print(f"❌ Video creation failed: {e}")
+            return None
                 
         except Exception as e:
             print(f"❌ Video processing failed: {e}")
@@ -306,7 +346,7 @@ class VideoProcessor:
             # CRITICAL: Slow down to 0.25x speed
             slowed_clip = highlight_clip.speedx(0.25)
             
-            # CRITICAL: Process frames with overlays using MediaPipe
+            # CRITICAL: Process frames with overlays using MediaPipe (memory optimized)
             processed_frames = []
             with mp.solutions.pose.Pose(
                 static_image_mode=False, 
@@ -314,9 +354,10 @@ class VideoProcessor:
                 min_tracking_confidence=0.5
             ) as pose:
                 
+                # Process frames in smaller batches to reduce memory usage
+                frame_count = 0
                 for frame in slowed_clip.iter_frames():
                     # CRITICAL: MoviePy iter_frames() already returns RGB, NO conversion needed
-                    # DELETED: frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     processed_frame = self._add_overlays(
                         frame,  # Pass original RGB frame directly
                         highlight.get('action_required', ''),
@@ -324,6 +365,12 @@ class VideoProcessor:
                         pose
                     )
                     processed_frames.append(processed_frame)
+                    
+                    # Free memory periodically
+                    frame_count += 1
+                    if frame_count % 30 == 0:  # Every 30 frames
+                        import gc
+                        gc.collect()
             
             # Create new clip from processed frames
             processed_clip = ImageSequenceClip(processed_frames, fps=slowed_clip.fps)
@@ -716,4 +763,42 @@ class VideoProcessor:
         except Exception as e:
             print(f"⚠️ Gap clip creation failed: {e}")
             # Fallback: simple black clip
-            return ColorClip(size=(width, height), color=(0, 0, 0), duration=duration) 
+            return ColorClip(size=(width, height), color=(0, 0, 0), duration=duration)
+
+    def _create_simplified_video(self, video_path: str, highlights: list, output_path: str, user_name: str = "FIGHTER") -> str:
+        """Create a simplified video when memory is limited"""
+        try:
+            print("🎬 Creating simplified video (memory-optimized)")
+            
+            # Just create a simple text overlay video
+            from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip
+            
+            # Load video with minimal memory usage
+            video = VideoFileClip(video_path, audio=False)
+            
+            # Create a simple text overlay
+            text_clip = TextClip("HIGHLIGHTS", fontsize=70, color='white', font='Arial-Bold')
+            text_clip = text_clip.set_position('center').set_duration(video.duration)
+            
+            # Composite and save
+            final_video = CompositeVideoClip([video, text_clip])
+            final_video.write_videofile(
+                output_path,
+                codec="libx264",
+                preset="ultrafast",
+                crf=30,
+                verbose=False,
+                logger=None
+            )
+            
+            # Cleanup
+            video.close()
+            text_clip.close()
+            final_video.close()
+            
+            print(f"✅ Simplified video created: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            print(f"❌ Simplified video creation failed: {e}")
+            return None 

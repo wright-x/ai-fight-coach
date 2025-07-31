@@ -6,6 +6,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
+# Set memory limits for video processing
+ENV PYTHONMALLOC=malloc
+ENV MALLOC_TRIM_THRESHOLD_=131072
+
 # Update apt and install the CORRECT system dependencies for Debian Bullseye.
 # This list is minimal and targets the build requirements for our Python packages.
 RUN apt-get update && apt-get install -y --no-install-recommends \

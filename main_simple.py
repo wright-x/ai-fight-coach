@@ -184,7 +184,7 @@ try:
     logger.info(f"   - VideoProcessor: {type(video_processor)}")
     logger.info(f"   - GeminiClient: {type(gemini_client)}")
     logger.info(f"   - TTSClient: {type(tts_client)}")
-    
+        
 except Exception as e:
     logger.error(f"❌ Component initialization failed: {e}")
     raise
@@ -444,7 +444,7 @@ async def upload_video(
         if not job:
             logger.error(f"Upload failed: Could not create job for user {user.id}")
             return JSONResponse({
-                "success": False,
+            "success": False,
                 "message": "Job creation failed"
             }, status_code=500)
         
@@ -568,6 +568,10 @@ async def process_video_analysis(job_id: str, db: Session):
     try:
         logger.info(f"Starting analysis for job {job_id}")
         
+        # Memory management
+        import gc
+        gc.collect()
+        
         # Get job data
         job_data = in_memory_files.get(job_id)
         if not job_data:
@@ -621,6 +625,9 @@ async def process_video_analysis(job_id: str, db: Session):
         if os.path.exists(video_path):
             os.remove(video_path)
         
+        # Final memory cleanup
+        gc.collect()
+        
         logger.info(f"Analysis completed for job {job_id}")
         
     except Exception as e:
@@ -630,7 +637,7 @@ async def process_video_analysis(job_id: str, db: Session):
             db_service.update_job_status(job_id, "failed")
         except:
             pass
-
+        
 @app.post("/api/track-page-view")
 async def track_page_view(request: Request):
     """Track page views for analytics"""
