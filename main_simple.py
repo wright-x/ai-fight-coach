@@ -101,7 +101,7 @@ class DatabaseService:
             
             logger.info(f"Created new user: {user.id}")
             return user
-        except Exception as e:
+    except Exception as e:
             logger.error(f"Error creating user: {e}")
             self.db.rollback()
             return None
@@ -120,7 +120,7 @@ class DatabaseService:
             self.db.commit()
             self.db.refresh(job)
             return job
-        except Exception as e:
+    except Exception as e:
             logger.error(f"Error creating job: {e}")
             self.db.rollback()
             raise
@@ -185,7 +185,7 @@ try:
     logger.info(f"   - GeminiClient: {type(gemini_client)}")
     logger.info(f"   - TTSClient: {type(tts_client)}")
         
-except Exception as e:
+    except Exception as e:
     logger.error(f"❌ Component initialization failed: {e}")
     raise
 
@@ -538,7 +538,7 @@ async def get_analysis(job_id: str):
     if os.path.exists(analysis_path):
         with open(analysis_path, 'r') as f:
             return json.load(f)
-    else:
+            else:
         raise HTTPException(status_code=404, detail="Analysis not found")
 
 # Results page
@@ -614,7 +614,7 @@ async def process_video_analysis(job_id: str, db: Session):
                 logger.info(f"Highlight video created successfully: {output_video_path}")
             except Exception as video_error:
                 logger.error(f"Video creation failed for job {job_id}: {video_error}")
-        else:
+                else:
             logger.warning(f"No highlights found for job {job_id}")
                 
         # Update job status
