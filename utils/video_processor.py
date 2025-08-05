@@ -171,8 +171,7 @@ class VideoProcessor:
                     remove_temp=True,
                     verbose=False,
                     logger=None,
-                    preset="ultrafast",  # Faster encoding, less memory
-                    crf=28  # Lower quality but smaller file size
+                    preset="ultrafast"  # Faster encoding, less memory
                 )
                 
                 # Cleanup
@@ -786,7 +785,6 @@ class VideoProcessor:
                 output_path,
                 codec="libx264",
                 preset="ultrafast",
-                crf=30,
                 verbose=False,
                 logger=None
             )
