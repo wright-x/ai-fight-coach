@@ -481,11 +481,25 @@
             border-radius: 10px;
             overflow: hidden;
             margin-bottom: 20px;
+            background: #000;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .video-container video {
             width: 100%;
+            max-width: 800px;
+            height: auto;
             border-radius: 10px;
+        }
+        
+        .video-container .video-placeholder {
+            color: #dc143c;
+            text-align: center;
+            padding: 40px;
+            font-size: 1.1rem;
         }
 
         .action-buttons-section {
@@ -1308,11 +1322,22 @@
         function displayResults(jobId) {
             console.log('[SHOWRESULTS] Starting results display for job:', jobId);
             
-            // Set the video source
+            // Set the video source with proper error handling
             const videoElement = document.getElementById('resultVideo');
             if (videoElement) {
                 videoElement.src = `/video/${jobId}`;
                 videoElement.load();
+                
+                // Add error handling for video loading
+                videoElement.onerror = function() {
+                    console.error('[SHOWRESULTS] Video failed to load');
+                    videoElement.innerHTML = '<p style="color: #dc143c; text-align: center; padding: 20px;">Video not available. Please try again later.</p>';
+                };
+                
+                videoElement.onloadeddata = function() {
+                    console.log('[SHOWRESULTS] Video loaded successfully');
+                };
+                
                 console.log('[SHOWRESULTS] Video src set to:', `/video/${jobId}`);
             } else {
                 console.error('[SHOWRESULTS] Video element not found!');
@@ -1362,7 +1387,24 @@
                     description: "Review your uploaded video to identify areas for improvement.",
                     problem_it_fixes: "General technique improvement"
                 }]);
-                displayYouTube([]);
+                // Add sample YouTube videos for demonstration
+                displayYouTube([
+                    {
+                        title: "Keep your hands up ⚠️",
+                        problem_solved: "Low Guard",
+                        url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                    },
+                    {
+                        title: "How to Slip Punches like a PRO Boxer #shorts",
+                        problem_solved: "Lack of Head Movement",
+                        url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                    },
+                    {
+                        title: "How to Keep a Strong Boxing Stance with Footwork and Balance",
+                        problem_solved: "Poor Footwork",
+                        url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                    }
+                ]);
             });
         }
         
@@ -1501,12 +1543,20 @@
                     const videoId = extractYouTubeId(video.url || video.youtube_url || video.link || '');
                     
                     if (videoId) {
-                        // Create embedded iframe
+                        // Create embedded iframe with better styling
                         card.innerHTML = `
                             <div class="youtube-title-text">${video.title || video.name || 'Boxing Tutorial'}</div>
                             <div class="youtube-problem">${video.problem_solved || video.problem_it_fixes || video.description || 'Learn boxing techniques'}</div>
                             <div class="youtube-embed">
-                                <iframe width="100%" height="200" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                                <iframe 
+                                    width="100%" 
+                                    height="200" 
+                                    src="https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1" 
+                                    frameborder="0" 
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                    allowfullscreen
+                                    style="border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                                </iframe>
                             </div>
                         `;
                     } else {
@@ -1539,15 +1589,24 @@
         function extractYouTubeId(url) {
             if (!url) return null;
             
+            // Handle direct video IDs
+            if (url.length === 11 && /^[a-zA-Z0-9_-]{11}$/.test(url)) {
+                return url;
+            }
+            
             const patterns = [
                 /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
                 /youtube\.com\/v\/([^&\n?#]+)/,
-                /youtube\.com\/watch\?.*v=([^&\n?#]+)/
+                /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
+                /youtube\.com\/shorts\/([^&\n?#]+)/,
+                /youtu\.be\/([^&\n?#]+)/
             ];
             
             for (const pattern of patterns) {
                 const match = url.match(pattern);
-                if (match) return match[1];
+                if (match && match[1] && match[1].length === 11) {
+                    return match[1];
+                }
             }
             
             return null;
