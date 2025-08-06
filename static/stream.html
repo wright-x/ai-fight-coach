@@ -3,306 +3,633 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Training - AI Fight Coach</title>
-    <link rel="stylesheet" href="style.css?v=3.0">
+    <title>Live Training Session - AI Fight Coach</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;400;700&display=swap" rel="stylesheet">
     <style>
-        /* Stream-specific styles - Black, Grey, White theme */
-        body {
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-            color: white;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        /* Ultra-Clean Dark Mode Boxing Analysis Dashboard */
+        :root {
+            --bg-primary: #101012;
+            --bg-panel: #1C1D21;
+            --bg-footer: #0B0B0C;
+            --text-primary: #FFFFFF;
+            --text-secondary: rgba(255, 255, 255, 0.6);
+            --accent-crimson: #FF3344;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --grid-opacity: 0.04;
+        }
+
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
-        }
-
-        .stream-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            text-align: center;
-        }
-
-        .stream-header {
-            margin-bottom: 40px;
-        }
-
-        .stream-title {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 10px;
-            background: linear-gradient(45deg, #ffffff, #cccccc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .stream-subtitle {
-            font-size: 1.2rem;
-            color: #aaaaaa;
-            margin-bottom: 30px;
-        }
-
-        .video-container {
+            overflow-x: hidden;
+            font-weight: 200;
             position: relative;
-            max-width: 800px;
-            margin: 0 auto 30px;
-            background: #000;
-            border-radius: 15px;
-            overflow: hidden;
-            border: 2px solid #333;
         }
 
-        #videoElement {
+        /* Background with noise texture and vignette */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
-            height: auto;
-            display: block;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 50% 20%, rgba(255, 51, 68, 0.03) 0%, transparent 50%),
+                url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><defs><pattern id="noise" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="0.3" fill="%23ffffff" opacity="0.03"/></pattern></defs><rect width="100" height="100" fill="url(%23noise)"/></svg>');
+            pointer-events: none;
+            z-index: 1;
         }
 
-        .caption-overlay {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            font-size: 1.2rem;
-            font-weight: 700;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            text-align: center;
-            backdrop-filter: blur(8px);
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            line-height: 1.4;
-            max-height: 150px;
-            overflow-y: auto;
-        }
-
-        .caption-overlay.show {
-            opacity: 1;
-        }
-
-        .controls {
+        /* Top Navigation - Fixed 72px */
+        .top-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 72px;
+            background: rgba(16, 16, 18, 0.95);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            border: 2px solid var(--accent-crimson);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
             justify-content: center;
-            gap: 20px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
+            font-size: 16px;
+            font-weight: 700;
         }
 
-        .btn {
-            padding: 12px 24px;
+        .settings-btn {
+            width: 40px;
+            height: 40px;
+            background: none;
             border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
+            color: var(--text-secondary);
             cursor: pointer;
-            transition: all 0.3s ease;
-            min-width: 120px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .btn-primary {
-            background: linear-gradient(45deg, #4a4a4a, #666666);
-            color: white;
+        .settings-btn:hover {
+            background: var(--glass-bg);
+            color: var(--text-primary);
         }
 
-        .btn-primary:hover {
-            background: linear-gradient(45deg, #555555, #777777);
-            transform: translateY(-2px);
+        /* Main Container */
+        .main-container {
+            margin-top: 72px;
+            padding: 40px 32px;
+            max-width: 1920px;
+            margin-left: auto;
+            margin-right: auto;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 32px;
+            position: relative;
+            z-index: 2;
         }
 
-        .btn-danger {
-            background: linear-gradient(45deg, #333333, #1a1a1a);
-            color: white;
+        /* Hero Header */
+        .hero-header {
+            grid-column: 1 / -1;
+            text-align: center;
+            margin-bottom: 24px;
         }
 
-        .btn-danger:hover {
-            background: linear-gradient(45deg, #444444, #2a2a2a);
-            transform: translateY(-2px);
+        .hero-title {
+            font-size: 40px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
         }
 
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
+        .hero-subtitle {
+            font-size: 20px;
+            color: var(--text-secondary);
+            font-weight: 200;
+            margin-bottom: 16px;
         }
 
-        .status-indicator {
+        /* Session Status Chip */
+        .status-chip {
             display: inline-flex;
             align-items: center;
             gap: 8px;
             padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-
-        .status-offline {
-            background: rgba(100, 100, 100, 0.2);
-            color: #aaaaaa;
-        }
-
-        .status-connecting {
-            background: rgba(200, 200, 200, 0.2);
-            color: #cccccc;
-        }
-
-        .status-live {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
+            border-radius: 24px;
+            font-size: 14px;
+            font-weight: 400;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .status-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: currentColor;
+            background: var(--accent-crimson);
         }
 
         .status-live .status-dot {
             animation: pulse 2s infinite;
+            box-shadow: 0 0 12px var(--accent-crimson);
         }
 
         @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
         }
 
-        .feedback-history {
-            max-width: 600px;
-            margin: 0 auto;
-            text-align: left;
+        /* How It Works Card */
+        .steps-card {
+            grid-column: 1 / 5;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 32px;
+            position: relative;
+            z-index: 4;
+        }
+
+        .steps-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+
+        .steps-list {
+            list-style: none;
+            space-y: 16px;
+        }
+
+        .steps-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .steps-list li::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--accent-crimson);
+            border-radius: 50%;
+            margin-top: 8px;
+            flex-shrink: 0;
+        }
+
+        /* Live Video Canvas */
+        .video-section {
+            grid-column: 5 / -1;
+            position: relative;
+        }
+
+        .video-container {
+            background: #000000;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            aspect-ratio: 16/9;
+            box-shadow: 
+                0 20px 40px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(255, 255, 255, 0.05);
+        }
+
+        .video-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                linear-gradient(45deg, transparent 49%, rgba(255, 255, 255, var(--grid-opacity)) 49%, rgba(255, 255, 255, var(--grid-opacity)) 51%, transparent 51%),
+                linear-gradient(-45deg, transparent 49%, rgba(255, 255, 255, var(--grid-opacity)) 49%, rgba(255, 255, 255, var(--grid-opacity)) 51%, transparent 51%);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        #videoElement {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: relative;
+            z-index: 2;
+        }
+
+        .video-overlay {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            right: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .elapsed-timer {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        .mute-icon {
+            width: 24px;
+            height: 24px;
+            color: var(--text-secondary);
+        }
+
+        /* Caption Overlay */
+        .caption-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: var(--text-primary);
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 400;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            text-align: center;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            line-height: 1.4;
+            z-index: 10;
+        }
+
+        .caption-overlay.show {
+            opacity: 1;
+        }
+
+        /* Control Strip */
+        .control-strip {
+            grid-column: 5 / -1;
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            min-width: 160px;
+        }
+
+        .btn-secondary {
+            background: var(--glass-bg);
+            color: var(--text-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+
+        .btn-primary {
+            background: var(--accent-crimson);
+            color: var(--text-primary);
+            box-shadow: 0 0 20px rgba(255, 51, 68, 0.3);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #ff1a32;
+            box-shadow: 0 0 30px rgba(255, 51, 68, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-outline:hover:not(:disabled) {
+            background: var(--glass-bg);
+            color: var(--text-primary);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        /* Feedback History Panel */
+        .feedback-section {
+            grid-column: 1 / -1;
+            margin-top: 40px;
+        }
+
+        .feedback-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .feedback-container {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+            max-height: 400px;
+            overflow-y: auto;
         }
 
         .feedback-item {
-            background: rgba(255, 255, 255, 0.05);
-            border-left: 4px solid #666;
-            padding: 15px;
-            margin-bottom: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 4px solid var(--accent-crimson);
+            padding: 16px;
+            margin-bottom: 12px;
             border-radius: 0 8px 8px 0;
-            font-size: 0.95rem;
+            position: relative;
         }
 
         .feedback-time {
-            color: #aaaaaa;
-            font-size: 0.8rem;
-            margin-bottom: 5px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
         }
 
-        .instructions {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 30px;
-            text-align: left;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
+        .feedback-text {
+            font-weight: 400;
+            line-height: 1.4;
+            margin-bottom: 8px;
         }
 
-        .instructions h3 {
-            margin-top: 0;
-            color: white;
+        .feedback-metrics {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
         }
 
-        .instructions ul {
-            color: #cccccc;
-            line-height: 1.6;
+        /* Floating Voice Meter Orb */
+        .voice-meter {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            width: 64px;
+            height: 64px;
+            background: radial-gradient(circle, var(--accent-crimson), #cc1a2a);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(255, 51, 68, 0.4);
+            transition: all 0.3s ease;
         }
 
-        .error-message {
-            background: rgba(200, 0, 0, 0.1);
-            border: 1px solid rgba(200, 0, 0, 0.3);
-            color: #ffaaaa;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
-            display: none;
+        .voice-meter:hover {
+            transform: scale(1.1);
+            box-shadow: 0 12px 40px rgba(255, 51, 68, 0.6);
         }
 
-        .back-link {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: #aaaaaa;
+        .voice-meter.active {
+            animation: voicePulse 1s infinite;
+        }
+
+        @keyframes voicePulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--bg-footer);
+            padding: 24px 32px;
+            text-align: center;
+            margin-top: 80px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .footer-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 200;
+        }
+
+        .footer-links {
+            display: inline-flex;
+            gap: 16px;
+            margin-left: 16px;
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
             text-decoration: none;
-            font-size: 1.1rem;
-            transition: color 0.3s ease;
+            transition: color 0.2s ease;
         }
 
-        .back-link:hover {
-            color: white;
+        .footer-links a:hover {
+            color: var(--text-primary);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                gap: 24px;
+            }
+            
+            .steps-card,
+            .video-section,
+            .control-strip {
+                grid-column: 1 / -1;
+            }
         }
 
         @media (max-width: 768px) {
-            .stream-title {
-                font-size: 2rem;
+            .main-container {
+                padding: 20px 16px;
             }
             
-            .controls {
+            .hero-title {
+                font-size: 32px;
+            }
+            
+            .hero-subtitle {
+                font-size: 18px;
+            }
+            
+            .control-strip {
                 flex-direction: column;
                 align-items: center;
             }
             
-            .btn {
-                min-width: 200px;
+            .voice-meter {
+                bottom: 16px;
+                right: 16px;
+                width: 56px;
+                height: 56px;
             }
+        }
+
+        /* Error Message */
+        .error-message {
+            background: rgba(255, 51, 68, 0.1);
+            border: 1px solid var(--accent-crimson);
+            color: var(--text-primary);
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+            display: none;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-    <a href="/" class="back-link">← Back to Home</a>
-    
-    <div class="stream-container">
-        <div class="stream-header">
-            <h1 class="stream-title">Live Training Session</h1>
-            <p class="stream-subtitle">Real-time boxing analysis with instant feedback</p>
-            <div class="status-indicator status-offline" id="statusIndicator">
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <a href="/" class="logo">
+            <div class="logo-icon">🥊</div>
+            <span style="font-weight: 700;">AI Fight Coach</span>
+        </a>
+        <button class="settings-btn" onclick="window.location.href='/'">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 10a2 2 0 114 0 2 2 0 01-4 0z"/>
+            </svg>
+        </button>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Hero Header -->
+        <div class="hero-header">
+            <h1 class="hero-title">Live Training Session</h1>
+            <p class="hero-subtitle">Real-time in-ear coaching, powered by AI</p>
+            <div class="status-chip" id="statusChip">
                 <div class="status-dot"></div>
-                <span id="statusText">Offline</span>
+                <span id="statusText">Session Ended</span>
             </div>
         </div>
 
-        <div class="instructions" id="instructions">
-            <h3>How it works:</h3>
-            <ul>
+        <!-- How It Works Card -->
+        <div class="steps-card">
+            <h3 class="steps-title">How it works</h3>
+            <ul class="steps-list">
                 <li><strong>Camera Access:</strong> Grant permission to use your camera</li>
                 <li><strong>Position:</strong> Stand 6-8 feet from your camera with good lighting</li>
                 <li><strong>Boxing:</strong> Start shadow boxing or hitting a bag</li>
-                <li><strong>Feedback:</strong> Get live coaching tips every 10 seconds</li>
+                <li><strong>Feedback:</strong> Get live coaching every 10 seconds</li>
                 <li><strong>Improve:</strong> Adjust your technique based on real-time guidance</li>
             </ul>
         </div>
 
-        <div class="error-message" id="errorMessage"></div>
-
-        <div class="video-container">
-            <video id="videoElement" autoplay muted playsinline></video>
-            <div class="caption-overlay" id="captionOverlay">
-                Initializing live analysis...
+        <!-- Live Video Canvas -->
+        <div class="video-section">
+            <div class="video-container">
+                <video id="videoElement" autoplay muted playsinline></video>
+                <div class="video-overlay">
+                    <div class="elapsed-timer" id="elapsedTimer">00:00</div>
+                    <div class="mute-icon">🔊</div>
+                </div>
+                <div class="caption-overlay" id="captionOverlay">
+                    Initializing live analysis...
+                </div>
             </div>
         </div>
 
-        <div class="controls">
-            <button class="btn btn-primary" id="startBtn" onclick="startStream()">
+        <!-- Control Strip -->
+        <div class="control-strip">
+            <button class="btn btn-secondary" id="startBtn" onclick="startStream()">
                 Request Camera Access
             </button>
             <button class="btn btn-primary" id="trainingBtn" onclick="startTraining()" disabled>
                 Start Training
             </button>
-            <button class="btn btn-danger" id="stopBtn" onclick="stopStream()" disabled>
+            <button class="btn btn-outline" id="stopBtn" onclick="stopStream()" disabled>
                 Stop Session
             </button>
         </div>
 
-        <div class="feedback-history" id="feedbackHistory">
-            <h3 style="text-align: center; color: #aaaaaa;">Feedback History</h3>
-            <!-- Feedback items will be added here -->
+        <!-- Error Message -->
+        <div class="error-message" id="errorMessage"></div>
+
+        <!-- Feedback History Panel -->
+        <div class="feedback-section">
+            <h3 class="feedback-title">Feedback History</h3>
+            <div class="feedback-container" id="feedbackContainer">
+                <!-- Feedback items will be added here -->
+            </div>
         </div>
     </div>
+
+    <!-- Floating Voice Meter Orb -->
+    <div class="voice-meter" id="voiceMeter">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+            <path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z"/>
+            <path d="M19 10v1a7 7 0 11-14 0v-1"/>
+            <path d="M12 18v4M8 22h8"/>
+        </svg>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <span class="footer-text">©2025 AI Boxing</span>
+        <div class="footer-links">
+            <a href="#">Terms</a>
+            <a href="#">Privacy</a>
+        </div>
+    </footer>
 
     <script>
         let videoElement;
@@ -310,8 +637,8 @@
         let isTraining = false;
         let feedbackInterval;
         let websocket;
-        let lastFeedbackTime = 0;
-        const FEEDBACK_INTERVAL = 10000; // 10 seconds
+        let sessionStartTime;
+        let timerInterval;
 
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
@@ -338,7 +665,7 @@
                 websocket.onclose = function() {
                     console.log('WebSocket disconnected');
                     if (isTraining) {
-                        setTimeout(setupWebSocket, 3000); // Reconnect after 3 seconds
+                        setTimeout(setupWebSocket, 3000);
                     }
                 };
                 
@@ -365,7 +692,6 @@
                 
                 addToFeedbackHistory(data.message, data.analysis_data);
             } else if (data.type === 'analysis') {
-                // Show real-time analysis data (for debugging)
                 console.log('Pose Analysis:', data.data);
             } else if (data.type === 'error') {
                 showError(data.message);
@@ -374,7 +700,6 @@
 
         function playTTSAudio(audioData) {
             try {
-                // Convert base64 to audio blob
                 const audioBytes = atob(audioData);
                 const audioArray = new Uint8Array(audioBytes.length);
                 for (let i = 0; i < audioBytes.length; i++) {
@@ -383,19 +708,32 @@
                 const audioBlob = new Blob([audioArray], { type: 'audio/mpeg' });
                 const audioUrl = URL.createObjectURL(audioBlob);
                 
-                // Play audio
                 const audio = new Audio(audioUrl);
                 audio.volume = 0.9;
                 audio.play();
                 
-                // Clean up URL after playing
+                // Pulse voice meter during TTS
+                const voiceMeter = document.getElementById('voiceMeter');
+                voiceMeter.classList.add('active');
+                
                 audio.addEventListener('ended', () => {
                     URL.revokeObjectURL(audioUrl);
+                    voiceMeter.classList.remove('active');
                 });
             } catch (error) {
                 console.error('TTS audio playback failed:', error);
-                // Fallback to browser TTS
                 speakFeedback(data.message);
+            }
+        }
+
+        function speakFeedback(message) {
+            if ('speechSynthesis' in window) {
+                speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(message);
+                utterance.rate = 0.9;
+                utterance.pitch = 0.9;
+                utterance.volume = 0.9;
+                speechSynthesis.speak(utterance);
             }
         }
 
@@ -403,23 +741,16 @@
             try {
                 updateStatus('connecting', 'Requesting Camera Access...');
                 
-                // Request camera access
                 mediaStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        facingMode: 'user'
-                    },
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
                     audio: false
                 });
 
                 videoElement.srcObject = mediaStream;
-                
                 updateStatus('live', 'Camera Ready');
                 
                 document.getElementById('startBtn').disabled = true;
                 document.getElementById('trainingBtn').disabled = false;
-                document.getElementById('instructions').style.display = 'none';
                 
                 displayFeedback('Camera access granted! Click "Start Training" when ready.');
                 
@@ -446,6 +777,7 @@
             }
 
             isTraining = true;
+            sessionStartTime = Date.now();
             updateStatus('live', 'Training in Progress');
             
             document.getElementById('trainingBtn').disabled = true;
@@ -453,7 +785,10 @@
             
             displayFeedback('Training started! Begin shadow boxing or hitting the bag.');
             
-            // Start sending video frames for analysis
+            // Start timer
+            timerInterval = setInterval(updateTimer, 1000);
+            
+            // Start video analysis
             startVideoAnalysis();
             
             // Start feedback interval
@@ -461,25 +796,27 @@
                 if (isTraining) {
                     requestFeedback();
                 }
-            }, FEEDBACK_INTERVAL);
+            }, 10000);
         }
 
         function stopStream() {
             isTraining = false;
             
-            // Stop video stream
             if (mediaStream) {
                 mediaStream.getTracks().forEach(track => track.stop());
                 mediaStream = null;
             }
             
-            // Clear intervals
             if (feedbackInterval) {
                 clearInterval(feedbackInterval);
                 feedbackInterval = null;
             }
             
-            // Close WebSocket
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            
             if (websocket) {
                 websocket.close();
             }
@@ -489,13 +826,11 @@
             document.getElementById('startBtn').disabled = false;
             document.getElementById('trainingBtn').disabled = true;
             document.getElementById('stopBtn').disabled = true;
-            document.getElementById('instructions').style.display = 'block';
             
             displayFeedback('Training session ended. Great work!');
         }
 
         function startVideoAnalysis() {
-            // Capture frames and send for analysis
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             
@@ -508,7 +843,6 @@
                 canvas.height = videoElement.videoHeight;
                 ctx.drawImage(videoElement, 0, 0);
                 
-                // Convert to base64 and send to backend
                 const imageData = canvas.toDataURL('image/jpeg', 0.8);
                 
                 if (websocket && websocket.readyState === WebSocket.OPEN) {
@@ -519,9 +853,8 @@
                     }));
                 }
                 
-                // Capture next frame
                 if (isTraining) {
-                    setTimeout(captureFrame, 1000); // Capture every second
+                    setTimeout(captureFrame, 1000);
                 }
             }
             
@@ -542,66 +875,26 @@
             overlay.textContent = message;
             overlay.classList.add('show');
             
-            // Hide after 12 seconds for longer detailed feedback
             setTimeout(() => {
                 overlay.classList.remove('show');
-            }, 12000);
-        }
-
-        function speakFeedback(message) {
-            // Use browser's speech synthesis with coaching voice
-            if ('speechSynthesis' in window) {
-                // Cancel any ongoing speech
-                speechSynthesis.cancel();
-                
-                const utterance = new SpeechSynthesisUtterance(message);
-                
-                // Get available voices
-                const voices = speechSynthesis.getVoices();
-                
-                // Try to find a good male voice for coaching
-                const preferredVoices = ['Google US English Male', 'Microsoft David', 'Alex', 'Daniel'];
-                let selectedVoice = null;
-                
-                for (const preferred of preferredVoices) {
-                    selectedVoice = voices.find(voice => voice.name.includes(preferred));
-                    if (selectedVoice) break;
-                }
-                
-                // Fallback to first available voice
-                if (!selectedVoice && voices.length > 0) {
-                    selectedVoice = voices.find(voice => voice.lang.startsWith('en')) || voices[0];
-                }
-                
-                if (selectedVoice) {
-                    utterance.voice = selectedVoice;
-                }
-                
-                // Configure for coaching tone
-                utterance.rate = 0.85;  // Slightly slower for clarity
-                utterance.pitch = 0.9;  // Lower pitch for authority
-                utterance.volume = 0.9; // High volume for gym environment
-                
-                speechSynthesis.speak(utterance);
-            }
+            }, 8000);
         }
 
         function addToFeedbackHistory(message, analysisData) {
-            const historyContainer = document.getElementById('feedbackHistory');
+            const container = document.getElementById('feedbackContainer');
             const feedbackItem = document.createElement('div');
             feedbackItem.className = 'feedback-item';
             
             const time = new Date().toLocaleTimeString();
             
-            // Create enhanced feedback display with technical data
             let technicalInfo = '';
             if (analysisData) {
-                const stanceQuality = (analysisData.stance_quality * 100).toFixed(0);
-                const footworkActivity = (analysisData.footwork_activity * 100).toFixed(0);
-                const guardPosition = (analysisData.guard_positioning * 100).toFixed(0);
+                const stanceQuality = Math.round(analysisData.stance_quality * 100);
+                const footworkActivity = Math.round(analysisData.footwork_activity * 100);
+                const guardPosition = Math.round(analysisData.guard_positioning * 100);
                 
                 technicalInfo = `
-                    <div style="font-size: 0.8rem; color: #888; margin-top: 5px;">
+                    <div class="feedback-metrics">
                         Stance: ${stanceQuality}% | Footwork: ${footworkActivity}% | Guard: ${guardPosition}%
                     </div>
                 `;
@@ -609,31 +902,36 @@
             
             feedbackItem.innerHTML = `
                 <div class="feedback-time">${time}</div>
-                <div style="font-weight: 600; color: white;">${message}</div>
+                <div class="feedback-text">${message}</div>
                 ${technicalInfo}
             `;
             
-            // Add to top of history
-            const firstChild = historyContainer.firstElementChild;
-            if (firstChild && firstChild.tagName !== 'H3') {
-                historyContainer.insertBefore(feedbackItem, firstChild);
-            } else {
-                historyContainer.appendChild(feedbackItem);
-            }
+            container.insertBefore(feedbackItem, container.firstChild);
             
-            // Keep only last 8 feedback items (less clutter)
-            const items = historyContainer.querySelectorAll('.feedback-item');
+            // Keep only last 8 feedback items
+            const items = container.querySelectorAll('.feedback-item');
             if (items.length > 8) {
                 items[items.length - 1].remove();
             }
         }
 
         function updateStatus(status, text) {
-            const indicator = document.getElementById('statusIndicator');
+            const chip = document.getElementById('statusChip');
             const statusText = document.getElementById('statusText');
             
-            indicator.className = `status-indicator status-${status}`;
+            chip.className = `status-chip status-${status}`;
             statusText.textContent = text;
+        }
+
+        function updateTimer() {
+            if (!sessionStartTime) return;
+            
+            const elapsed = Date.now() - sessionStartTime;
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            
+            document.getElementById('elapsedTimer').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
 
         function showError(message) {
