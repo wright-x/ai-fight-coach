@@ -28,7 +28,7 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: #FFFFFF;
@@ -273,7 +273,7 @@
             margin-bottom: 8px;
             overflow: hidden;
         }
-        
+
         .play-badge {
             position: absolute;
             top: 50%;
@@ -740,11 +740,11 @@
             color: white;
             font-size: 1rem;
         }
-        
+
         .modal-content input::placeholder {
             color: #cccccc;
         }
-        
+
         .modal-content button {
             background: linear-gradient(135deg, #000 0%, #8b0000 100%);
             color: white;
@@ -756,7 +756,7 @@
             font-size: 1rem;
             transition: all 0.3s ease;
         }
-        
+
         .modal-content button:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(220, 20, 60, 0.5);
@@ -775,17 +775,17 @@
                     <div class="bullet-item">
                         <span class="bullet-icon">🎥</span>
                         <span class="bullet-text">Upload your boxing video</span>
-                    </div>
+        </div>
                     <div class="bullet-item">
                         <span class="bullet-icon">⚡</span>
                         <span class="bullet-text">Get instant feedback & drills to improve</span>
-                    </div>
+                        </div>
                     <div class="bullet-item">
                         <span class="bullet-icon">🏠</span>
                         <span class="bullet-text">Train at home. No gym. No stress</span>
+                        </div>
                     </div>
-                </div>
-                
+
                 <div style="margin-top: auto;">
                     <select id="analysisType" class="analysis-dropdown">
                         <option value="everything">Complete Analysis (Everything)</option>
@@ -803,8 +803,8 @@
                         Start Analysis →
                     </button>
                 </div>
-            </div>
-            
+                </div>
+
             <!-- Right Card: How It Works -->
             <div class="card">
                 <h2 class="h2">How It Works</h2>
@@ -821,36 +821,36 @@
                         <div class="overlay-tag">
                             <span class="overlay-label">DROPPING LEFT HAND</span>
                         </div>
-                    </div>
+                        </div>
                 </div>
                 
                 <div class="step-content">
                     <div class="step-number">2</div>
                     <div class="step-heading">Get an INSTANT breakdown of your boxing skill. </div>
                     <div class="sub-body">Slow Motion BREAKDOWN + Highlighted mistakes and coach level corrections (in as little as 3 minutes)</div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
 
     <!-- Progress Page (Keep existing) -->
-    <div id="progressPage" class="page">
-        <div class="progress-container">
+            <div id="progressPage" class="page">
+                <div class="progress-container">
             <h3>Analyzing your video...</h3>
-            <div class="progress-bar">
+                    <div class="progress-bar">
                 <div class="progress-fill" id="progressFill" style="width: 0%"></div>
-            </div>
-            <p id="progressText">Initializing analysis...</p>
-            <div class="loading-stages">
-                <div class="stage" id="stage1">📹 Uploading video...</div>
-                <div class="stage" id="stage2">🤖 AI analyzing footage...</div>
-                <div class="stage" id="stage3">🎯 Detecting highlights...</div>
-                <div class="stage" id="stage4">🎬 Processing video...</div>
-                <div class="stage" id="stage5">🔊 Generating audio...</div>
-                <div class="stage" id="stage6">✨ Finalizing results...</div>
-            </div>
-        </div>
-    </div>
+                    </div>
+                    <p id="progressText">Initializing analysis...</p>
+                    <div class="loading-stages">
+                        <div class="stage" id="stage1">📹 Uploading video...</div>
+                        <div class="stage" id="stage2">🤖 AI analyzing footage...</div>
+                        <div class="stage" id="stage3">🎯 Detecting highlights...</div>
+                        <div class="stage" id="stage4">🎬 Processing video...</div>
+                        <div class="stage" id="stage5">🔊 Generating audio...</div>
+                        <div class="stage" id="stage6">✨ Finalizing results...</div>
+                        </div>
+                    </div>
+                </div>
 
     <!-- Results Page (Keep existing) -->
     <div id="resultsPage" class="page">
@@ -858,54 +858,54 @@
         <div class="results-header">
             <h1>Your Analysis is Ready</h1>
             <p>Review your boxing technique with AI-powered insights</p>
-        </div>
+            </div>
 
         <div id="videoPlayerContainer" class="video-player-section">
             <h2 class="section-title">Your Analyzed Video</h2>
-            <div class="video-container">
-                <video id="resultVideo" controls>
-                    Your browser does not support the video tag.
-                </video>
+                    <div class="video-container">
+                        <video id="resultVideo" controls>
+                            Your browser does not support the video tag.
+                        </video>
             </div>
         </div>
 
         <div id="actionButtonsContainer" class="action-buttons-section">
-            <button class="download-btn" onclick="downloadVideo()">Download Video</button>
-            <button class="analyze-again-btn" onclick="runAnotherAnalysis()">Run Another Analysis</button>
-        </div>
-        
+                            <button class="download-btn" onclick="downloadVideo()">Download Video</button>
+                            <button class="analyze-again-btn" onclick="runAnotherAnalysis()">Run Another Analysis</button>
+                    </div>
+                    
         <div id="youtubeContainer" class="youtube-section">
             <h2 class="section-title">YouTube Recommendations</h2>
-        </div>
+                </div>
 
         <div id="highlightsContainer" class="highlights-section">
             <h2 class="section-title">Key Highlights</h2>
-        </div>
+                </div>
 
         <div id="drillsContainer" class="drills-section">
             <h2 class="section-title">Recommended Drills</h2>
-        </div>
+                </div>
 
         <div id="feedbackFormContainer" class="feedback-section">
-            <div class="feedback-box">
-                <div class="feedback-icon">💬</div>
-                <div class="feedback-content">
-                    <h4>How was your analysis experience?</h4>
-                    <p>We'd love to hear your feedback to make this tool even better for boxers like you!</p>
+                    <div class="feedback-box">
+                        <div class="feedback-icon">💬</div>
+                        <div class="feedback-content">
+                            <h4>How was your analysis experience?</h4>
+                            <p>We'd love to hear your feedback to make this tool even better for boxers like you!</p>
                     <form id="feedbackForm" onsubmit="submitFeedback(event)">
                         <input type="email" id="feedbackEmail" placeholder="Enter your email (optional)" class="feedback-input">
                         <textarea id="feedbackText" placeholder="Tell us what you think about the analysis, what worked well, and what could be improved..." rows="4" class="feedback-textarea"></textarea>
-                        <div class="feedback-buttons">
+                            <div class="feedback-buttons">
                             <button type="button" class="feedback-btn positive" onclick="setFeedbackRating('positive')">👍 Great!</button>
                             <button type="button" class="feedback-btn neutral" onclick="setFeedbackRating('neutral')">😐 Okay</button>
                             <button type="button" class="feedback-btn negative" onclick="setFeedbackRating('negative')">👎 Needs Work</button>
-                        </div>
+                            </div>
                         <button type="submit" class="submit-feedback-btn">Send Feedback</button>
                     </form>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
 
     <!-- Registration Modal -->
     <div id="registrationModal" class="modal" style="display: none;">
@@ -1033,8 +1033,8 @@
             if (!startTime) return;
             
             const elapsed = (Date.now() - startTime) / 1000; // seconds
-            const progressFill = document.getElementById('progressFill');
-            const progressText = document.getElementById('progressText');
+                const progressFill = document.getElementById('progressFill');
+                const progressText = document.getElementById('progressText');
                 
             if (!progressFill || !progressText) return;
             
@@ -1074,7 +1074,7 @@
                 progressText.textContent = 'Generating highlights';
             } else if (progressPercent <= 90) {
                 progressText.textContent = 'Adding voice-over & captions';
-            } else {
+                } else {
                 progressText.textContent = 'Finalizing analysis...';
             }
         }
@@ -1117,7 +1117,7 @@
                     if (data.status === 'completed') {
                         // Job finished - snap to 100% and redirect
                         const progressFill = document.getElementById('progressFill');
-                        const progressText = document.getElementById('progressText');
+                    const progressText = document.getElementById('progressText');
                         
                         if (progressFill) progressFill.style.width = '100%';
                         if (progressText) progressText.textContent = 'Ready! Redirecting...';
@@ -1163,7 +1163,7 @@
                 a.click();
                 document.body.removeChild(a);
                 alert('Video downloaded successfully!');
-            } else {
+                    } else {
                 alert('No video available to download.');
             }
         }
@@ -1225,7 +1225,7 @@
                     document.querySelectorAll('.feedback-btn').forEach(btn => {
                         btn.classList.remove('selected');
                     });
-                } else {
+                        } else {
                     alert('Failed to submit feedback. Please try again.');
                 }
             })
@@ -1422,7 +1422,7 @@
             container.innerHTML = '<h2 class="section-title">Key Highlights</h2>';
             
             if (highlights && highlights.length > 0) {
-                highlights.forEach((highlight, index) => {
+            highlights.forEach((highlight, index) => {
                     console.log('[DISPLAY] Processing highlight:', highlight);
                     console.log('[DISPLAY] Highlight fields:', Object.keys(highlight));
                     
@@ -1435,15 +1435,15 @@
                     // Get action required
                     const actionRequired = highlight.action_required || 'Continue practicing';
                     
-                    const card = document.createElement('div');
-                    card.className = 'highlight-card';
-                    card.innerHTML = `
+                const card = document.createElement('div');
+                card.className = 'highlight-card';
+                card.innerHTML = `
                         <div class="highlight-title">Highlight ${index + 1} - ${timestamp}</div>
                         <div class="highlight-description">${description}</div>
                         <div class="highlight-action">Action Required: ${actionRequired}</div>
-                    `;
-                    container.appendChild(card);
-                });
+                `;
+                container.appendChild(card);
+            });
                 console.log('[DISPLAY] Rendered', highlights.length, 'highlight cards');
             } else {
                 // Fallback message
@@ -1495,15 +1495,15 @@
                     console.log('[DISPLAY] Processing drill:', drill);
                     console.log('[DISPLAY] Drill fields:', Object.keys(drill));
                     
-                    const card = document.createElement('div');
-                    card.className = 'drill-card';
-                    card.innerHTML = `
+                const card = document.createElement('div');
+                card.className = 'drill-card';
+                card.innerHTML = `
                         <div class="drill-name">${drill.drill_name || drill.name || 'Recommended Drill'}</div>
                         <div class="drill-description">${drill.description || drill.drill_description || 'No description available'}</div>
                         <div class="drill-problem">Fixes: ${drill.problem_it_fixes || drill.fixes || 'General technique improvement'}</div>
-                    `;
-                    container.appendChild(card);
-                });
+                `;
+                container.appendChild(card);
+            });
                 console.log('[DISPLAY] Rendered', drills.length, 'drill cards');
             } else {
                 // Fallback message
@@ -1536,15 +1536,15 @@
                     console.log('[DISPLAY] Processing YouTube video:', video);
                     console.log('[DISPLAY] Video fields:', Object.keys(video));
                     
-                    const card = document.createElement('div');
-                    card.className = 'youtube-card';
+                const card = document.createElement('div');
+                card.className = 'youtube-card';
                     
                     // Extract YouTube video ID from URL
                     const videoId = extractYouTubeId(video.url || video.youtube_url || video.link || '');
                     
                     if (videoId) {
                         // Create embedded iframe with better styling
-                        card.innerHTML = `
+                card.innerHTML = `
                             <div class="youtube-title-text">${video.title || video.name || 'Boxing Tutorial'}</div>
                             <div class="youtube-problem">${video.problem_solved || video.problem_it_fixes || video.description || 'Learn boxing techniques'}</div>
                             <div class="youtube-embed">

@@ -101,7 +101,7 @@ class DatabaseService:
             
             logger.info(f"Created new user: {user.id}")
             return user
-    except Exception as e:
+        except Exception as e:
             logger.error(f"Error creating user: {e}")
             self.db.rollback()
             return None
@@ -120,7 +120,7 @@ class DatabaseService:
             self.db.commit()
             self.db.refresh(job)
             return job
-    except Exception as e:
+        except Exception as e:
             logger.error(f"Error creating job: {e}")
             self.db.rollback()
             raise
