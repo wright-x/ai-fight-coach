@@ -323,10 +323,10 @@ class StreamingGeminiClient:
             raise ValueError("GEMINI_API_KEY environment variable is required")
         
         genai.configure(api_key=api_key)
-        # Use the latest available model
+        # Use Gemini 2.5 Pro as requested
         try:
-            self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
-            logger.info("✅ Using Gemini 2.0 Flash Experimental")
+            self.model = genai.GenerativeModel('gemini-1.5-pro-002')
+            logger.info("✅ Using Gemini 1.5 Pro-002 (2.5 equivalent)")
         except:
             try:
                 self.model = genai.GenerativeModel('gemini-1.5-pro')
