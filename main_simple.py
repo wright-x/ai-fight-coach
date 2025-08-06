@@ -11,7 +11,7 @@ import tempfile
 import shutil
 from datetime import datetime
 from typing import Optional, List
-from fastapi import FastAPI, File, UploadFile, Form, Request, BackgroundTasks, HTTPException, Depends
+from fastapi import FastAPI, File, UploadFile, Form, Request, BackgroundTasks, HTTPException, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -227,6 +227,10 @@ async def upload_page():
 @app.get("/admin")
 async def admin_page():
     return FileResponse("static/admin.html")
+
+@app.get("/stream")
+async def stream_page():
+    return FileResponse("static/stream.html")
 
 def create_user(db: Session, email: str, name: str = None):
     """Create or get existing user"""
@@ -737,6 +741,121 @@ async def get_page_analytics(request: Request):
     except Exception as e:
         print(f"Error getting page analytics: {e}")
         return {"error": "Failed to get analytics"}
+
+# WebSocket connection manager for streaming
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+        self.stream_processors = {}  # websocket_id -> StreamProcessor
+    
+    async def connect(self, websocket: WebSocket, client_id: str):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        
+        # Initialize stream processor for this connection
+        from utils.stream_processor import StreamProcessor
+        self.stream_processors[client_id] = StreamProcessor()
+        logger.info(f"Client {client_id} connected to stream")
+    
+    def disconnect(self, websocket: WebSocket, client_id: str):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        if client_id in self.stream_processors:
+            del self.stream_processors[client_id]
+        logger.info(f"Client {client_id} disconnected from stream")
+    
+    async def send_personal_message(self, message: dict, websocket: WebSocket):
+        await websocket.send_text(json.dumps(message))
+    
+    def get_processor(self, client_id: str):
+        return self.stream_processors.get(client_id)
+
+manager = ConnectionManager()
+
+# WebSocket endpoint for real-time streaming
+@app.websocket("/ws/stream")
+async def websocket_endpoint(websocket: WebSocket):
+    client_id = f"client_{datetime.now().timestamp()}"
+    await manager.connect(websocket, client_id)
+    
+    try:
+        while True:
+            # Receive message from client
+            data = await websocket.receive_text()
+            message = json.loads(data)
+            
+            processor = manager.get_processor(client_id)
+            if not processor:
+                await manager.send_personal_message({
+                    "type": "error",
+                    "message": "Stream processor not initialized"
+                }, websocket)
+                continue
+            
+            if message["type"] == "frame":
+                # Process video frame
+                frame_data = message["data"]
+                analysis_result = processor.process_frame(frame_data)
+                
+                # Send back analysis if needed (for debugging)
+                await manager.send_personal_message({
+                    "type": "analysis",
+                    "data": {
+                        "pose_detected": analysis_result.get("pose_detected", False),
+                        "error_count": len(analysis_result.get("errors", []))
+                    }
+                }, websocket)
+                
+            elif message["type"] == "request_feedback":
+                # Generate and send feedback
+                errors = processor.current_errors if hasattr(processor, 'current_errors') else []
+                feedback = processor.generate_feedback(errors)
+                
+                await manager.send_personal_message({
+                    "type": "feedback",
+                    "message": feedback
+                }, websocket)
+                
+                # Generate TTS audio (optional - can be done client-side)
+                try:
+                    tts_audio = await generate_tts_audio(feedback)
+                    if tts_audio:
+                        await manager.send_personal_message({
+                            "type": "tts_audio",
+                            "audio_data": tts_audio
+                        }, websocket)
+                except Exception as e:
+                    logger.error(f"TTS generation failed: {e}")
+                
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, client_id)
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        manager.disconnect(websocket, client_id)
+
+async def generate_tts_audio(text: str) -> Optional[str]:
+    """Generate TTS audio and return as base64 string"""
+    try:
+        # Use ElevenLabs for TTS
+        from elevenlabs import generate, Voice
+        
+        api_key = os.getenv("ELEVENLABS_API_KEY")
+        if not api_key:
+            return None
+        
+        audio = generate(
+            text=text,
+            voice=Voice(voice_id="21m00Tcm4TlvDq8ikWAM"),  # Rachel voice
+            model="eleven_monolingual_v1"
+        )
+        
+        # Convert to base64 for transmission
+        audio_b64 = base64.b64encode(audio).decode()
+        return audio_b64
+        
+    except Exception as e:
+        logger.error(f"TTS generation error: {e}")
+        return None
 
 if __name__ == "__main__":
     import uvicorn
