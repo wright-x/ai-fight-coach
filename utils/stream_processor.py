@@ -323,7 +323,17 @@ class StreamingGeminiClient:
             raise ValueError("GEMINI_API_KEY environment variable is required")
         
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        # Use the latest available model
+        try:
+            self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            logger.info("✅ Using Gemini 2.0 Flash Experimental")
+        except:
+            try:
+                self.model = genai.GenerativeModel('gemini-1.5-pro')
+                logger.info("✅ Using Gemini 1.5 Pro")
+            except:
+                self.model = genai.GenerativeModel('gemini-1.5-flash')
+                logger.info("✅ Using Gemini 1.5 Flash (fallback)")
         
         # Track recent feedback for variety enforcement
         self.recent_tokens = deque(maxlen=6)  # Store recent bigrams
@@ -494,22 +504,22 @@ RESPONSE (≤15 words, be different):"""
             raise
     
     async def _stream_gemini_response(self, prompt: str) -> str:
-        """Stream response from Gemini and accumulate tokens"""
-        accumulated_text = ""
-        
-        # Use streaming generation
-        def _generate_stream():
-            return self.model.generate_content_stream(prompt)
-        
-        response_stream = await asyncio.to_thread(_generate_stream)
-        
-        for chunk in response_stream:
-            if chunk.text:
-                accumulated_text += chunk.text
-                # Yield control every 150ms for potential interim updates
-                await asyncio.sleep(0.015)
-        
-        return accumulated_text.strip()
+        """Generate response from Gemini using regular generation (streaming not available)"""
+        try:
+            # Use regular generation since streaming doesn't exist
+            response = await asyncio.to_thread(
+                self.model.generate_content, prompt
+            )
+            
+            if response and response.text:
+                return response.text.strip()
+            else:
+                logger.error("❌ Empty response from Gemini")
+                raise Exception("Empty response from Gemini")
+                
+        except Exception as e:
+            logger.error(f"❌ Gemini generation error: {e}")
+            raise
     
     def _is_duplicate_feedback(self, feedback: str) -> bool:
         """Check if feedback contains duplicate bigrams from recent history"""
@@ -544,13 +554,71 @@ RESPONSE (≤15 words, be different):"""
             self.last_verb_used = words[0]
     
     def _generate_emergency_fallback(self, analysis: Dict) -> str:
-        """Generate emergency fallback when Gemini completely fails"""
-        stance = analysis.get('stance_analysis', {})
-        guard = analysis.get('guard_analysis', {})
+        """Generate emergency fallback when Gemini completely fails - with variety"""
+        import random
         
-        if stance.get('stance_width_ratio', 1.0) < 0.7:
-            return "Widen stance, better balance."
-        elif guard.get('hand_height', 0) < 0.6:
-            return "Hands up, protect chin."
-        else:
-            return "Stay focused, keep moving."
+        # Get current category for variety
+        current_category = self._get_next_category()
+        
+        # Expert coaching cues based on boxing fundamentals
+        fallback_cues = {
+            'guard': [
+                "Tuck elbows tighter, protect body.",
+                "Hands up, chin down.",
+                "Keep guard high, stay ready.",
+                "Elbows in, cover ribs."
+            ],
+            'footwork': [
+                "Bounce on balls of feet.",
+                "Stay light, quick steps.",
+                "Move lateral, don't stand still.",
+                "Pivot on front foot."
+            ],
+            'head_movement': [
+                "Move head after punching.",
+                "Slip left, slip right.",
+                "Duck low, come up ready.",
+                "Keep head moving, stay elusive."
+            ],
+            'punch_mechanics': [
+                "Snap punches back fast.",
+                "Turn rear hip through.",
+                "Double up that jab.",
+                "Exhale on impact."
+            ],
+            'rhythm': [
+                "Find your rhythm now.",
+                "Breathe steady, stay relaxed.",
+                "Good tempo, keep it up.",
+                "Smooth combinations."
+            ],
+            'defense_counters': [
+                "Block and counter immediately.",
+                "Parry, then attack.",
+                "Stay defensive, watch openings.",
+                "Counter after his punch."
+            ],
+            'power_chain': [
+                "Drive from legs up.",
+                "Engage core, turn hips.",
+                "Ground force to fist.",
+                "Full body rotation."
+            ]
+        }
+        
+        # Get cues for current category
+        category_cues = fallback_cues.get(current_category, fallback_cues['rhythm'])
+        
+        # Add variety by not using the same fallback twice
+        if not hasattr(self, '_last_fallback'):
+            self._last_fallback = None
+        
+        available_cues = [cue for cue in category_cues if cue != self._last_fallback]
+        if not available_cues:
+            available_cues = category_cues
+        
+        selected_cue = random.choice(available_cues)
+        self._last_fallback = selected_cue
+        
+        logger.info(f"🔄 Emergency fallback ({current_category}): {selected_cue}")
+        return selected_cue
