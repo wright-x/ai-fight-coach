@@ -91,8 +91,8 @@ class DatabaseService:
             # Check if user already exists
             existing_user = self.db.query(User).filter(User.email == email).first()
             if existing_user:
-                logger.info(f"User already exists: {existing_user.id}")
-                return existing_user  # Return existing user instead of None
+        logger.info(f"User already exists: {existing_user.id}")
+        return existing_user  # Return existing user instead of None
             
             # Create new user (without name column)
             user = User(email=email)
@@ -117,7 +117,7 @@ class DatabaseService:
                 status="processing"
                 # analysis_type column doesn't exist
             )
-            self.db.add(job)
+        self.db.add(job)
             self.db.commit()
             self.db.refresh(job)
             return job
@@ -133,7 +133,7 @@ class DatabaseService:
             job.status = status
             if video_url:
                 job.video_url = video_url
-            self.db.commit()
+        self.db.commit()
     
     def record_job_view(self, job_id: str, ip_address: str = None, user_agent: str = None):
         """Record a job view"""
@@ -189,8 +189,8 @@ try:
     logger.info(f"   - VideoProcessor: {type(video_processor)}")
     logger.info(f"   - GeminiClient: {type(gemini_client)}")
     logger.info(f"   - TTSClient: {type(tts_client)}")
-except Exception as e:
-    logger.error(f"❌ Component initialization failed: {e}")
+    except Exception as e:
+        logger.error(f"❌ Component initialization failed: {e}")
     raise
 
 # In-memory storage
@@ -209,33 +209,33 @@ templates = Jinja2Templates(directory="templates")
 async def startup_event():
     """Initialize database tables"""
     Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created")
+        logger.info("Database tables created")
 
 # Admin token verification
 def verify_admin_token(request: Request):
     admin_token = os.getenv("ADMIN_TOKEN", "admin123")
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    return token == admin_token
+        return token == admin_token
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+        return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 @app.get("/")
 async def root():
-    return FileResponse("static/index.html")
+        return FileResponse("static/index.html")
 
 @app.get("/upload")
 async def upload_page():
-    return FileResponse("static/index.html")
+        return FileResponse("static/index.html")
 
 @app.get("/admin")
 async def admin_page():
-    return FileResponse("static/admin.html")
+        return FileResponse("static/admin.html")
 
 @app.get("/stream")
 async def stream_page():
-    return FileResponse("static/stream.html")
+        return FileResponse("static/stream.html")
 
 def create_user(db: Session, email: str, name: str = None):
     """Create or get existing user"""
@@ -243,7 +243,7 @@ def create_user(db: Session, email: str, name: str = None):
         # Check if user exists
         existing_user = db.query(User).filter(User.email == email).first()
         if existing_user:
-            return existing_user
+        return existing_user
         
         # Create new user
         new_user = User(email=email)
@@ -264,7 +264,7 @@ async def register_user(request: Request):
         email = body.get("email")
         
         if not name or not email:
-            return JSONResponse({"success": False, "message": "Name and email required"})
+        return JSONResponse({"success": False, "message": "Name and email required"})
         
         # Create or update user in database using DatabaseService
         db = next(get_db())
@@ -288,7 +288,7 @@ async def admin_dashboard():
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     response.headers["ETag"] = f'"{int(datetime.utcnow().timestamp())}"'
-    return response
+        return response
 
 @app.get("/api/admin/stats")
 async def admin_stats(db: Session = Depends(get_db), _: bool = Depends(verify_admin_token)):
@@ -299,7 +299,7 @@ async def admin_stats(db: Session = Depends(get_db), _: bool = Depends(verify_ad
         # Test database connection
         try:
             db.execute(text("SELECT 1"))
-            logger.info("Database connection successful for admin stats")
+        logger.info("Database connection successful for admin stats")
         except Exception as db_error:
             logger.error(f"Database connection failed for admin stats: {db_error}")
             raise HTTPException(status_code=500, detail="Database connection failed")
@@ -310,9 +310,9 @@ async def admin_stats(db: Session = Depends(get_db), _: bool = Depends(verify_ad
         return stats
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Admin stats error: {e}")
-        import traceback
+        except Exception as e:
+            logger.error(f"Admin stats error: {e}")
+import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -325,7 +325,7 @@ async def admin_users(db: Session = Depends(get_db), _: bool = Depends(verify_ad
         # Test database connection
         try:
             db.execute(text("SELECT 1"))
-            logger.info("Database connection successful for admin users")
+        logger.info("Database connection successful for admin users")
         except Exception as db_error:
             logger.error(f"Database connection failed for admin users: {db_error}")
             raise HTTPException(status_code=500, detail="Database connection failed")
@@ -352,9 +352,9 @@ async def admin_users(db: Session = Depends(get_db), _: bool = Depends(verify_ad
         return result
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Admin users error: {e}")
-        import traceback
+except Exception as e:
+    logger.error(f"Admin users error: {e}")
+import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -367,7 +367,7 @@ async def admin_jobs(db: Session = Depends(get_db), _: bool = Depends(verify_adm
         # Test database connection
         try:
             db.execute(text("SELECT 1"))
-            logger.info("Database connection successful for admin jobs")
+        logger.info("Database connection successful for admin jobs")
         except Exception as db_error:
             logger.error(f"Database connection failed for admin jobs: {db_error}")
             raise HTTPException(status_code=500, detail="Database connection failed")
@@ -392,9 +392,9 @@ async def admin_jobs(db: Session = Depends(get_db), _: bool = Depends(verify_adm
         return result
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Admin jobs error: {e}")
-        import traceback
+except Exception as e:
+    logger.error(f"Admin jobs error: {e}")
+import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -485,7 +485,7 @@ async def upload_video(
         try:
             await process_video_analysis(job.id, db)
             logger.info(f"Video processing completed for job {job.id}")
-            except Exception as e:
+        except Exception as e:
             logger.error(f"Video processing failed: {e}")
             # Don't fail the upload, just log the error
         
@@ -497,9 +497,9 @@ async def upload_video(
             "message": "Video uploaded successfully"
         })
         
-    except Exception as e:
-        logger.error(f"Upload error: {e}")
-        import traceback
+        except Exception as e:
+            logger.error(f"Upload error: {e}")
+import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
         return JSONResponse({
             "success": False,
@@ -515,7 +515,7 @@ async def get_status(job_id: str, db: Session = Depends(get_db)):
         job = db.query(Job).filter(Job.id == job_id).first()
         
         if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail="Job not found")
         
         return {
             "job_id": job.id,
@@ -545,7 +545,7 @@ async def get_analysis(job_id: str):
     analysis_path = f"output/analysis_{job_id}.json"
     if os.path.exists(analysis_path):
         with open(analysis_path, 'r') as f:
-            return json.load(f)
+        return json.load(f)
     else:
         raise HTTPException(status_code=404, detail="Analysis not found")
 
@@ -557,7 +557,7 @@ async def get_results(job_id: str, db: Session = Depends(get_db)):
         # Validate job_id is not a static file request
         if job_id.startswith('style.css') or job_id.startswith('static/') or '.' in job_id:
             # This is a static file request, not a job ID
-            return FileResponse("static/index.html")
+        return FileResponse("static/index.html")
         
         # Record view only for valid job IDs
         db_service = DatabaseService(db)
@@ -577,7 +577,7 @@ async def process_video_analysis(job_id: str, db: Session):
         logger.info(f"Starting analysis for job {job_id}")
         
         # Memory management
-        import gc
+    import gc
         gc.collect()
         
         # Get job data
@@ -638,8 +638,8 @@ async def process_video_analysis(job_id: str, db: Session):
         
         logger.info(f"Analysis completed for job {job_id}")
         
-    except Exception as e:
-        logger.error(f"Analysis failed for job {job_id}: {e}")
+except Exception as e:
+    logger.error(f"Analysis failed for job {job_id}: {e}")
         try:
             db_service = DatabaseService(db)
             db_service.update_job_status(job_id, "failed")
@@ -674,8 +674,8 @@ async def track_page_view(request: Request):
         
         return {"success": True, "message": "Page view tracked"}
         
-    except Exception as e:
-        print(f"Error tracking page view: {e}")
+except Exception as e:
+    print(f"Error tracking page view: {e}")
         return {"success": False, "message": "Failed to track page view"}
 
 @app.get("/api/admin/page-analytics")
@@ -685,7 +685,7 @@ async def get_page_analytics(request: Request):
         # Verify admin token
         token = request.headers.get("Authorization")
         if not verify_admin_token(token):
-            return {"error": "Unauthorized"}
+        return {"error": "Unauthorized"}
         
         db = get_db()
         
@@ -743,8 +743,8 @@ async def get_page_analytics(request: Request):
             ]
         }
         
-    except Exception as e:
-        print(f"Error getting page analytics: {e}")
+except Exception as e:
+    print(f"Error getting page analytics: {e}")
         return {"error": "Failed to get analytics"}
 
 # WebSocket connection manager for streaming
@@ -759,14 +759,14 @@ class ConnectionManager:
         self.active_connections.append(websocket)
         
         # Initialize stream processor for this connection
-        from utils.stream_processor import StreamProcessor
+from utils.stream_processor import StreamProcessor
         self.stream_processors[client_id] = StreamProcessor()
         self.feedback_history[client_id] = []  # Initialize feedback history
         logger.info(f"Client {client_id} connected to stream")
     
     def disconnect(self, websocket: WebSocket, client_id: str):
         if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+        self.active_connections.remove(websocket)
         if client_id in self.stream_processors:
             del self.stream_processors[client_id]
         if client_id in self.feedback_history:
@@ -784,11 +784,11 @@ class ConnectionManager:
     
     def add_feedback_type(self, client_id: str, feedback_type: str):
         if client_id not in self.feedback_history:
-            self.feedback_history[client_id] = []
+        self.feedback_history[client_id] = []
         self.feedback_history[client_id].append(feedback_type)
         # Keep only last 3 feedback types to avoid repetition
         if len(self.feedback_history[client_id]) > 3:
-            self.feedback_history[client_id].pop(0)
+        self.feedback_history[client_id].pop(0)
 
 manager = ConnectionManager()
 
@@ -834,7 +834,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 recent_feedback_types = manager.get_feedback_history(client_id)
                 
                 # Initialize streaming Gemini client for elite coaching
-                from utils.stream_processor import StreamingGeminiClient
+from utils.stream_processor import StreamingGeminiClient
                 gemini_coach = StreamingGeminiClient()
                 
                 # Get elite-level coaching feedback (short and non-repetitive)
@@ -896,8 +896,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 
     except WebSocketDisconnect:
         manager.disconnect(websocket, client_id)
-    except Exception as e:
-        logger.error(f"WebSocket error: {e}")
+except Exception as e:
+    logger.error(f"WebSocket error: {e}")
         manager.disconnect(websocket, client_id)
 
 async def generate_fast_tts_audio(text: str) -> Optional[str]:
@@ -908,8 +908,8 @@ async def generate_fast_tts_audio(text: str) -> Optional[str]:
         
         api_key = os.getenv("ELEVENLABS_API_KEY")
         if not api_key:
-            logger.warning("ELEVENLABS_API_KEY not found, TTS disabled")
-            return None
+        logger.warning("ELEVENLABS_API_KEY not found, TTS disabled")
+        return None
         
         # Set API key
         set_api_key(api_key)
@@ -928,14 +928,14 @@ async def generate_fast_tts_audio(text: str) -> Optional[str]:
         logger.info(f"✅ TTS generated successfully, size: {len(audio_b64)} chars")
         return audio_b64
         
-    except Exception as e:
-        logger.error(f"❌ ElevenLabs TTS generation error: {e}")
-        import traceback
+except Exception as e:
+    logger.error(f"❌ ElevenLabs TTS generation error: {e}")
+import traceback
         traceback.print_exc()
         return None
 
 if __name__ == "__main__":
-    import uvicorn
+import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port) 
 
