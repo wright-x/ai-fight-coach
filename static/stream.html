@@ -355,13 +355,47 @@
         function handleWebSocketMessage(data) {
             if (data.type === 'feedback') {
                 displayFeedback(data.message);
-                speakFeedback(data.message);
+                
+                // Use ElevenLabs TTS if available, fallback to browser TTS
+                if (data.tts_audio) {
+                    playTTSAudio(data.tts_audio);
+                } else {
+                    speakFeedback(data.message);
+                }
+                
                 addToFeedbackHistory(data.message, data.analysis_data);
             } else if (data.type === 'analysis') {
                 // Show real-time analysis data (for debugging)
                 console.log('Pose Analysis:', data.data);
             } else if (data.type === 'error') {
                 showError(data.message);
+            }
+        }
+
+        function playTTSAudio(audioData) {
+            try {
+                // Convert base64 to audio blob
+                const audioBytes = atob(audioData);
+                const audioArray = new Uint8Array(audioBytes.length);
+                for (let i = 0; i < audioBytes.length; i++) {
+                    audioArray[i] = audioBytes.charCodeAt(i);
+                }
+                const audioBlob = new Blob([audioArray], { type: 'audio/mpeg' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                // Play audio
+                const audio = new Audio(audioUrl);
+                audio.volume = 0.9;
+                audio.play();
+                
+                // Clean up URL after playing
+                audio.addEventListener('ended', () => {
+                    URL.revokeObjectURL(audioUrl);
+                });
+            } catch (error) {
+                console.error('TTS audio playback failed:', error);
+                // Fallback to browser TTS
+                speakFeedback(data.message);
             }
         }
 

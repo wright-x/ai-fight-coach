@@ -747,6 +747,7 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
         self.stream_processors = {}  # websocket_id -> StreamProcessor
+        self.feedback_history = {}  # websocket_id -> list of recent feedback types
     
     async def connect(self, websocket: WebSocket, client_id: str):
         await websocket.accept()
@@ -755,6 +756,7 @@ class ConnectionManager:
         # Initialize stream processor for this connection
         from utils.stream_processor import StreamProcessor
         self.stream_processors[client_id] = StreamProcessor()
+        self.feedback_history[client_id] = []  # Initialize feedback history
         logger.info(f"Client {client_id} connected to stream")
     
     def disconnect(self, websocket: WebSocket, client_id: str):
@@ -762,6 +764,8 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
         if client_id in self.stream_processors:
             del self.stream_processors[client_id]
+        if client_id in self.feedback_history:
+            del self.feedback_history[client_id]
         logger.info(f"Client {client_id} disconnected from stream")
     
     async def send_personal_message(self, message: dict, websocket: WebSocket):
@@ -769,6 +773,17 @@ class ConnectionManager:
     
     def get_processor(self, client_id: str):
         return self.stream_processors.get(client_id)
+    
+    def get_feedback_history(self, client_id: str):
+        return self.feedback_history.get(client_id, [])
+    
+    def add_feedback_type(self, client_id: str, feedback_type: str):
+        if client_id not in self.feedback_history:
+            self.feedback_history[client_id] = []
+        self.feedback_history[client_id].append(feedback_type)
+        # Keep only last 3 feedback types to avoid repetition
+        if len(self.feedback_history[client_id]) > 3:
+            self.feedback_history[client_id].pop(0)
 
 manager = ConnectionManager()
 
@@ -810,16 +825,40 @@ async def websocket_endpoint(websocket: WebSocket):
                 # Generate comprehensive analysis and elite coaching feedback
                 comprehensive_analysis = processor.generate_comprehensive_analysis()
                 
+                # Get feedback history to avoid repetition
+                recent_feedback_types = manager.get_feedback_history(client_id)
+                
                 # Initialize streaming Gemini client for elite coaching
                 from utils.stream_processor import StreamingGeminiClient
                 gemini_coach = StreamingGeminiClient()
                 
-                # Get elite-level coaching feedback
-                elite_feedback = await gemini_coach.generate_elite_coaching_feedback(comprehensive_analysis)
+                # Get elite-level coaching feedback (short and non-repetitive)
+                elite_feedback = await gemini_coach.generate_elite_coaching_feedback(
+                    comprehensive_analysis, 
+                    recent_feedback_types
+                )
+                
+                # Determine feedback type for history tracking
+                feedback_type = "general"
+                if "stance" in elite_feedback.lower():
+                    feedback_type = "stance"
+                elif "foot" in elite_feedback.lower() or "move" in elite_feedback.lower():
+                    feedback_type = "footwork"
+                elif "hand" in elite_feedback.lower() or "guard" in elite_feedback.lower():
+                    feedback_type = "guard"
+                elif "hip" in elite_feedback.lower() or "power" in elite_feedback.lower():
+                    feedback_type = "power"
+                
+                # Add to feedback history
+                manager.add_feedback_type(client_id, feedback_type)
+                
+                # Generate fast TTS audio
+                tts_audio = await generate_fast_tts_audio(elite_feedback)
                 
                 await manager.send_personal_message({
                     "type": "feedback",
                     "message": elite_feedback,
+                    "tts_audio": tts_audio,  # Include TTS audio
                     "analysis_data": {
                         "stance_quality": comprehensive_analysis.get('stance_analysis', {}).get('stance_width_ratio', 0),
                         "footwork_activity": comprehensive_analysis.get('footwork_analysis', {}).get('total_movement', 0),
@@ -834,7 +873,30 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.error(f"WebSocket error: {e}")
         manager.disconnect(websocket, client_id)
 
-# Browser TTS is handled client-side for better performance and lower latency
+async def generate_fast_tts_audio(text: str) -> Optional[str]:
+    """Generate TTS audio with ElevenLabs and return as base64 string"""
+    try:
+        # Use ElevenLabs for fast, high-quality TTS
+        from elevenlabs import generate, Voice
+        
+        api_key = os.getenv("ELEVENLABS_API_KEY")
+        if not api_key:
+            return None
+        
+        # Use faster model and optimized voice
+        audio = generate(
+            text=text,
+            voice=Voice(voice_id="pNInz6obpgDQGcFmaJgB"),  # Adam voice - more coaching-like
+            model="eleven_turbo_v2"  # Fastest model
+        )
+        
+        # Convert to base64 for transmission
+        audio_b64 = base64.b64encode(audio).decode()
+        return audio_b64
+        
+    except Exception as e:
+        logger.error(f"Fast TTS generation error: {e}")
+        return None
 
 if __name__ == "__main__":
     import uvicorn

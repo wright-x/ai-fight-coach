@@ -37,12 +37,14 @@ class StreamProcessor:
         self.last_analysis_time = datetime.now()
         self.pose_history = []  # Store last 30 poses for pattern analysis
         self.current_errors = []  # Current technique errors
-        self.feedback_history = []  # Recent feedback given
+        self.feedback_history = []  # Recent feedback given (to avoid repetition)
+        self.last_feedback_type = None  # Track last feedback type
         
         # Analysis parameters
         self.analysis_frequency = 1.0  # Analyze every second
         self.feedback_cooldown = 10.0  # 10 seconds between feedback
         self.pose_history_size = 30  # Keep 30 poses in history
+        self.frames_without_pose = 0  # Track frames without pose detection
         
         logger.info("✅ StreamProcessor initialized")
 
@@ -74,6 +76,7 @@ class StreamProcessor:
             
             if results.pose_landmarks:
                 analysis_result['pose_detected'] = True
+                self.frames_without_pose = 0  # Reset counter
                 
                 # Extract key pose points
                 pose_data = self._extract_pose_data(results.pose_landmarks)
@@ -98,6 +101,11 @@ class StreamProcessor:
                     if time_since_last_feedback >= self.feedback_cooldown and errors:
                         analysis_result['should_give_feedback'] = True
                         self.last_analysis_time = current_time
+            else:
+                # No pose detected
+                self.frames_without_pose += 1
+                if self.frames_without_pose > 10:  # After 10 frames without pose
+                    analysis_result['no_pose_detected'] = True
             
             return analysis_result
             
@@ -499,46 +507,41 @@ class StreamingGeminiClient:
         
         logger.info("✅ Elite StreamingGeminiClient initialized")
     
-    async def generate_elite_coaching_feedback(self, comprehensive_analysis: Dict) -> str:
+    async def generate_elite_coaching_feedback(self, comprehensive_analysis: Dict, last_feedback_types: list = None) -> str:
         """
-        Generate world-class boxing coaching feedback using comprehensive technical analysis
-        Returns detailed, actionable feedback like the best trainers in the world
+        Generate concise, non-repetitive elite coaching feedback (15 words max)
         """
         try:
             if comprehensive_analysis.get("insufficient_data"):
-                return "Keep moving, I'm analyzing your technique. Show me more combinations."
+                return "Show me your stance and start moving."
             
-            # Create elite-level coaching prompt
+            if comprehensive_analysis.get("no_pose_detected"):
+                return "Step back, I can't see you properly. Get in frame."
+            
+            # Avoid repetition
+            if last_feedback_types is None:
+                last_feedback_types = []
+            
+            # Create short, specific coaching prompt
             prompt = f"""
-You are Freddie Roach, the legendary boxing trainer who trained Manny Pacquiao, Miguel Cotto, and Amir Khan. You're giving LIVE coaching feedback during a training session.
+You are giving LIVE boxing coaching feedback. Be EXTREMELY concise - maximum 15 words.
 
-CURRENT TECHNICAL ANALYSIS:
-Stance: {comprehensive_analysis.get('stance_analysis', {})}
-Footwork: {comprehensive_analysis.get('footwork_analysis', {})}
-Guard: {comprehensive_analysis.get('guard_analysis', {})}
-Power Mechanics: {comprehensive_analysis.get('power_generation_analysis', {})}
-Balance: {comprehensive_analysis.get('balance_analysis', {})}
-Head Movement: {comprehensive_analysis.get('head_movement_analysis', {})}
-Elite Comparison: {comprehensive_analysis.get('comparison_to_elite', {})}
+ANALYSIS DATA:
+Stance Quality: {comprehensive_analysis.get('stance_analysis', {}).get('stance_width_ratio', 0):.1f}
+Footwork Activity: {comprehensive_analysis.get('footwork_analysis', {}).get('total_movement', 0):.1f}
+Guard Height: {comprehensive_analysis.get('guard_analysis', {}).get('hand_height', 0):.1f}
+Power Mechanics: {comprehensive_analysis.get('power_generation_analysis', {}).get('kinetic_chain_efficiency', 0):.1f}
 
-Give me REAL coaching feedback like you would to a professional fighter. Focus on:
+AVOID REPEATING: {', '.join(last_feedback_types) if last_feedback_types else 'None'}
 
-1. SPECIFIC technical corrections (not generic praise)
-2. FOOTWORK improvements (like you taught Pacquiao)
-3. POWER generation through proper mechanics
-4. DEFENSIVE positioning and head movement
-5. What elite boxers do differently
+Give ONE specific instruction. Examples:
+- "Hands higher, protect that chin"
+- "Get on your toes, more bounce"
+- "Turn that back hip through"
+- "Move your head after punching"
+- "Widen stance, better balance"
 
-Examples of your style:
-- "Turn that back foot more, you're losing power in your right hand"
-- "Step to the left after every jab, make them miss"
-- "Your weight is on your heels, get on the balls of your feet"
-- "Hands up, chin down, you're giving me a target"
-- "Circle left, use your jab to set up the left hook"
-
-Give me 2-3 sentences of SPECIFIC technical advice. Be direct, be honest, be detailed like you're preparing someone for a title fight.
-
-RESPOND AS FREDDIE ROACH HIMSELF:
+RESPONSE (15 words maximum):
 """
 
             response = await asyncio.to_thread(
@@ -548,46 +551,49 @@ RESPOND AS FREDDIE ROACH HIMSELF:
             
             feedback = response.text.strip()
             
-            # Ensure it's not too long for TTS (max 200 characters for better speech)
-            if len(feedback) > 200:
-                # Split into sentences and take first 2
-                sentences = feedback.split('.')[:2]
-                feedback = '. '.join(sentences) + '.'
+            # Force 15 word limit
+            words = feedback.split()
+            if len(words) > 15:
+                feedback = ' '.join(words[:15])
             
             return feedback
             
         except Exception as e:
             logger.error(f"Elite Gemini coaching error: {e}")
-            # Fallback to professional-level advice
-            return self._generate_fallback_elite_feedback(comprehensive_analysis)
+            # Fallback to short advice
+            return self._generate_short_fallback_feedback(comprehensive_analysis, last_feedback_types)
     
-    def _generate_fallback_elite_feedback(self, analysis: Dict) -> str:
-        """Fallback elite-level feedback when Gemini fails"""
+    def _generate_short_fallback_feedback(self, analysis: Dict, last_feedback_types: list = None) -> str:
+        """Generate short fallback feedback when Gemini fails"""
         
         stance = analysis.get('stance_analysis', {})
         footwork = analysis.get('footwork_analysis', {}) 
         guard = analysis.get('guard_analysis', {})
         power = analysis.get('power_generation_analysis', {})
         
-        # Professional-level observations
-        if stance.get('stance_width_ratio', 1.0) < 0.8:
-            return "Widen that stance, you need a solid base to generate power. Get those feet shoulder-width apart and stay balanced."
+        # Short, specific observations (15 words max)
+        if stance.get('stance_width_ratio', 1.0) < 0.8 and 'stance' not in (last_feedback_types or []):
+            return "Widen that stance, better balance."
         
-        if footwork.get('total_movement', 0) < 0.1:
-            return "You're standing still like a heavy bag. Move your feet! Lateral movement, in and out, make yourself a hard target."
+        if footwork.get('total_movement', 0) < 0.1 and 'footwork' not in (last_feedback_types or []):
+            return "Move your feet, you're standing still."
         
-        if guard.get('hand_height', 0) < 0.7:
-            return "Hands up! Keep those gloves at cheek level. Every time you drop your hands, you're giving me your chin."
+        if guard.get('hand_height', 0) < 0.7 and 'guard' not in (last_feedback_types or []):
+            return "Hands up, protect that chin."
         
-        if power.get('kinetic_chain_efficiency', 1.0) > 0.5:
-            return "Your power comes from the ground up. Turn that back hip, rotate through your shots, use your whole body."
+        if power.get('kinetic_chain_efficiency', 1.0) > 0.5 and 'power' not in (last_feedback_types or []):
+            return "Turn that back hip through."
         
-        # Default professional advice
-        elite_advice = [
-            "Work that jab more, it's your most important weapon. Use it to measure distance and set up combinations.",
-            "Stay relaxed until you throw. Tension kills speed and power. Breathe and flow.",
-            "After every combination, move your head. Hit and don't get hit, that's the sweet science.",
-            "Plant your feet when you punch, move when you're not punching. Know when to be mobile and when to be solid."
+        # Default short advice (avoid repetition)
+        short_advice = [
+            "Good, keep that rhythm going.",
+            "Nice form, stay focused.",
+            "Breathe and stay relaxed.",
+            "Move your head after punching.",
+            "Get on your toes more.",
+            "Circle left, use angles.",
+            "Double up that jab.",
+            "Snap those punches back."
         ]
         
-        return np.random.choice(elite_advice)
+        return np.random.choice(short_advice)
