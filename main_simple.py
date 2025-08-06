@@ -174,11 +174,15 @@ logger = logging.getLogger(__name__)
 try:
     from utils.video_processor import VideoProcessor
     from utils.gemini_client import GeminiClient
-        from utils.tts_client import TTSClient
-    
-    video_processor = VideoProcessor()
-    gemini_client = GeminiClient()
-    tts_client = TTSClient()
+    from utils.tts_client import TTSClient
+
+    try:
+        video_processor = VideoProcessor()
+        gemini_client = GeminiClient()
+        tts_client = TTSClient()
+    except Exception as e:
+        logger.error(f"Component initialization failed: {e}")
+        raise
     
     logger.info("✅ Components initialized:")
     logger.info(f"   - VideoProcessor: {type(video_processor)}")
@@ -246,7 +250,7 @@ def create_user(db: Session, email: str, name: str = None):
         db.commit()
         db.refresh(new_user)
         return new_user
-        except Exception as e:
+    except Exception as e:
         db.rollback()
         print(f"Error creating user: {e}")
         raise e
@@ -271,7 +275,7 @@ async def register_user(request: Request):
             "message": "Registration successful",
             "user_id": user.id
         })
-        except Exception as e:
+    except Exception as e:
         print(f"Registration error: {e}")
         return JSONResponse({"success": False, "message": str(e)})
 
@@ -347,7 +351,7 @@ async def admin_users(db: Session = Depends(get_db), _: bool = Depends(verify_ad
         return result
     except HTTPException:
         raise
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Admin users error: {e}")
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
@@ -387,7 +391,7 @@ async def admin_jobs(db: Session = Depends(get_db), _: bool = Depends(verify_adm
         return result
     except HTTPException:
         raise
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Admin jobs error: {e}")
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
@@ -462,7 +466,7 @@ async def upload_video(
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             logger.info(f"File saved to {file_path}")
-            except Exception as e:
+        except Exception as e:
             logger.error(f"File save failed: {e}")
             return JSONResponse({
                 "success": False,
@@ -480,7 +484,7 @@ async def upload_video(
         try:
             await process_video_analysis(job.id, db)
             logger.info(f"Video processing completed for job {job.id}")
-            except Exception as e:
+        except Exception as e:
             logger.error(f"Video processing failed: {e}")
             # Don't fail the upload, just log the error
         
@@ -519,7 +523,7 @@ async def get_status(job_id: str, db: Session = Depends(get_db)):
             "created_ts": job.created_ts.isoformat()
         }
         
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Status error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -617,7 +621,7 @@ async def process_video_analysis(job_id: str, db: Session):
                 logger.info(f"Highlight video created successfully: {output_video_path}")
             except Exception as video_error:
                 logger.error(f"Video creation failed for job {job_id}: {video_error}")
-    else:
+        else:
             logger.warning(f"No highlights found for job {job_id}")
                 
         # Update job status
@@ -669,7 +673,7 @@ async def track_page_view(request: Request):
         
         return {"success": True, "message": "Page view tracked"}
         
-        except Exception as e:
+    except Exception as e:
         print(f"Error tracking page view: {e}")
         return {"success": False, "message": "Failed to track page view"}
 
@@ -738,7 +742,7 @@ async def get_page_analytics(request: Request):
             ]
         }
         
-        except Exception as e:
+    except Exception as e:
         print(f"Error getting page analytics: {e}")
         return {"error": "Failed to get analytics"}
 
@@ -908,7 +912,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 
     except WebSocketDisconnect:
         manager.disconnect(websocket, client_id)
-        except Exception as e:
+    except Exception as e:
         logger.error(f"WebSocket error: {e}")
         manager.disconnect(websocket, client_id)
 
@@ -950,4 +954,6 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port) 
+
+
 
