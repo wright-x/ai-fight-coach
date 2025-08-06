@@ -485,7 +485,7 @@ async def upload_video(
         try:
             await process_video_analysis(job.id, db)
             logger.info(f"Video processing completed for job {job.id}")
-            except Exception as e:
+        except Exception as e:
             logger.error(f"Video processing failed: {e}")
             # Don't fail the upload, just log the error
         
@@ -622,7 +622,7 @@ async def process_video_analysis(job_id: str, db: Session):
                 logger.info(f"Highlight video created successfully: {output_video_path}")
             except Exception as video_error:
                 logger.error(f"Video creation failed for job {job_id}: {video_error}")
-    else:
+        else:
             logger.warning(f"No highlights found for job {job_id}")
                 
         # Update job status
