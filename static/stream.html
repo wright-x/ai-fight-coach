@@ -641,12 +641,7 @@
             <button class="btn btn-secondary" id="startBtn" onclick="startStream()">
                 Request Camera Access
             </button>
-            <button class="btn btn-secondary" id="audioTestBtn" onclick="testAudio()" style="display: none;">
-                🔊 Test Audio (iPhone)
-            </button>
-            <button class="btn btn-secondary" id="ttsTestBtn" onclick="testElevenLabsTTS()" style="display: none;">
-                🎤 Test ElevenLabs
-            </button>
+
             <button class="btn btn-primary" id="trainingBtn" onclick="startTraining()" disabled>
                 Start Training
             </button>
@@ -707,45 +702,7 @@
             }
         });
 
-        function testAudio() {
-            // Test browser TTS first
-            if ('speechSynthesis' in window) {
-                speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance("Audio test successful. You should hear this message.");
-                utterance.rate = 0.9;
-                utterance.pitch = 0.9;
-                utterance.volume = 1.0;
-                speechSynthesis.speak(utterance);
-                console.log('🔊 Testing browser TTS on iPhone');
-            }
-            
-            // Initialize audio context
-            if (!hasUserInteracted) {
-                initAudioContext();
-                hasUserInteracted = true;
-                console.log('🔊 Audio context initialized after user interaction');
-            }
-            
-            displayFeedback('Audio test - you should hear this message!');
-        }
 
-        function testElevenLabsTTS() {
-            console.log('🎤 [iPhone] Testing ElevenLabs TTS...');
-            
-            if (websocket && websocket.readyState === WebSocket.OPEN) {
-                // Send a test request to backend
-                websocket.send(JSON.stringify({
-                    type: 'test_tts',
-                    message: 'This is a test of ElevenLabs TTS on iPhone',
-                    timestamp: Date.now()
-                }));
-                
-                displayFeedback('Testing ElevenLabs TTS - check console for details');
-            } else {
-                console.log('❌ [iPhone] WebSocket not connected');
-                displayFeedback('WebSocket not connected. Start training first.');
-            }
-        }
 
         function setupWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

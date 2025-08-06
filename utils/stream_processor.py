@@ -11,22 +11,26 @@ import base64
 import json
 import asyncio
 import logging
+import time
+import re
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
+from collections import deque
 import io
 from PIL import Image
 
 logger = logging.getLogger(__name__)
 
 class StreamProcessor:
-    """Real-time video analysis for live streaming"""
+    """Processes video frames in real-time for live boxing analysis"""
     
     def __init__(self):
-        # Initialize MediaPipe
+        # Initialize MediaPipe Pose
         self.mp_pose = mp.solutions.pose
+        self.mp_drawing = mp.solutions.drawing_utils
         self.pose = self.mp_pose.Pose(
             static_image_mode=False,
-            model_complexity=1,  # Balance between speed and accuracy
+            model_complexity=1,
             enable_segmentation=False,
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5
@@ -34,426 +38,235 @@ class StreamProcessor:
         
         # Analysis state
         self.frame_count = 0
-        self.last_analysis_time = datetime.now()
-        self.pose_history = []  # Store last 30 poses for pattern analysis
-        self.current_errors = []  # Current technique errors
-        self.feedback_history = []  # Recent feedback given (to avoid repetition)
-        self.last_feedback_type = None  # Track last feedback type
+        self.pose_history = deque(maxlen=30)  # Store last 30 poses for analysis
+        self.current_errors = []
+        self.feedback_history = []
+        self.last_feedback_type = None
+        self.frames_without_pose = 0
         
-        # Analysis parameters
-        self.analysis_frequency = 1.0  # Analyze every second
-        self.feedback_cooldown = 10.0  # 10 seconds between feedback
-        self.pose_history_size = 30  # Keep 30 poses in history
-        self.frames_without_pose = 0  # Track frames without pose detection
-        
-        logger.info("✅ StreamProcessor initialized")
-
+        logger.info("✅ StreamProcessor initialized with MediaPipe Pose")
+    
     def process_frame(self, frame_data: str) -> Dict:
-        """
-        Process a single frame from the video stream
-        Returns analysis results and any immediate feedback
-        """
+        """Process a single frame and extract pose data"""
         try:
-            # Decode base64 image
-            image_data = base64.b64decode(frame_data.split(',')[1])
-            image = Image.open(io.BytesIO(image_data))
-            frame = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+            # Decode base64 frame
+            img_data = base64.b64decode(frame_data.split(',')[1])
+            img = Image.open(io.BytesIO(img_data))
+            img_array = np.array(img)
             
-            self.frame_count += 1
-            current_time = datetime.now()
+            # Convert to RGB
+            if len(img_array.shape) == 3 and img_array.shape[2] == 3:
+                rgb_frame = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+            else:
+                rgb_frame = img_array
             
             # Process with MediaPipe
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = self.pose.process(frame_rgb)
+            results = self.pose.process(rgb_frame)
             
-            analysis_result = {
-                'frame_count': self.frame_count,
-                'timestamp': current_time.isoformat(),
-                'pose_detected': False,
-                'errors': [],
-                'should_give_feedback': False
-            }
+            self.frame_count += 1
             
             if results.pose_landmarks:
-                analysis_result['pose_detected'] = True
-                self.frames_without_pose = 0  # Reset counter
-                
-                # Extract key pose points
+                # Extract pose data
                 pose_data = self._extract_pose_data(results.pose_landmarks)
+                self.pose_history.append(pose_data)
+                self.frames_without_pose = 0
                 
-                # Add to pose history
-                self.pose_history.append({
-                    'timestamp': current_time,
-                    'pose_data': pose_data
-                })
-                
-                # Keep only recent poses
-                if len(self.pose_history) > self.pose_history_size:
-                    self.pose_history.pop(0)
-                
-                # Analyze technique if we have enough data
-                if len(self.pose_history) >= 5:  # Need at least 5 poses
-                    errors = self._analyze_technique()
-                    analysis_result['errors'] = errors
-                    
-                    # Check if we should give feedback
-                    time_since_last_feedback = (current_time - self.last_analysis_time).total_seconds()
-                    if time_since_last_feedback >= self.feedback_cooldown and errors:
-                        analysis_result['should_give_feedback'] = True
-                        self.last_analysis_time = current_time
+                return {
+                    "success": True,
+                    "pose_detected": True,
+                    "pose_data": pose_data,
+                    "frame_count": self.frame_count
+                }
             else:
-                # No pose detected
                 self.frames_without_pose += 1
-                if self.frames_without_pose > 10:  # After 10 frames without pose
-                    analysis_result['no_pose_detected'] = True
-            
-            return analysis_result
-            
+                return {
+                    "success": True,
+                    "pose_detected": False,
+                    "frames_without_pose": self.frames_without_pose,
+                    "frame_count": self.frame_count
+                }
+                
         except Exception as e:
             logger.error(f"Frame processing error: {e}")
             return {
-                'frame_count': self.frame_count,
-                'timestamp': datetime.now().isoformat(),
-                'error': str(e)
+                "success": False,
+                "error": str(e),
+                "frame_count": self.frame_count
             }
-
+    
     def _extract_pose_data(self, landmarks) -> Dict:
-        """Extract key pose points for analysis"""
-        # Key landmarks for boxing analysis
-        key_points = {
-            'nose': landmarks.landmark[0],
-            'left_shoulder': landmarks.landmark[11],
-            'right_shoulder': landmarks.landmark[12],
-            'left_elbow': landmarks.landmark[13],
-            'right_elbow': landmarks.landmark[14],
-            'left_wrist': landmarks.landmark[15],
-            'right_wrist': landmarks.landmark[16],
-            'left_hip': landmarks.landmark[23],
-            'right_hip': landmarks.landmark[24],
-            'left_knee': landmarks.landmark[25],
-            'right_knee': landmarks.landmark[26],
-            'left_ankle': landmarks.landmark[27],
-            'right_ankle': landmarks.landmark[28]
-        }
-        
-        # Convert to x, y coordinates
-        pose_data = {}
-        for name, landmark in key_points.items():
-            pose_data[name] = {
-                'x': landmark.x,
-                'y': landmark.y,
-                'visibility': landmark.visibility
-            }
-        
-        return pose_data
-
-    def _analyze_technique(self) -> List[str]:
-        """
-        Analyze recent poses for technique errors
-        Returns list of current errors
-        """
-        errors = []
-        
-        if len(self.pose_history) < 5:
-            return errors
-        
-        # Get latest pose
-        latest_pose = self.pose_history[-1]['pose_data']
-        
-        # Check guard position
-        guard_error = self._check_guard_position(latest_pose)
-        if guard_error:
-            errors.append(guard_error)
-        
-        # Check stance
-        stance_error = self._check_stance(latest_pose)
-        if stance_error:
-            errors.append(stance_error)
-        
-        # Check head position
-        head_error = self._check_head_position(latest_pose)
-        if head_error:
-            errors.append(head_error)
-        
-        # Check movement patterns (requires history)
-        movement_error = self._check_movement_patterns()
-        if movement_error:
-            errors.append(movement_error)
-        
-        return errors
-
-    def _check_guard_position(self, pose_data: Dict) -> Optional[str]:
-        """Check if hands are in proper guard position"""
+        """Extract relevant pose data from MediaPipe landmarks"""
         try:
-            left_wrist = pose_data['left_wrist']
-            right_wrist = pose_data['right_wrist']
-            nose = pose_data['nose']
-            
-            # Hands should be roughly at face level for guard
-            face_level = nose['y']
-            left_hand_level = left_wrist['y']
-            right_hand_level = right_wrist['y']
-            
-            # Allow some tolerance
-            tolerance = 0.15
-            
-            if abs(left_hand_level - face_level) > tolerance or abs(right_hand_level - face_level) > tolerance:
-                return "Keep your hands up in guard position"
-            
-            return None
-        except KeyError:
-            return None
-
-    def _check_stance(self, pose_data: Dict) -> Optional[str]:
-        """Check if stance is balanced and stable"""
-        try:
-            left_ankle = pose_data['left_ankle']
-            right_ankle = pose_data['right_ankle']
-            left_hip = pose_data['left_hip']
-            right_hip = pose_data['right_hip']
-            
-            # Check foot positioning
-            foot_distance = abs(left_ankle['x'] - right_ankle['x'])
-            
-            # Feet should be shoulder-width apart
-            shoulder_width = abs(left_hip['x'] - right_hip['x'])
-            
-            if foot_distance < shoulder_width * 0.7:
-                return "Widen your stance for better balance"
-            elif foot_distance > shoulder_width * 1.5:
-                return "Narrow your stance slightly"
-            
-            return None
-        except KeyError:
-            return None
-
-    def _check_head_position(self, pose_data: Dict) -> Optional[str]:
-        """Check head and chin position"""
-        try:
-            nose = pose_data['nose']
-            left_shoulder = pose_data['left_shoulder']
-            right_shoulder = pose_data['right_shoulder']
-            
-            # Head should be centered over shoulders
-            shoulder_center_x = (left_shoulder['x'] + right_shoulder['x']) / 2
-            head_offset = abs(nose['x'] - shoulder_center_x)
-            
-            if head_offset > 0.1:  # 10% tolerance
-                return "Keep your head centered over your shoulders"
-            
-            # Check if chin is tucked (nose should be above shoulder line)
-            shoulder_y = (left_shoulder['y'] + right_shoulder['y']) / 2
-            if nose['y'] > shoulder_y:
-                return "Tuck your chin down for protection"
-            
-            return None
-        except KeyError:
-            return None
-
-    def _check_movement_patterns(self) -> Optional[str]:
-        """Analyze movement patterns over time"""
-        if len(self.pose_history) < 10:
-            return None
-        
-        try:
-            # Check for foot movement (good)
-            recent_poses = self.pose_history[-10:]
-            left_foot_positions = [pose['pose_data']['left_ankle']['x'] for pose in recent_poses]
-            right_foot_positions = [pose['pose_data']['right_ankle']['x'] for pose in recent_poses]
-            
-            # Calculate movement variance
-            left_variance = np.var(left_foot_positions)
-            right_variance = np.var(right_foot_positions)
-            
-            # If very little movement, encourage footwork
-            if left_variance < 0.001 and right_variance < 0.001:
-                return "Add more footwork and movement"
-            
-            # Check for head movement
-            head_positions = [pose['pose_data']['nose']['x'] for pose in recent_poses]
-            head_variance = np.var(head_positions)
-            
-            if head_variance < 0.0005:
-                return "Practice head movement and slipping"
-            
-            return None
-        except (KeyError, IndexError):
-            return None
-
-    def generate_comprehensive_analysis(self) -> Dict:
-        """
-        Generate comprehensive technical analysis for Gemini
-        Returns detailed pose data, movement patterns, and context for elite-level coaching
-        """
-        if len(self.pose_history) < 10:
-            return {"insufficient_data": True}
-        
-        recent_poses = self.pose_history[-10:]
-        analysis = {
-            "stance_analysis": self._analyze_stance_details(),
-            "guard_analysis": self._analyze_guard_details(), 
-            "footwork_analysis": self._analyze_footwork_patterns(),
-            "head_movement_analysis": self._analyze_head_movement(),
-            "balance_analysis": self._analyze_balance_distribution(),
-            "power_generation_analysis": self._analyze_power_mechanics(),
-            "defensive_positioning": self._analyze_defensive_setup(),
-            "movement_efficiency": self._analyze_movement_efficiency(),
-            "timing_patterns": self._analyze_timing_patterns(),
-            "comparison_to_elite": self._compare_to_professional_standards()
-        }
-        
-        return analysis
-
-    def _analyze_stance_details(self) -> Dict:
-        """Detailed stance analysis like a world-class trainer would do"""
-        if len(self.pose_history) < 5:
-            return {}
-        
-        latest_pose = self.pose_history[-1]['pose_data']
-        
-        try:
-            left_ankle = latest_pose['left_ankle']
-            right_ankle = latest_pose['right_ankle']
-            left_knee = latest_pose['left_knee'] 
-            right_knee = latest_pose['right_knee']
-            left_hip = latest_pose['left_hip']
-            right_hip = latest_pose['right_hip']
-            
-            # Calculate foot positioning
-            foot_distance = abs(left_ankle['x'] - right_ankle['x'])
-            shoulder_width = abs(left_hip['x'] - right_hip['x'])
-            stance_ratio = foot_distance / shoulder_width if shoulder_width > 0 else 0
-            
-            # Analyze weight distribution
-            left_weight = (left_knee['y'] + left_hip['y']) / 2
-            right_weight = (right_knee['y'] + right_hip['y']) / 2
-            weight_balance = abs(left_weight - right_weight)
-            
-            # Check for orthodox vs southpaw
-            is_orthodox = left_ankle['x'] < right_ankle['x']
+            # Get key landmarks
+            nose = landmarks.landmark[self.mp_pose.PoseLandmark.NOSE]
+            left_shoulder = landmarks.landmark[self.mp_pose.PoseLandmark.LEFT_SHOULDER]
+            right_shoulder = landmarks.landmark[self.mp_pose.PoseLandmark.RIGHT_SHOULDER]
+            left_elbow = landmarks.landmark[self.mp_pose.PoseLandmark.LEFT_ELBOW]
+            right_elbow = landmarks.landmark[self.mp_pose.PoseLandmark.RIGHT_ELBOW]
+            left_wrist = landmarks.landmark[self.mp_pose.PoseLandmark.LEFT_WRIST]
+            right_wrist = landmarks.landmark[self.mp_pose.PoseLandmark.RIGHT_WRIST]
+            left_hip = landmarks.landmark[self.mp_pose.PoseLandmark.LEFT_HIP]
+            right_hip = landmarks.landmark[self.mp_pose.PoseLandmark.RIGHT_HIP]
+            left_ankle = landmarks.landmark[self.mp_pose.PoseLandmark.LEFT_ANKLE]
+            right_ankle = landmarks.landmark[self.mp_pose.PoseLandmark.RIGHT_ANKLE]
             
             return {
-                "stance_width_ratio": stance_ratio,
-                "weight_distribution": weight_balance,
-                "stance_type": "orthodox" if is_orthodox else "southpaw",
-                "foot_angle_analysis": self._calculate_foot_angles(),
-                "knee_bend_analysis": self._analyze_knee_positioning(),
-                "hip_alignment": self._analyze_hip_alignment()
+                "nose": {"x": nose.x, "y": nose.y, "z": nose.z},
+                "shoulders": {
+                    "left": {"x": left_shoulder.x, "y": left_shoulder.y, "z": left_shoulder.z},
+                    "right": {"x": right_shoulder.x, "y": right_shoulder.y, "z": right_shoulder.z}
+                },
+                "elbows": {
+                    "left": {"x": left_elbow.x, "y": left_elbow.y, "z": left_elbow.z},
+                    "right": {"x": right_elbow.x, "y": right_elbow.y, "z": right_elbow.z}
+                },
+                "wrists": {
+                    "left": {"x": left_wrist.x, "y": left_wrist.y, "z": left_wrist.z},
+                    "right": {"x": right_wrist.x, "y": right_wrist.y, "z": right_wrist.z}
+                },
+                "hips": {
+                    "left": {"x": left_hip.x, "y": left_hip.y, "z": left_hip.z},
+                    "right": {"x": right_hip.x, "y": right_hip.y, "z": right_hip.z}
+                },
+                "ankles": {
+                    "left": {"x": left_ankle.x, "y": left_ankle.y, "z": left_ankle.z},
+                    "right": {"x": right_ankle.x, "y": right_ankle.y, "z": right_ankle.z}
+                },
+                "timestamp": time.time()
             }
-        except KeyError:
+        except Exception as e:
+            logger.error(f"Pose data extraction error: {e}")
             return {}
-
-    def _analyze_footwork_patterns(self) -> Dict:
-        """Analyze footwork like Freddie Roach or Abel Sanchez would"""
-        if len(self.pose_history) < 15:
-            return {}
+    
+    def generate_comprehensive_analysis(self) -> Dict:
+        """Generate comprehensive analysis based on recent pose history"""
+        if len(self.pose_history) < 5:
+            return {"insufficient_data": True}
         
-        # Track foot movement over time
-        recent_poses = self.pose_history[-15:]
+        if self.frames_without_pose > 10:
+            return {"no_pose_detected": True}
         
-        left_foot_path = [(pose['pose_data']['left_ankle']['x'], pose['pose_data']['left_ankle']['y']) 
-                         for pose in recent_poses if 'left_ankle' in pose['pose_data']]
-        right_foot_path = [(pose['pose_data']['right_ankle']['x'], pose['pose_data']['right_ankle']['y']) 
-                          for pose in recent_poses if 'right_ankle' in pose['pose_data']]
+        try:
+            return {
+                "stance_analysis": self._analyze_stance_details(),
+                "footwork_analysis": self._analyze_footwork_patterns(),
+                "guard_analysis": self._analyze_guard_details(),
+                "head_movement_analysis": self._analyze_head_movement(),
+                "balance_analysis": self._analyze_balance_distribution(),
+                "power_generation_analysis": self._analyze_power_mechanics(),
+                "defensive_analysis": self._analyze_defensive_positioning(),
+                "movement_efficiency": self._analyze_movement_efficiency(),
+                "timing_analysis": self._analyze_timing_patterns(),
+                "comparison_to_elite": self._compare_to_professional_standards()
+            }
+        except Exception as e:
+            logger.error(f"Analysis generation error: {e}")
+            return {"analysis_error": True}
+    
+    def _analyze_stance_details(self):
+        """Analyze stance width, balance, and positioning"""
+        if not self.pose_history:
+            return {"stance_width_ratio": 0.5}
         
-        # Calculate movement metrics
-        left_distance = sum(np.sqrt((left_foot_path[i][0] - left_foot_path[i-1][0])**2 + 
-                                   (left_foot_path[i][1] - left_foot_path[i-1][1])**2) 
-                           for i in range(1, len(left_foot_path)))
+        recent_poses = list(self.pose_history)[-10:]
+        stance_widths = []
         
-        right_distance = sum(np.sqrt((right_foot_path[i][0] - right_foot_path[i-1][0])**2 + 
-                                    (right_foot_path[i][1] - right_foot_path[i-1][1])**2) 
-                            for i in range(1, len(right_foot_path)))
+        for pose in recent_poses:
+            if 'ankles' in pose:
+                left_ankle = pose['ankles']['left']
+                right_ankle = pose['ankles']['right']
+                width = abs(left_ankle['x'] - right_ankle['x'])
+                stance_widths.append(width)
+        
+        avg_width = np.mean(stance_widths) if stance_widths else 0.5
+        return {
+            "stance_width_ratio": min(max(avg_width, 0.0), 2.0),
+            "balance_score": 0.7,
+            "weight_distribution": 0.5
+        }
+    
+    def _analyze_footwork_patterns(self):
+        """Analyze footwork activity and movement patterns"""
+        if len(self.pose_history) < 3:
+            return {"total_movement": 0.0}
+        
+        movement_sum = 0
+        for i in range(1, len(self.pose_history)):
+            prev_pose = self.pose_history[i-1]
+            curr_pose = self.pose_history[i]
+            
+            if 'ankles' in prev_pose and 'ankles' in curr_pose:
+                left_movement = abs(curr_pose['ankles']['left']['x'] - prev_pose['ankles']['left']['x'])
+                right_movement = abs(curr_pose['ankles']['right']['x'] - prev_pose['ankles']['right']['x'])
+                movement_sum += (left_movement + right_movement) / 2
         
         return {
-            "total_movement": left_distance + right_distance,
-            "left_foot_activity": left_distance,
-            "right_foot_activity": right_distance,
-            "movement_balance": abs(left_distance - right_distance),
+            "total_movement": min(movement_sum * 10, 2.0),
             "pivot_frequency": self._calculate_pivot_frequency(),
             "step_rhythm": self._analyze_step_rhythm(),
             "lateral_movement": self._analyze_lateral_movement(),
-            "forward_backward_ratio": self._analyze_directional_movement()
+            "directional_balance": self._analyze_directional_movement()
         }
-
-    def _analyze_power_mechanics(self) -> Dict:
-        """Analyze power generation like Teddy Atlas or Nacho Beristain"""
-        latest_pose = self.pose_history[-1]['pose_data']
-        
-        try:
-            # Hip rotation analysis
-            left_hip = latest_pose['left_hip']
-            right_hip = latest_pose['right_hip']
-            hip_angle = np.arctan2(right_hip['y'] - left_hip['y'], right_hip['x'] - left_hip['x'])
-            
-            # Shoulder alignment for power generation
-            left_shoulder = latest_pose['left_shoulder']
-            right_shoulder = latest_pose['right_shoulder']
-            shoulder_angle = np.arctan2(right_shoulder['y'] - left_shoulder['y'], 
-                                      right_shoulder['x'] - left_shoulder['x'])
-            
-            # Kinetic chain analysis
-            kinetic_chain_alignment = abs(hip_angle - shoulder_angle)
-            
-            return {
-                "hip_rotation_angle": hip_angle,
-                "shoulder_alignment": shoulder_angle,
-                "kinetic_chain_efficiency": kinetic_chain_alignment,
-                "core_engagement": self._analyze_core_stability(),
-                "ground_connection": self._analyze_ground_force_transfer(),
-                "rotation_timing": self._analyze_rotation_timing()
-            }
-        except KeyError:
-            return {}
-
-    def _compare_to_professional_standards(self) -> Dict:
-        """Compare technique to elite boxer standards"""
-        return {
-            "canelo_stance_similarity": 0.7,  # Placeholder - would use ML model
-            "floyd_footwork_similarity": 0.6,
-            "lomachenko_movement_similarity": 0.5,
-            "ggg_power_mechanics": 0.8,
-            "elite_guard_positioning": 0.6,
-            "professional_balance": 0.7
-        }
-
-    def reset_analysis(self):
-        """Reset analysis state for new session"""
-        self.frame_count = 0
-        self.pose_history = []
-        self.current_errors = []
-        self.feedback_history = []
-        self.last_analysis_time = datetime.now()
-        logger.info("Analysis state reset")
-
-    # Helper methods for comprehensive analysis
-    def _calculate_foot_angles(self):
-        """Calculate foot positioning angles"""
-        return {"left_foot_angle": 15, "right_foot_angle": 45}  # Placeholder
-    
-    def _analyze_knee_positioning(self):
-        """Analyze knee bend and positioning"""
-        return {"knee_bend_optimal": 0.8, "knee_alignment": 0.9}
-    
-    def _analyze_hip_alignment(self):
-        """Analyze hip positioning and alignment"""
-        return {"hip_square_percentage": 0.7, "hip_rotation_ready": 0.8}
     
     def _analyze_guard_details(self):
-        """Detailed guard analysis"""
-        return {"hand_height": 0.9, "elbow_positioning": 0.8, "guard_tightness": 0.7}
+        """Analyze guard positioning and hand height"""
+        if not self.pose_history:
+            return {"hand_height": 0.5}
+        
+        recent_poses = list(self.pose_history)[-5:]
+        hand_heights = []
+        
+        for pose in recent_poses:
+            if 'wrists' in pose and 'shoulders' in pose:
+                left_hand_height = pose['shoulders']['left']['y'] - pose['wrists']['left']['y']
+                right_hand_height = pose['shoulders']['right']['y'] - pose['wrists']['right']['y']
+                avg_height = (left_hand_height + right_hand_height) / 2
+                hand_heights.append(max(avg_height, 0))
+        
+        avg_hand_height = np.mean(hand_heights) if hand_heights else 0.5
+        return {
+            "hand_height": min(max(avg_hand_height, 0.0), 1.0),
+            "elbow_position": 0.7,
+            "guard_stability": 0.6
+        }
     
     def _analyze_head_movement(self):
-        """Analyze head movement patterns"""
-        return {"head_mobility": 0.6, "slip_readiness": 0.7, "chin_tuck": 0.8}
+        """Analyze head movement and positioning"""
+        if len(self.pose_history) < 3:
+            return {"head_movement_frequency": 0.0}
+        
+        head_movements = []
+        for i in range(1, len(self.pose_history)):
+            prev_pose = self.pose_history[i-1]
+            curr_pose = self.pose_history[i]
+            
+            if 'nose' in prev_pose and 'nose' in curr_pose:
+                movement = abs(curr_pose['nose']['x'] - prev_pose['nose']['x']) + abs(curr_pose['nose']['y'] - prev_pose['nose']['y'])
+                head_movements.append(movement)
+        
+        avg_movement = np.mean(head_movements) if head_movements else 0.0
+        return {
+            "head_movement_frequency": min(avg_movement * 20, 1.0),
+            "slip_frequency": 0.3,
+            "head_position": 0.5
+        }
     
     def _analyze_balance_distribution(self):
         """Analyze weight distribution and balance"""
-        return {"weight_distribution": 0.7, "balance_stability": 0.8}
+        return {"weight_forward": 0.5, "lateral_balance": 0.5, "stability_score": 0.7}
     
-    def _analyze_defensive_setup(self):
+    def _analyze_power_mechanics(self):
+        """Analyze power generation mechanics"""
+        return {
+            "kinetic_chain_efficiency": 0.6,
+            "core_engagement": self._analyze_core_stability(),
+            "ground_force_transfer": self._analyze_ground_force_transfer(),
+            "rotation_timing": self._analyze_rotation_timing()
+        }
+    
+    def _analyze_defensive_positioning(self):
         """Analyze defensive positioning"""
-        return {"defense_readiness": 0.7, "counter_positioning": 0.6}
+        return {"guard_coverage": 0.7, "counter_readiness": 0.6}
     
     def _analyze_movement_efficiency(self):
         """Analyze movement efficiency"""
@@ -490,9 +303,17 @@ class StreamProcessor:
     def _analyze_rotation_timing(self):
         """Analyze rotation timing"""
         return 0.6
+    
+    def _compare_to_professional_standards(self):
+        """Compare current form to professional standards"""
+        return {
+            "professional_similarity": 0.6,
+            "technique_score": 0.7,
+            "areas_for_improvement": ["footwork", "guard"]
+        }
 
 class StreamingGeminiClient:
-    """Elite-level boxing coach powered by Gemini - gives feedback like Freddie Roach, Abel Sanchez, Teddy Atlas"""
+    """Elite-level boxing coach powered by Gemini Streaming - gives feedback like Freddie Roach"""
     
     def __init__(self):
         import google.generativeai as genai
@@ -503,120 +324,233 @@ class StreamingGeminiClient:
         
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-1.5-flash')
-        self.conversation_history = []
         
-        logger.info("✅ Elite StreamingGeminiClient initialized")
+        # Track recent feedback for variety enforcement
+        self.recent_tokens = deque(maxlen=6)  # Store recent bigrams
+        self.category_rotation = deque(['guard', 'footwork', 'head_movement', 'punch_mechanics', 'rhythm', 'defense_counters', 'power_chain'], maxlen=7)
+        self.last_category_used = None
+        self.positive_reinforcement_count = 0
+        self.last_verb_used = None
+        
+        logger.info("✅ Elite StreamingGeminiClient with deduplication initialized")
     
     async def generate_elite_coaching_feedback(self, comprehensive_analysis: Dict, last_feedback_types: list = None) -> str:
         """
-        Generate concise, non-repetitive elite coaching feedback (15 words max)
+        Generate concise, non-repetitive elite coaching feedback using Gemini streaming (≤15 words)
+        Implements Freddie Roach-style coaching with strict variety enforcement
         """
         try:
+            # Handle special cases first
             if comprehensive_analysis.get("insufficient_data"):
                 return "Show me your stance and start moving."
             
             if comprehensive_analysis.get("no_pose_detected"):
-                return "Step back, I can't see you properly. Get in frame."
+                return "Step back into frame—camera can't see you."
             
-            # Avoid repetition
-            if last_feedback_types is None:
-                last_feedback_types = []
+            # Extract analysis data for the prompt
+            stance_data = comprehensive_analysis.get('stance_analysis', {})
+            footwork_data = comprehensive_analysis.get('footwork_analysis', {})
+            guard_data = comprehensive_analysis.get('guard_analysis', {})
+            head_data = comprehensive_analysis.get('head_movement_analysis', {})
             
-            # Create varied coaching prompt with forced rotation
-            avoided_topics = ', '.join(last_feedback_types) if last_feedback_types else 'None'
+            stance_width_ratio = stance_data.get('stance_width_ratio', 0.0)
+            hand_height = guard_data.get('hand_height', 0.0)
+            total_movement = footwork_data.get('total_movement', 0.0)
+            head_mobility = head_data.get('head_movement_frequency', 0.0)
             
-            # Force specific variety based on what was said recently
-            variety_instruction = ""
-            if 'power' in last_feedback_types or 'hip' in ' '.join(last_feedback_types):
-                variety_instruction = "FOCUS ON: footwork, head movement, or guard position. DO NOT mention hips or power."
-            elif 'footwork' in last_feedback_types:
-                variety_instruction = "FOCUS ON: guard position, head movement, or punching technique. DO NOT mention footwork."
-            elif 'guard' in last_feedback_types:
-                variety_instruction = "FOCUS ON: footwork, breathing, or punch combinations. DO NOT mention hands or guard."
-            else:
-                variety_instruction = "FOCUS ON: variety - pick from footwork, guard, head movement, or punch timing."
+            # Determine next category to focus on (forced rotation)
+            next_category = self._get_next_category()
             
-            prompt = f"""
-You are a boxing coach giving LIVE feedback. Be EXTREMELY concise - maximum 15 words.
-
-ANALYSIS DATA:
-Stance Quality: {comprehensive_analysis.get('stance_analysis', {}).get('stance_width_ratio', 0):.1f}
-Footwork Activity: {comprehensive_analysis.get('footwork_analysis', {}).get('total_movement', 0):.1f}
-Guard Height: {comprehensive_analysis.get('guard_analysis', {}).get('hand_height', 0):.1f}
-Power Mechanics: {comprehensive_analysis.get('power_generation_analysis', {}).get('kinetic_chain_efficiency', 0):.1f}
-
-RECENTLY SAID: {avoided_topics}
-{variety_instruction}
-
-VARIED COACHING OPTIONS:
-• Footwork: "Bounce on your toes", "Circle left more", "Quick steps"
-• Guard: "Hands up higher", "Protect that chin", "Tight elbows"  
-• Head Movement: "Move your head", "Slip more", "Duck and weave"
-• Punching: "Snap punches back", "Double the jab", "Breathe when punching"
-• Rhythm: "Stay relaxed", "Find your rhythm", "Good tempo"
-
-RESPONSE (15 words max, BE DIFFERENT):
-"""
-
-            response = await asyncio.to_thread(
-                self.model.generate_content,
-                prompt
+            # Check if we need positive reinforcement (every 4th cue)
+            self.positive_reinforcement_count += 1
+            needs_positive = self.positive_reinforcement_count % 4 == 0
+            
+            # Create the elite coaching prompt
+            prompt = self._create_freddie_roach_prompt(
+                stance_width_ratio, hand_height, total_movement, head_mobility,
+                next_category, needs_positive
             )
             
-            feedback = response.text.strip()
+            # Use streaming generation
+            feedback = await self._generate_streaming_feedback(prompt)
             
-            # Force 15 word limit
-            words = feedback.split()
-            if len(words) > 15:
-                feedback = ' '.join(words[:15])
+            # Enforce variety and deduplication
+            if self._is_duplicate_feedback(feedback):
+                logger.warning(f"🔄 Duplicate detected: '{feedback}', regenerating...")
+                retry_prompt = prompt + "\n\nTry again—do NOT reuse previous wording."
+                feedback = await self._generate_streaming_feedback(retry_prompt)
+            
+            # Store tokens for future deduplication
+            self._store_feedback_tokens(feedback)
             
             return feedback
             
         except Exception as e:
-            logger.error(f"Elite Gemini coaching error: {e}")
-            # Fallback to short advice
-            return self._generate_short_fallback_feedback(comprehensive_analysis, last_feedback_types)
+            logger.error(f"Elite Gemini streaming error: {e}")
+            # Use fallback only once, then resume Gemini
+            return self._generate_emergency_fallback(comprehensive_analysis)
     
-    def _generate_short_fallback_feedback(self, analysis: Dict, last_feedback_types: list = None) -> str:
-        """Generate short fallback feedback when Gemini fails"""
+    def _create_freddie_roach_prompt(self, stance_width_ratio: float, hand_height: float, 
+                                   total_movement: float, head_mobility: float,
+                                   focus_category: str, needs_positive: bool) -> str:
+        """Create the exact Freddie Roach-style prompt as specified"""
         
-        stance = analysis.get('stance_analysis', {})
-        footwork = analysis.get('footwork_analysis', {}) 
-        guard = analysis.get('guard_analysis', {})
-        power = analysis.get('power_generation_analysis', {})
+        # Build category rotation instruction
+        rotation_instruction = self._get_category_instruction(focus_category)
         
-        # Avoid repetitive feedback by categories
-        recent_types = last_feedback_types or []
+        # Add positive reinforcement if needed
+        positive_note = "Sprinkle in positive reinforcement if appropriate." if needs_positive else ""
         
-        # Rotate through different coaching areas
-        if 'stance' not in recent_types and stance.get('stance_width_ratio', 1.0) < 0.8:
-            return "Widen that stance, better balance."
+        prompt = f"""ROLE & TONE
+You are a world-class boxing coach with an encyclopedic toolkit of cues.
+Speak like Freddie Roach on fight night: concise, urgent, brutally honest—but never vulgar.
+
+OUTPUT RULES
+One sentence only, ≤ 15 words.
+Must be fresh: do not repeat any phrase, verb, or noun used in the past 90 seconds.
+
+Rotate focus in this order, skipping categories already covered in the last 3 tips:
+Guard (hands, elbows, chin)
+Footwork (stance width, pivots, lateral steps)
+Head movement (slips, rolls, angle changes)
+Punch mechanics (hip rotation, snap, retraction)
+Rhythm / breathing (tempo, relaxation)
+Defense & counters (blocks, parries, counter-timing)
+Power chain (ground force, core engagement)
+
+{rotation_instruction}
+Never start two consecutive cues with the same verb.
+{positive_note}
+
+CONTEXT VARIABLES (insert live numbers)
+StanceWidthRatio: {stance_width_ratio:.2f}
+GuardHeight: {hand_height:.2f}
+FootworkActivity: {total_movement:.2f}
+HeadMobility: {head_mobility:.2f}
+
+EXAMPLES
+"Tuck elbows tighter; shorten stance two inches."
+"Bounce left, double jab—don't park your feet."
+"Good rhythm; add a quick slip after the cross."
+"Rotate rear hip fully, exhale on impact."
+
+FAIL-SAFE
+If no pose detected for 3 seconds: "Step back into frame—camera can't see you."
+
+RESPONSE (≤15 words, be different):"""
         
-        if 'footwork' not in recent_types and footwork.get('total_movement', 0) < 0.1:
-            return "Move your feet, you're standing still."
-        
-        if 'guard' not in recent_types and guard.get('hand_height', 0) < 0.7:
-            return "Hands up, protect that chin."
-        
-        if 'power' not in recent_types and power.get('kinetic_chain_efficiency', 1.0) > 0.5:
-            return "Turn that back hip through."
-        
-        # Categorized advice to ensure variety
-        advice_categories = {
-            'footwork': ["Bounce on your toes.", "Circle left more.", "Quick steps in and out.", "Stay light on feet."],
-            'head_movement': ["Move your head after punching.", "Slip left and right.", "Duck and weave more.", "Keep head moving."],
-            'punching': ["Snap those punches back.", "Double up that jab.", "Breathe when you punch.", "Throw combinations."],
-            'rhythm': ["Find your rhythm.", "Stay relaxed.", "Good tempo, keep it up.", "Smooth and steady."],
-            'defense': ["Stay defensive.", "Protect yourself.", "Watch for counters.", "Stay ready."],
-            'general': ["Great work, keep going.", "Nice form, stay focused.", "Looking good.", "Keep that energy up."]
-        }
-        
-        # Pick a category that wasn't used recently
-        available_categories = [cat for cat in advice_categories.keys() if cat not in recent_types]
-        
-        if available_categories:
-            chosen_category = np.random.choice(available_categories)
-            return np.random.choice(advice_categories[chosen_category])
+        return prompt
+    
+    def _get_next_category(self) -> str:
+        """Get the next category in rotation, skipping recently used ones"""
+        # Rotate to next category
+        if self.last_category_used:
+            try:
+                current_index = list(self.category_rotation).index(self.last_category_used)
+                next_index = (current_index + 1) % len(self.category_rotation)
+                next_category = list(self.category_rotation)[next_index]
+            except ValueError:
+                next_category = list(self.category_rotation)[0]
         else:
-            # If all categories used, pick random from general
-            return np.random.choice(advice_categories['general'])
+            next_category = list(self.category_rotation)[0]
+        
+        self.last_category_used = next_category
+        return next_category
+    
+    def _get_category_instruction(self, category: str) -> str:
+        """Get specific instruction for the focus category"""
+        instructions = {
+            'guard': "FOCUS ON: Guard positioning - hands, elbows, chin protection.",
+            'footwork': "FOCUS ON: Footwork - stance width, pivots, lateral movement.",
+            'head_movement': "FOCUS ON: Head movement - slips, rolls, angle changes.",
+            'punch_mechanics': "FOCUS ON: Punch mechanics - hip rotation, snap, retraction.",
+            'rhythm': "FOCUS ON: Rhythm and breathing - tempo, relaxation.",
+            'defense_counters': "FOCUS ON: Defense and counters - blocks, parries, timing.",
+            'power_chain': "FOCUS ON: Power chain - ground force, core engagement."
+        }
+        return instructions.get(category, "FOCUS ON: Overall technique improvement.")
+    
+    async def _generate_streaming_feedback(self, prompt: str) -> str:
+        """Generate feedback using Gemini streaming for optimal latency"""
+        try:
+            # Create streaming task
+            stream_task = asyncio.create_task(self._stream_gemini_response(prompt))
+            
+            # Wait for response with timeout
+            feedback = await asyncio.wait_for(stream_task, timeout=2.0)
+            
+            # Enforce 15 word limit
+            words = feedback.split()
+            if len(words) > 15:
+                feedback = ' '.join(words[:15])
+            
+            return feedback.strip()
+            
+        except asyncio.TimeoutError:
+            logger.warning("⏰ Streaming timeout, using emergency fallback")
+            return "Keep moving, stay focused."
+        except Exception as e:
+            logger.error(f"❌ Streaming generation failed: {e}")
+            raise
+    
+    async def _stream_gemini_response(self, prompt: str) -> str:
+        """Stream response from Gemini and accumulate tokens"""
+        accumulated_text = ""
+        
+        # Use streaming generation
+        def _generate_stream():
+            return self.model.generate_content_stream(prompt)
+        
+        response_stream = await asyncio.to_thread(_generate_stream)
+        
+        for chunk in response_stream:
+            if chunk.text:
+                accumulated_text += chunk.text
+                # Yield control every 150ms for potential interim updates
+                await asyncio.sleep(0.015)
+        
+        return accumulated_text.strip()
+    
+    def _is_duplicate_feedback(self, feedback: str) -> bool:
+        """Check if feedback contains duplicate bigrams from recent history"""
+        # Extract bigrams from new feedback
+        words = feedback.lower().split()
+        new_bigrams = [f"{words[i]} {words[i+1]}" for i in range(len(words)-1) if i < len(words)-1]
+        
+        # Check against recent tokens
+        for bigram in new_bigrams:
+            if bigram in self.recent_tokens:
+                return True
+        
+        # Check for same starting verb
+        if words and self.last_verb_used:
+            first_word = words[0]
+            if first_word == self.last_verb_used:
+                return True
+        
+        return False
+    
+    def _store_feedback_tokens(self, feedback: str) -> None:
+        """Store bigrams and verbs from feedback for deduplication"""
+        words = feedback.lower().split()
+        
+        # Store bigrams
+        bigrams = [f"{words[i]} {words[i+1]}" for i in range(len(words)-1) if i < len(words)-1]
+        for bigram in bigrams:
+            self.recent_tokens.append(bigram)
+        
+        # Store first verb
+        if words:
+            self.last_verb_used = words[0]
+    
+    def _generate_emergency_fallback(self, analysis: Dict) -> str:
+        """Generate emergency fallback when Gemini completely fails"""
+        stance = analysis.get('stance_analysis', {})
+        guard = analysis.get('guard_analysis', {})
+        
+        if stance.get('stance_width_ratio', 1.0) < 0.7:
+            return "Widen stance, better balance."
+        elif guard.get('hand_height', 0) < 0.6:
+            return "Hands up, protect chin."
+        else:
+            return "Stay focused, keep moving."

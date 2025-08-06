@@ -891,24 +891,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     }
                 }, websocket)
                 
-            elif message["type"] == "test_tts":
-                # Test ElevenLabs TTS generation
-                test_message = message.get("message", "Test message")
-                logger.info(f"🎤 TTS Test requested: '{test_message}'")
-                
-                test_tts_audio = await generate_fast_tts_audio(test_message)
-                
-                await manager.send_personal_message({
-                    "type": "feedback",
-                    "message": f"TTS Test: {test_message}",
-                    "tts_audio": test_tts_audio,
-                    "analysis_data": {
-                        "stance_quality": 0.8,
-                        "footwork_activity": 0.6,
-                        "guard_positioning": 0.9,
-                        "test": True
-                    }
-                }, websocket)
+
                 
     except WebSocketDisconnect:
         manager.disconnect(websocket, client_id)
