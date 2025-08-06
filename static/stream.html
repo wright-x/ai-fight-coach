@@ -596,6 +596,9 @@
             <button class="btn btn-secondary" id="audioTestBtn" onclick="testAudio()" style="display: none;">
                 🔊 Test Audio (iPhone)
             </button>
+            <button class="btn btn-secondary" id="ttsTestBtn" onclick="testElevenLabsTTS()" style="display: none;">
+                🎤 Test ElevenLabs
+            </button>
             <button class="btn btn-primary" id="trainingBtn" onclick="startTraining()" disabled>
                 Start Training
             </button>
@@ -648,10 +651,11 @@
             videoElement = document.getElementById('videoElement');
             setupWebSocket();
             
-            // Show audio test button on iOS devices
+            // Show audio test buttons on iOS devices
             if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
                 document.getElementById('audioTestBtn').style.display = 'block';
-                console.log('📱 iOS device detected, showing audio test button');
+                document.getElementById('ttsTestBtn').style.display = 'block';
+                console.log('📱 iOS device detected, showing audio test buttons');
             }
         });
 
@@ -675,6 +679,24 @@
             }
             
             displayFeedback('Audio test - you should hear this message!');
+        }
+
+        function testElevenLabsTTS() {
+            console.log('🎤 [iPhone] Testing ElevenLabs TTS...');
+            
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                // Send a test request to backend
+                websocket.send(JSON.stringify({
+                    type: 'test_tts',
+                    message: 'This is a test of ElevenLabs TTS on iPhone',
+                    timestamp: Date.now()
+                }));
+                
+                displayFeedback('Testing ElevenLabs TTS - check console for details');
+            } else {
+                console.log('❌ [iPhone] WebSocket not connected');
+                displayFeedback('WebSocket not connected. Start training first.');
+            }
         }
 
         function setupWebSocket() {
@@ -740,12 +762,20 @@
 
         function playTTSAudio(audioData, message) {
             try {
-                console.log('🔊 Playing ElevenLabs TTS audio...');
+                console.log('🔊 [iPhone] Playing ElevenLabs TTS audio...');
+                console.log('🔊 [iPhone] Audio data length:', audioData ? audioData.length : 'undefined');
+                
+                if (!audioData) {
+                    console.log('❌ [iPhone] No audio data, using browser TTS');
+                    speakFeedback(message);
+                    return;
+                }
                 
                 // Initialize audio context on first interaction
                 if (!hasUserInteracted) {
                     initAudioContext();
                     hasUserInteracted = true;
+                    console.log('🔊 [iPhone] Audio context initialized');
                 }
                 
                 // Convert base64 to audio blob
@@ -754,54 +784,73 @@
                 for (let i = 0; i < audioBytes.length; i++) {
                     audioArray[i] = audioBytes.charCodeAt(i);
                 }
-                const audioBlob = new Blob([audioArray], { type: 'audio/mpeg' });
+                const audioBlob = new Blob([audioArray], { type: 'audio/mp3' });
                 const audioUrl = URL.createObjectURL(audioBlob);
                 
-                // Create and configure audio element
-                const audio = new Audio(audioUrl);
-                audio.volume = 1.0; // Max volume for iPhone
-                audio.preload = 'auto';
+                console.log('🔊 [iPhone] Audio blob created, size:', audioBlob.size);
                 
-                // iOS specific fixes
-                audio.setAttribute('playsinline', 'true');
-                audio.setAttribute('webkit-playsinline', 'true');
+                // Create and configure audio element specifically for iPhone
+                const audio = new Audio();
+                audio.src = audioUrl;
+                audio.volume = 1.0; // Max volume for iPhone
+                audio.preload = 'metadata';
+                audio.crossOrigin = 'anonymous';
+                
+                // iOS specific attributes
+                audio.setAttribute('playsinline', '');
+                audio.setAttribute('webkit-playsinline', '');
+                audio.setAttribute('controls', 'false');
+                
+                // Add to DOM temporarily for iOS compatibility
+                audio.style.display = 'none';
+                document.body.appendChild(audio);
                 
                 // Pulse voice meter during TTS
                 const voiceMeter = document.getElementById('voiceMeter');
                 voiceMeter.classList.add('active');
                 
-                // Play with promise handling for iOS
-                const playPromise = audio.play();
-                
-                if (playPromise !== undefined) {
-                    playPromise
-                        .then(() => {
-                            console.log('✅ ElevenLabs TTS playing successfully');
-                        })
-                        .catch(error => {
-                            console.error('❌ TTS playback failed:', error);
-                            // Fallback to browser TTS
-                            speakFeedback(message);
-                        });
-                }
+                // Enhanced iPhone play handling
+                audio.addEventListener('canplaythrough', () => {
+                    console.log('🔊 [iPhone] Audio ready to play');
+                    const playPromise = audio.play();
+                    
+                    if (playPromise !== undefined) {
+                        playPromise
+                            .then(() => {
+                                console.log('✅ [iPhone] ElevenLabs TTS playing successfully');
+                            })
+                            .catch(error => {
+                                console.error('❌ [iPhone] TTS playback failed:', error);
+                                document.body.removeChild(audio);
+                                URL.revokeObjectURL(audioUrl);
+                                voiceMeter.classList.remove('active');
+                                speakFeedback(message);
+                            });
+                    }
+                });
                 
                 audio.addEventListener('ended', () => {
+                    console.log('🔊 [iPhone] TTS playback completed');
+                    document.body.removeChild(audio);
                     URL.revokeObjectURL(audioUrl);
                     voiceMeter.classList.remove('active');
-                    console.log('🔊 TTS playback completed');
                 });
                 
                 audio.addEventListener('error', (e) => {
-                    console.error('❌ Audio error:', e);
+                    console.error('❌ [iPhone] Audio error:', e.target.error);
+                    if (document.body.contains(audio)) {
+                        document.body.removeChild(audio);
+                    }
                     URL.revokeObjectURL(audioUrl);
                     voiceMeter.classList.remove('active');
-                    // Fallback to browser TTS
                     speakFeedback(message);
                 });
                 
+                // Load the audio
+                audio.load();
+                
             } catch (error) {
-                console.error('❌ TTS audio processing failed:', error);
-                // Fallback to browser TTS
+                console.error('❌ [iPhone] TTS audio processing failed:', error);
                 speakFeedback(message);
             }
         }

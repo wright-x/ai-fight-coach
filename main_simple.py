@@ -866,8 +866,14 @@ async def websocket_endpoint(websocket: WebSocket):
                 # Add to feedback history
                 manager.add_feedback_type(client_id, feedback_type)
                 
-                # Generate fast TTS audio
+                # Generate fast TTS audio with debugging
+                logger.info(f"🎤 Attempting TTS generation for: '{elite_feedback}'")
                 tts_audio = await generate_fast_tts_audio(elite_feedback)
+                
+                if tts_audio:
+                    logger.info(f"✅ TTS audio generated successfully, length: {len(tts_audio)}")
+                else:
+                    logger.warning("❌ TTS audio generation failed, falling back to browser TTS")
                 
                 await manager.send_personal_message({
                     "type": "feedback",
@@ -878,6 +884,25 @@ async def websocket_endpoint(websocket: WebSocket):
                         "footwork_activity": comprehensive_analysis.get('footwork_analysis', {}).get('total_movement', 0),
                         "guard_positioning": comprehensive_analysis.get('guard_analysis', {}).get('hand_height', 0),
                         "elite_similarity": comprehensive_analysis.get('comparison_to_elite', {})
+                    }
+                }, websocket)
+                
+            elif message["type"] == "test_tts":
+                # Test ElevenLabs TTS generation
+                test_message = message.get("message", "Test message")
+                logger.info(f"🎤 TTS Test requested: '{test_message}'")
+                
+                test_tts_audio = await generate_fast_tts_audio(test_message)
+                
+                await manager.send_personal_message({
+                    "type": "feedback",
+                    "message": f"TTS Test: {test_message}",
+                    "tts_audio": test_tts_audio,
+                    "analysis_data": {
+                        "stance_quality": 0.8,
+                        "footwork_activity": 0.6,
+                        "guard_positioning": 0.9,
+                        "test": True
                     }
                 }, websocket)
                 
