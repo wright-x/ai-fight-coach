@@ -593,6 +593,9 @@
             <button class="btn btn-secondary" id="startBtn" onclick="startStream()">
                 Request Camera Access
             </button>
+            <button class="btn btn-secondary" id="audioTestBtn" onclick="testAudio()" style="display: none;">
+                🔊 Test Audio (iPhone)
+            </button>
             <button class="btn btn-primary" id="trainingBtn" onclick="startTraining()" disabled>
                 Start Training
             </button>
@@ -644,7 +647,35 @@
         document.addEventListener('DOMContentLoaded', function() {
             videoElement = document.getElementById('videoElement');
             setupWebSocket();
+            
+            // Show audio test button on iOS devices
+            if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+                document.getElementById('audioTestBtn').style.display = 'block';
+                console.log('📱 iOS device detected, showing audio test button');
+            }
         });
+
+        function testAudio() {
+            // Test browser TTS first
+            if ('speechSynthesis' in window) {
+                speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance("Audio test successful. You should hear this message.");
+                utterance.rate = 0.9;
+                utterance.pitch = 0.9;
+                utterance.volume = 1.0;
+                speechSynthesis.speak(utterance);
+                console.log('🔊 Testing browser TTS on iPhone');
+            }
+            
+            // Initialize audio context
+            if (!hasUserInteracted) {
+                initAudioContext();
+                hasUserInteracted = true;
+                console.log('🔊 Audio context initialized after user interaction');
+            }
+            
+            displayFeedback('Audio test - you should hear this message!');
+        }
 
         function setupWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -685,7 +716,7 @@
                 
                 // Use ElevenLabs TTS if available, fallback to browser TTS
                 if (data.tts_audio) {
-                    playTTSAudio(data.tts_audio);
+                    playTTSAudio(data.tts_audio, data.message);
                 } else {
                     speakFeedback(data.message);
                 }
@@ -698,8 +729,26 @@
             }
         }
 
-        function playTTSAudio(audioData) {
+        let audioContext = null;
+        let hasUserInteracted = false;
+
+        function initAudioContext() {
+            if (!audioContext && window.AudioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playTTSAudio(audioData, message) {
             try {
+                console.log('🔊 Playing ElevenLabs TTS audio...');
+                
+                // Initialize audio context on first interaction
+                if (!hasUserInteracted) {
+                    initAudioContext();
+                    hasUserInteracted = true;
+                }
+                
+                // Convert base64 to audio blob
                 const audioBytes = atob(audioData);
                 const audioArray = new Uint8Array(audioBytes.length);
                 for (let i = 0; i < audioBytes.length; i++) {
@@ -708,21 +757,52 @@
                 const audioBlob = new Blob([audioArray], { type: 'audio/mpeg' });
                 const audioUrl = URL.createObjectURL(audioBlob);
                 
+                // Create and configure audio element
                 const audio = new Audio(audioUrl);
-                audio.volume = 0.9;
-                audio.play();
+                audio.volume = 1.0; // Max volume for iPhone
+                audio.preload = 'auto';
+                
+                // iOS specific fixes
+                audio.setAttribute('playsinline', 'true');
+                audio.setAttribute('webkit-playsinline', 'true');
                 
                 // Pulse voice meter during TTS
                 const voiceMeter = document.getElementById('voiceMeter');
                 voiceMeter.classList.add('active');
                 
+                // Play with promise handling for iOS
+                const playPromise = audio.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => {
+                            console.log('✅ ElevenLabs TTS playing successfully');
+                        })
+                        .catch(error => {
+                            console.error('❌ TTS playback failed:', error);
+                            // Fallback to browser TTS
+                            speakFeedback(message);
+                        });
+                }
+                
                 audio.addEventListener('ended', () => {
                     URL.revokeObjectURL(audioUrl);
                     voiceMeter.classList.remove('active');
+                    console.log('🔊 TTS playback completed');
                 });
+                
+                audio.addEventListener('error', (e) => {
+                    console.error('❌ Audio error:', e);
+                    URL.revokeObjectURL(audioUrl);
+                    voiceMeter.classList.remove('active');
+                    // Fallback to browser TTS
+                    speakFeedback(message);
+                });
+                
             } catch (error) {
-                console.error('TTS audio playback failed:', error);
-                speakFeedback(data.message);
+                console.error('❌ TTS audio processing failed:', error);
+                // Fallback to browser TTS
+                speakFeedback(message);
             }
         }
 
@@ -774,6 +854,13 @@
             if (!mediaStream) {
                 showError('Please start camera first');
                 return;
+            }
+
+            // Initialize audio context for iOS compatibility
+            if (!hasUserInteracted) {
+                initAudioContext();
+                hasUserInteracted = true;
+                console.log('🔊 Audio context initialized for iOS');
             }
 
             isTraining = true;
