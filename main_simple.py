@@ -184,7 +184,7 @@ try:
     logger.info(f"   - VideoProcessor: {type(video_processor)}")
     logger.info(f"   - GeminiClient: {type(gemini_client)}")
     logger.info(f"   - TTSClient: {type(tts_client)}")
-        except Exception as e:
+except Exception as e:
     logger.error(f"❌ Component initialization failed: {e}")
     raise
 
@@ -246,7 +246,7 @@ def create_user(db: Session, email: str, name: str = None):
         db.commit()
         db.refresh(new_user)
         return new_user
-        except Exception as e:
+    except Exception as e:
         db.rollback()
         print(f"Error creating user: {e}")
         raise e
@@ -271,7 +271,7 @@ async def register_user(request: Request):
             "message": "Registration successful",
             "user_id": user.id
         })
-        except Exception as e:
+    except Exception as e:
         print(f"Registration error: {e}")
         return JSONResponse({"success": False, "message": str(e)})
 
@@ -305,7 +305,7 @@ async def admin_stats(db: Session = Depends(get_db), _: bool = Depends(verify_ad
         return stats
     except HTTPException:
         raise
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Admin stats error: {e}")
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
@@ -347,7 +347,7 @@ async def admin_users(db: Session = Depends(get_db), _: bool = Depends(verify_ad
         return result
     except HTTPException:
         raise
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Admin users error: {e}")
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
@@ -387,7 +387,7 @@ async def admin_jobs(db: Session = Depends(get_db), _: bool = Depends(verify_adm
         return result
     except HTTPException:
         raise
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Admin jobs error: {e}")
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
@@ -492,7 +492,7 @@ async def upload_video(
             "message": "Video uploaded successfully"
         })
         
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Upload error: {e}")
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
@@ -519,7 +519,7 @@ async def get_status(job_id: str, db: Session = Depends(get_db)):
             "created_ts": job.created_ts.isoformat()
         }
         
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Status error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -560,7 +560,7 @@ async def get_results(job_id: str, db: Session = Depends(get_db)):
         
         return FileResponse("static/index.html")
         
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Results error: {e}")
         # Return the page anyway, just don't record the view
         return FileResponse("static/index.html")
@@ -633,7 +633,7 @@ async def process_video_analysis(job_id: str, db: Session):
         
         logger.info(f"Analysis completed for job {job_id}")
         
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Analysis failed for job {job_id}: {e}")
         try:
             db_service = DatabaseService(db)
@@ -669,7 +669,7 @@ async def track_page_view(request: Request):
         
         return {"success": True, "message": "Page view tracked"}
         
-        except Exception as e:
+    except Exception as e:
         print(f"Error tracking page view: {e}")
         return {"success": False, "message": "Failed to track page view"}
 
@@ -738,7 +738,7 @@ async def get_page_analytics(request: Request):
             ]
         }
         
-        except Exception as e:
+    except Exception as e:
         print(f"Error getting page analytics: {e}")
         return {"error": "Failed to get analytics"}
 
@@ -908,7 +908,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 
     except WebSocketDisconnect:
         manager.disconnect(websocket, client_id)
-        except Exception as e:
+    except Exception as e:
         logger.error(f"WebSocket error: {e}")
         manager.disconnect(websocket, client_id)
 
@@ -940,7 +940,7 @@ async def generate_fast_tts_audio(text: str) -> Optional[str]:
         logger.info(f"✅ TTS generated successfully, size: {len(audio_b64)} chars")
         return audio_b64
         
-        except Exception as e:
+    except Exception as e:
         logger.error(f"❌ ElevenLabs TTS generation error: {e}")
         import traceback
         traceback.print_exc()
