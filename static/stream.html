@@ -64,16 +64,20 @@
             bottom: 20px;
             left: 20px;
             right: 20px;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.9);
             color: white;
-            padding: 15px;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: 600;
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 1.2rem;
+            font-weight: 700;
             opacity: 0;
             transition: opacity 0.3s ease;
             text-align: center;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(8px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            line-height: 1.4;
+            max-height: 150px;
+            overflow-y: auto;
         }
 
         .caption-overlay.show {
@@ -352,7 +356,10 @@
             if (data.type === 'feedback') {
                 displayFeedback(data.message);
                 speakFeedback(data.message);
-                addToFeedbackHistory(data.message);
+                addToFeedbackHistory(data.message, data.analysis_data);
+            } else if (data.type === 'analysis') {
+                // Show real-time analysis data (for debugging)
+                console.log('Pose Analysis:', data.data);
             } else if (data.type === 'error') {
                 showError(data.message);
             }
@@ -501,32 +508,75 @@
             overlay.textContent = message;
             overlay.classList.add('show');
             
-            // Hide after 8 seconds
+            // Hide after 12 seconds for longer detailed feedback
             setTimeout(() => {
                 overlay.classList.remove('show');
-            }, 8000);
+            }, 12000);
         }
 
         function speakFeedback(message) {
-            // Use browser's speech synthesis as fallback
+            // Use browser's speech synthesis with coaching voice
             if ('speechSynthesis' in window) {
+                // Cancel any ongoing speech
+                speechSynthesis.cancel();
+                
                 const utterance = new SpeechSynthesisUtterance(message);
-                utterance.rate = 0.9;
-                utterance.pitch = 1;
-                utterance.volume = 0.8;
+                
+                // Get available voices
+                const voices = speechSynthesis.getVoices();
+                
+                // Try to find a good male voice for coaching
+                const preferredVoices = ['Google US English Male', 'Microsoft David', 'Alex', 'Daniel'];
+                let selectedVoice = null;
+                
+                for (const preferred of preferredVoices) {
+                    selectedVoice = voices.find(voice => voice.name.includes(preferred));
+                    if (selectedVoice) break;
+                }
+                
+                // Fallback to first available voice
+                if (!selectedVoice && voices.length > 0) {
+                    selectedVoice = voices.find(voice => voice.lang.startsWith('en')) || voices[0];
+                }
+                
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                }
+                
+                // Configure for coaching tone
+                utterance.rate = 0.85;  // Slightly slower for clarity
+                utterance.pitch = 0.9;  // Lower pitch for authority
+                utterance.volume = 0.9; // High volume for gym environment
+                
                 speechSynthesis.speak(utterance);
             }
         }
 
-        function addToFeedbackHistory(message) {
+        function addToFeedbackHistory(message, analysisData) {
             const historyContainer = document.getElementById('feedbackHistory');
             const feedbackItem = document.createElement('div');
             feedbackItem.className = 'feedback-item';
             
             const time = new Date().toLocaleTimeString();
+            
+            // Create enhanced feedback display with technical data
+            let technicalInfo = '';
+            if (analysisData) {
+                const stanceQuality = (analysisData.stance_quality * 100).toFixed(0);
+                const footworkActivity = (analysisData.footwork_activity * 100).toFixed(0);
+                const guardPosition = (analysisData.guard_positioning * 100).toFixed(0);
+                
+                technicalInfo = `
+                    <div style="font-size: 0.8rem; color: #888; margin-top: 5px;">
+                        Stance: ${stanceQuality}% | Footwork: ${footworkActivity}% | Guard: ${guardPosition}%
+                    </div>
+                `;
+            }
+            
             feedbackItem.innerHTML = `
                 <div class="feedback-time">${time}</div>
-                <div>${message}</div>
+                <div style="font-weight: 600; color: white;">${message}</div>
+                ${technicalInfo}
             `;
             
             // Add to top of history
@@ -537,9 +587,9 @@
                 historyContainer.appendChild(feedbackItem);
             }
             
-            // Keep only last 10 feedback items
+            // Keep only last 8 feedback items (less clutter)
             const items = historyContainer.querySelectorAll('.feedback-item');
-            if (items.length > 10) {
+            if (items.length > 8) {
                 items[items.length - 1].remove();
             }
         }

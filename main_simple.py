@@ -807,25 +807,26 @@ async def websocket_endpoint(websocket: WebSocket):
                 }, websocket)
                 
             elif message["type"] == "request_feedback":
-                # Generate and send feedback
-                errors = processor.current_errors if hasattr(processor, 'current_errors') else []
-                feedback = processor.generate_feedback(errors)
+                # Generate comprehensive analysis and elite coaching feedback
+                comprehensive_analysis = processor.generate_comprehensive_analysis()
+                
+                # Initialize streaming Gemini client for elite coaching
+                from utils.stream_processor import StreamingGeminiClient
+                gemini_coach = StreamingGeminiClient()
+                
+                # Get elite-level coaching feedback
+                elite_feedback = await gemini_coach.generate_elite_coaching_feedback(comprehensive_analysis)
                 
                 await manager.send_personal_message({
                     "type": "feedback",
-                    "message": feedback
+                    "message": elite_feedback,
+                    "analysis_data": {
+                        "stance_quality": comprehensive_analysis.get('stance_analysis', {}).get('stance_width_ratio', 0),
+                        "footwork_activity": comprehensive_analysis.get('footwork_analysis', {}).get('total_movement', 0),
+                        "guard_positioning": comprehensive_analysis.get('guard_analysis', {}).get('hand_height', 0),
+                        "elite_similarity": comprehensive_analysis.get('comparison_to_elite', {})
+                    }
                 }, websocket)
-                
-                # Generate TTS audio (optional - can be done client-side)
-                try:
-                    tts_audio = await generate_tts_audio(feedback)
-                    if tts_audio:
-                        await manager.send_personal_message({
-                            "type": "tts_audio",
-                            "audio_data": tts_audio
-                        }, websocket)
-                except Exception as e:
-                    logger.error(f"TTS generation failed: {e}")
                 
     except WebSocketDisconnect:
         manager.disconnect(websocket, client_id)
@@ -833,29 +834,7 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.error(f"WebSocket error: {e}")
         manager.disconnect(websocket, client_id)
 
-async def generate_tts_audio(text: str) -> Optional[str]:
-    """Generate TTS audio and return as base64 string"""
-    try:
-        # Use ElevenLabs for TTS
-        from elevenlabs import generate, Voice
-        
-        api_key = os.getenv("ELEVENLABS_API_KEY")
-        if not api_key:
-            return None
-        
-        audio = generate(
-            text=text,
-            voice=Voice(voice_id="21m00Tcm4TlvDq8ikWAM"),  # Rachel voice
-            model="eleven_monolingual_v1"
-        )
-        
-        # Convert to base64 for transmission
-        audio_b64 = base64.b64encode(audio).decode()
-        return audio_b64
-        
-    except Exception as e:
-        logger.error(f"TTS generation error: {e}")
-        return None
+# Browser TTS is handled client-side for better performance and lower latency
 
 if __name__ == "__main__":
     import uvicorn
