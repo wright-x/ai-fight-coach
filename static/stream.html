@@ -226,10 +226,28 @@
             border-radius: 16px;
             overflow: hidden;
             position: relative;
-            aspect-ratio: 16/9;
+            aspect-ratio: 16/9; /* Default fallback */
             box-shadow: 
                 0 20px 40px rgba(0, 0, 0, 0.4),
                 0 0 0 1px rgba(255, 255, 255, 0.05);
+            transition: aspect-ratio 0.3s ease;
+        }
+
+        /* Dynamic aspect ratio classes for different camera orientations */
+        .video-container.portrait {
+            aspect-ratio: 9/16; /* iPhone portrait */
+        }
+
+        .video-container.square {
+            aspect-ratio: 1/1; /* Square aspect */
+        }
+
+        .video-container.landscape {
+            aspect-ratio: 16/9; /* Landscape */
+        }
+
+        .video-container.ultra-wide {
+            aspect-ratio: 21/9; /* Ultra-wide */
         }
 
         .video-container::before {
@@ -520,6 +538,36 @@
                 right: 16px;
                 width: 56px;
                 height: 56px;
+            }
+
+            /* Mobile-specific video container adjustments */
+            .video-container.portrait {
+                max-height: 70vh; /* Limit height on mobile for portrait videos */
+            }
+            
+            .video-section {
+                max-width: 100%;
+            }
+        }
+
+        /* iPhone specific optimizations */
+        @media (max-width: 480px) {
+            .video-container {
+                border-radius: 12px; /* Slightly smaller radius on small screens */
+            }
+            
+            .video-container.portrait {
+                max-height: 60vh; /* Even more constrained on very small screens */
+                max-width: 80vw;
+                margin: 0 auto;
+            }
+            
+            .caption-overlay {
+                bottom: 10px;
+                left: 10px;
+                right: 10px;
+                padding: 12px;
+                font-size: 14px;
             }
         }
 
@@ -870,12 +918,23 @@
             try {
                 updateStatus('connecting', 'Requesting Camera Access...');
                 
-                mediaStream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+                // Request optimal camera settings for iPhone
+                const constraints = {
+                    video: {
+                        width: { ideal: 1280, max: 1920 },
+                        height: { ideal: 720, max: 1080 },
+                        facingMode: 'user',
+                        frameRate: { ideal: 30 }
+                    },
                     audio: false
-                });
+                };
 
+                mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
                 videoElement.srcObject = mediaStream;
+                
+                // Wait for video metadata to load and adjust aspect ratio
+                videoElement.addEventListener('loadedmetadata', updateVideoAspectRatio);
+                
                 updateStatus('live', 'Camera Ready');
                 
                 document.getElementById('startBtn').disabled = true;
@@ -896,6 +955,43 @@
                     errorMsg += 'Please check your camera settings and try again.';
                 }
                 showError(errorMsg);
+            }
+        }
+
+        function updateVideoAspectRatio() {
+            const videoContainer = document.querySelector('.video-container');
+            const videoWidth = videoElement.videoWidth;
+            const videoHeight = videoElement.videoHeight;
+            
+            if (videoWidth && videoHeight) {
+                const aspectRatio = videoWidth / videoHeight;
+                
+                console.log(`📱 Video dimensions: ${videoWidth}x${videoHeight}, aspect ratio: ${aspectRatio.toFixed(2)}`);
+                
+                // Remove all aspect ratio classes
+                videoContainer.classList.remove('portrait', 'square', 'landscape', 'ultra-wide');
+                
+                // Determine and apply the appropriate aspect ratio class
+                if (aspectRatio < 0.8) {
+                    // Portrait (iPhone vertical)
+                    videoContainer.classList.add('portrait');
+                    console.log('📱 Applied portrait aspect ratio (9:16)');
+                } else if (aspectRatio >= 0.8 && aspectRatio <= 1.2) {
+                    // Square-ish
+                    videoContainer.classList.add('square');
+                    console.log('📱 Applied square aspect ratio (1:1)');
+                } else if (aspectRatio > 1.2 && aspectRatio <= 2.0) {
+                    // Landscape (most common)
+                    videoContainer.classList.add('landscape');
+                    console.log('📱 Applied landscape aspect ratio (16:9)');
+                } else {
+                    // Ultra-wide
+                    videoContainer.classList.add('ultra-wide');
+                    console.log('📱 Applied ultra-wide aspect ratio (21:9)');
+                }
+                
+                // Also set a custom CSS property for precise aspect ratio if needed
+                videoContainer.style.setProperty('--video-aspect-ratio', aspectRatio);
             }
         }
 
