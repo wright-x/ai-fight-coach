@@ -838,16 +838,30 @@ async def websocket_endpoint(websocket: WebSocket):
                     recent_feedback_types
                 )
                 
-                # Determine feedback type for history tracking
+                # Determine feedback type for history tracking (more specific detection)
+                feedback_lower = elite_feedback.lower()
                 feedback_type = "general"
-                if "stance" in elite_feedback.lower():
+                
+                if "stance" in feedback_lower or "widen" in feedback_lower or "balance" in feedback_lower:
                     feedback_type = "stance"
-                elif "foot" in elite_feedback.lower() or "move" in elite_feedback.lower():
+                elif "foot" in feedback_lower or "step" in feedback_lower or "move your feet" in feedback_lower:
                     feedback_type = "footwork"
-                elif "hand" in elite_feedback.lower() or "guard" in elite_feedback.lower():
+                elif "hand" in feedback_lower or "guard" in feedback_lower or "chin" in feedback_lower:
                     feedback_type = "guard"
-                elif "hip" in elite_feedback.lower() or "power" in elite_feedback.lower():
+                elif "hip" in feedback_lower or "turn" in feedback_lower or "power" in feedback_lower or "snap" in feedback_lower:
                     feedback_type = "power"
+                elif "head" in feedback_lower or "slip" in feedback_lower:
+                    feedback_type = "head_movement"
+                elif "jab" in feedback_lower or "punch" in feedback_lower:
+                    feedback_type = "punching"
+                
+                # Debug logging
+                logger.info(f"📝 Feedback: '{elite_feedback}' → Type: '{feedback_type}' | Recent types: {recent_feedback_types}")
+                
+                # Force variety if same type repeated 2 times
+                if recent_feedback_types.count(feedback_type) >= 2:
+                    logger.warning(f"🔄 Forcing variety - '{feedback_type}' repeated {recent_feedback_types.count(feedback_type)} times")
+                    feedback_type = "force_variety"
                 
                 # Add to feedback history
                 manager.add_feedback_type(client_id, feedback_type)

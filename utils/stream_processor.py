@@ -522,9 +522,22 @@ class StreamingGeminiClient:
             if last_feedback_types is None:
                 last_feedback_types = []
             
-            # Create short, specific coaching prompt
+            # Create varied coaching prompt with forced rotation
+            avoided_topics = ', '.join(last_feedback_types) if last_feedback_types else 'None'
+            
+            # Force specific variety based on what was said recently
+            variety_instruction = ""
+            if 'power' in last_feedback_types or 'hip' in ' '.join(last_feedback_types):
+                variety_instruction = "FOCUS ON: footwork, head movement, or guard position. DO NOT mention hips or power."
+            elif 'footwork' in last_feedback_types:
+                variety_instruction = "FOCUS ON: guard position, head movement, or punching technique. DO NOT mention footwork."
+            elif 'guard' in last_feedback_types:
+                variety_instruction = "FOCUS ON: footwork, breathing, or punch combinations. DO NOT mention hands or guard."
+            else:
+                variety_instruction = "FOCUS ON: variety - pick from footwork, guard, head movement, or punch timing."
+            
             prompt = f"""
-You are giving LIVE boxing coaching feedback. Be EXTREMELY concise - maximum 15 words.
+You are a boxing coach giving LIVE feedback. Be EXTREMELY concise - maximum 15 words.
 
 ANALYSIS DATA:
 Stance Quality: {comprehensive_analysis.get('stance_analysis', {}).get('stance_width_ratio', 0):.1f}
@@ -532,16 +545,17 @@ Footwork Activity: {comprehensive_analysis.get('footwork_analysis', {}).get('tot
 Guard Height: {comprehensive_analysis.get('guard_analysis', {}).get('hand_height', 0):.1f}
 Power Mechanics: {comprehensive_analysis.get('power_generation_analysis', {}).get('kinetic_chain_efficiency', 0):.1f}
 
-AVOID REPEATING: {', '.join(last_feedback_types) if last_feedback_types else 'None'}
+RECENTLY SAID: {avoided_topics}
+{variety_instruction}
 
-Give ONE specific instruction. Examples:
-- "Hands higher, protect that chin"
-- "Get on your toes, more bounce"
-- "Turn that back hip through"
-- "Move your head after punching"
-- "Widen stance, better balance"
+VARIED COACHING OPTIONS:
+• Footwork: "Bounce on your toes", "Circle left more", "Quick steps"
+• Guard: "Hands up higher", "Protect that chin", "Tight elbows"  
+• Head Movement: "Move your head", "Slip more", "Duck and weave"
+• Punching: "Snap punches back", "Double the jab", "Breathe when punching"
+• Rhythm: "Stay relaxed", "Find your rhythm", "Good tempo"
 
-RESPONSE (15 words maximum):
+RESPONSE (15 words max, BE DIFFERENT):
 """
 
             response = await asyncio.to_thread(
@@ -571,29 +585,38 @@ RESPONSE (15 words maximum):
         guard = analysis.get('guard_analysis', {})
         power = analysis.get('power_generation_analysis', {})
         
-        # Short, specific observations (15 words max)
-        if stance.get('stance_width_ratio', 1.0) < 0.8 and 'stance' not in (last_feedback_types or []):
+        # Avoid repetitive feedback by categories
+        recent_types = last_feedback_types or []
+        
+        # Rotate through different coaching areas
+        if 'stance' not in recent_types and stance.get('stance_width_ratio', 1.0) < 0.8:
             return "Widen that stance, better balance."
         
-        if footwork.get('total_movement', 0) < 0.1 and 'footwork' not in (last_feedback_types or []):
+        if 'footwork' not in recent_types and footwork.get('total_movement', 0) < 0.1:
             return "Move your feet, you're standing still."
         
-        if guard.get('hand_height', 0) < 0.7 and 'guard' not in (last_feedback_types or []):
+        if 'guard' not in recent_types and guard.get('hand_height', 0) < 0.7:
             return "Hands up, protect that chin."
         
-        if power.get('kinetic_chain_efficiency', 1.0) > 0.5 and 'power' not in (last_feedback_types or []):
+        if 'power' not in recent_types and power.get('kinetic_chain_efficiency', 1.0) > 0.5:
             return "Turn that back hip through."
         
-        # Default short advice (avoid repetition)
-        short_advice = [
-            "Good, keep that rhythm going.",
-            "Nice form, stay focused.",
-            "Breathe and stay relaxed.",
-            "Move your head after punching.",
-            "Get on your toes more.",
-            "Circle left, use angles.",
-            "Double up that jab.",
-            "Snap those punches back."
-        ]
+        # Categorized advice to ensure variety
+        advice_categories = {
+            'footwork': ["Bounce on your toes.", "Circle left more.", "Quick steps in and out.", "Stay light on feet."],
+            'head_movement': ["Move your head after punching.", "Slip left and right.", "Duck and weave more.", "Keep head moving."],
+            'punching': ["Snap those punches back.", "Double up that jab.", "Breathe when you punch.", "Throw combinations."],
+            'rhythm': ["Find your rhythm.", "Stay relaxed.", "Good tempo, keep it up.", "Smooth and steady."],
+            'defense': ["Stay defensive.", "Protect yourself.", "Watch for counters.", "Stay ready."],
+            'general': ["Great work, keep going.", "Nice form, stay focused.", "Looking good.", "Keep that energy up."]
+        }
         
-        return np.random.choice(short_advice)
+        # Pick a category that wasn't used recently
+        available_categories = [cat for cat in advice_categories.keys() if cat not in recent_types]
+        
+        if available_categories:
+            chosen_category = np.random.choice(available_categories)
+            return np.random.choice(advice_categories[chosen_category])
+        else:
+            # If all categories used, pick random from general
+            return np.random.choice(advice_categories['general'])
