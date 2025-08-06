@@ -101,7 +101,7 @@ class DatabaseService:
             
             logger.info(f"Created new user: {user.id}")
             return user
-        except Exception as e:
+    except Exception as e:
             logger.error(f"Error creating user: {e}")
             self.db.rollback()
             return None
@@ -120,7 +120,7 @@ class DatabaseService:
             self.db.commit()
             self.db.refresh(job)
             return job
-            except Exception as e:
+    except Exception as e:
             logger.error(f"Error creating job: {e}")
             self.db.rollback()
             raise
@@ -174,7 +174,7 @@ logger = logging.getLogger(__name__)
 try:
     from utils.video_processor import VideoProcessor
     from utils.gemini_client import GeminiClient
-    from utils.tts_client import TTSClient
+        from utils.tts_client import TTSClient
     
     video_processor = VideoProcessor()
     gemini_client = GeminiClient()
@@ -305,7 +305,7 @@ async def admin_stats(db: Session = Depends(get_db), _: bool = Depends(verify_ad
         return stats
     except HTTPException:
         raise
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Admin stats error: {e}")
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
@@ -480,7 +480,7 @@ async def upload_video(
         try:
             await process_video_analysis(job.id, db)
             logger.info(f"Video processing completed for job {job.id}")
-                except Exception as e:
+            except Exception as e:
             logger.error(f"Video processing failed: {e}")
             # Don't fail the upload, just log the error
         
@@ -492,7 +492,7 @@ async def upload_video(
             "message": "Video uploaded successfully"
         })
         
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Upload error: {e}")
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
@@ -560,7 +560,7 @@ async def get_results(job_id: str, db: Session = Depends(get_db)):
         
         return FileResponse("static/index.html")
         
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Results error: {e}")
         # Return the page anyway, just don't record the view
         return FileResponse("static/index.html")
@@ -633,7 +633,7 @@ async def process_video_analysis(job_id: str, db: Session):
         
         logger.info(f"Analysis completed for job {job_id}")
         
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Analysis failed for job {job_id}: {e}")
         try:
             db_service = DatabaseService(db)
@@ -940,7 +940,7 @@ async def generate_fast_tts_audio(text: str) -> Optional[str]:
         logger.info(f"✅ TTS generated successfully, size: {len(audio_b64)} chars")
         return audio_b64
         
-        except Exception as e:
+    except Exception as e:
         logger.error(f"❌ ElevenLabs TTS generation error: {e}")
         import traceback
         traceback.print_exc()
@@ -950,3 +950,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port) 
+
