@@ -335,15 +335,30 @@ class StreamingGeminiClient:
             raise ValueError("GEMINI_API_KEY environment variable is required")
         
         genai.configure(api_key=api_key)
-        # Lock to real Gemini 2.5 Pro - no fallbacks
-        self.model = genai.GenerativeModel("gemini-2.0-flash-exp")
-        logger.info("🔥 Using REAL Gemini 2.5 Pro (2.0-flash-exp)")
+        # Use gemini-2.5-flash for high RPM micro-cues
+        model_name = os.getenv("GEMINI_MODEL_COACH", "gemini-2.5-flash")
+        self.model = genai.GenerativeModel(model_name)
+        logger.info(f"🔥 Using {model_name} for live coaching")
         
         # Hard variety guard - track last 5 full sentences
         self.last_5_responses = deque(maxlen=5)
         self.category_history = deque(maxlen=3)
         self.verb_history = deque(maxlen=3)
         self.retry_count = 0
+        
+        # Rate limiting and banned terms
+        self.last_request_time = 0
+        self.rate_limit_delay = 1.2  # seconds between requests
+        self.backoff_until = 0
+        self.banned_terms = {"kid", "bro", "champ", "buddy", "pal"}
+        
+        # Rolling averages for compliment logic
+        self.metric_history = {
+            'hand_height': deque(maxlen=30),
+            'stance_width_ratio': deque(maxlen=30),
+            'total_movement': deque(maxlen=30),
+            'head_mobility': deque(maxlen=30)
+        }
         self.positive_reinforcement_count = 0
         self.last_verb_used = None
         
@@ -379,6 +394,46 @@ class StreamingGeminiClient:
         words = text.strip().lower().split()
         return words[0] if words else ""
     
+    def _sanitize_response(self, response: str) -> str:
+        """Remove banned terms and clean up response"""
+        response_lower = response.lower()
+        for term in self.banned_terms:
+            if term in response_lower:
+                # Remove the banned term (case-insensitive)
+                import re
+                pattern = re.compile(re.escape(term), re.IGNORECASE)
+                response = pattern.sub('', response)
+        
+        # Clean up extra whitespace
+        response = ' '.join(response.split())
+        return response.strip()
+    
+    def _should_praise(self, current_metrics: dict) -> bool:
+        """Determine if we should add praise based on metrics"""
+        if not any(self.metric_history.values()):
+            return False
+        
+        # Check if any metric is above threshold or improving
+        thresholds = {
+            'hand_height': 0.7,  # Good guard height
+            'stance_width_ratio': 0.6,  # Good stance width
+            'total_movement': 0.3,  # Active footwork
+            'head_mobility': 0.2   # Head movement
+        }
+        
+        for metric, value in current_metrics.items():
+            if metric in thresholds and value > thresholds[metric]:
+                return random.random() < 0.25  # 25% chance when good
+        
+        # Check for improvement vs rolling average
+        for metric, value in current_metrics.items():
+            if metric in self.metric_history and len(self.metric_history[metric]) >= 10:
+                avg = sum(self.metric_history[metric]) / len(self.metric_history[metric])
+                if value > avg * 1.1:  # 10% improvement
+                    return random.random() < 0.25
+        
+        return False
+    
     def _check_variety(self, response_text: str) -> bool:
         """Check if response is too similar to recent ones"""
         # Check Levenshtein ratio
@@ -406,7 +461,9 @@ class StreamingGeminiClient:
         return True
     
     async def generate_elite_coaching_feedback(self, comprehensive_analysis: Dict, last_feedback_types: list = None) -> str:
-        """Generate elite coaching feedback using real Gemini 2.5 Pro streaming with hard variety guard"""
+        """Generate elite coaching feedback using gemini-2.5-flash with rate limiting and sanitization"""
+        import time
+        
         # Handle special cases first
         if comprehensive_analysis.get("insufficient_data"):
             return "Show me your stance and start moving."
@@ -414,42 +471,100 @@ class StreamingGeminiClient:
         if comprehensive_analysis.get("no_pose_detected"):
             return "Step back into frame—camera can't see you."
         
-        max_retries = 2
+        # Rate limiting check
+        current_time = time.time()
+        if current_time < self.backoff_until:
+            logger.info(f"⏰ Rate limit backoff active until {self.backoff_until:.1f}s")
+            return "Shadowbox four beats while I reconnect."
         
+        if current_time - self.last_request_time < self.rate_limit_delay:
+            logger.info(f"⏰ Rate limit delay: {self.rate_limit_delay - (current_time - self.last_request_time):.1f}s remaining")
+            return "Keep moving, stay focused."
+        
+        # Update metric history
+        stance_data = comprehensive_analysis.get('stance_analysis', {})
+        guard_data = comprehensive_analysis.get('guard_analysis', {})
+        footwork_data = comprehensive_analysis.get('footwork_analysis', {})
+        head_data = comprehensive_analysis.get('head_movement_analysis', {})
+        
+        current_metrics = {
+            'hand_height': guard_data.get('hand_height', 0.0),
+            'stance_width_ratio': stance_data.get('stance_width_ratio', 0.0),
+            'total_movement': footwork_data.get('total_movement', 0.0),
+            'head_mobility': head_data.get('head_movement_frequency', 0.0)
+        }
+        
+        for metric, value in current_metrics.items():
+            self.metric_history[metric].append(value)
+        
+        # Determine if we should praise
+        should_praise = self._should_praise(current_metrics)
+        
+        # Build the new coaching prompt
+        excluded_categories = list(self.category_history)
+        jitter = random.randint(1000, 9999)
+        
+        prompt = f"""ROLE
+You are a world-class boxing coach. Sound urgent, specific, and professional—never condescending.
+
+HARD BANS
+Never use address terms or nicknames (e.g., "kid", "bro", "champ", "buddy", "pal").
+Never use profanity. No trash talk. No filler like "come on".
+
+OUTPUT
+One sentence, ≤ 15 words. Direct, actionable, specific boxing cue.
+No repeated opening verb across consecutive tips. No repeated bigrams within 90 seconds.
+
+FOCUS ROTATION (skip categories used in last 3 tips)
+1) Guard (hands, elbows, chin), 
+2) Footwork (stance width, pivots, lateral movement), 
+3) Head movement (slips, rolls, angles), 
+4) Punch mechanics (hip rotation, snap, retraction), 
+5) Rhythm/breathing (tempo, relaxation), 
+6) Defense & counters (blocks, parries, timing), 
+7) Power chain (ground force, core engagement).
+
+POSITIVE REINFORCEMENT (subtle, optional)
+If a metric is above target or improving vs. 30-frame average, prefix with 1–2 words of praise
+(e.g., "Nice guard.", "Good rhythm.") then give the cue. Do this at most 1 in every 4 tips.
+
+LIVE CONTEXT
+StanceWidthRatio: {current_metrics['stance_width_ratio']:.2f}   (target ~0.55–0.70)
+GuardHeight: {current_metrics['hand_height']:.2f}          (higher = better)
+FootworkActivity: {current_metrics['total_movement']:.2f}
+HeadMobility: {current_metrics['head_mobility']:.2f}
+RecentlyExcludedCategories: {excluded_categories}
+ShouldPraise: {should_praise}
+
+RESPONSE
+Return only the final one-sentence cue (≤15 words). No preamble, no hashtags, no emojis.
+PROMPT_JITTER_{jitter}"""
+        
+        max_retries = 2
         for attempt in range(max_retries + 1):
             try:
-                # Build basic prompt
-                stance_data = comprehensive_analysis.get('stance_analysis', {})
-                guard_data = comprehensive_analysis.get('guard_analysis', {})
+                # Update request time
+                self.last_request_time = current_time
                 
-                # Exclude categories from recent history
-                excluded_categories = list(self.category_history)
-                
-                # Build prompt with jitter for entropy
-                jitter = random.randint(1000, 9999)
-                prompt = f"""You are Freddie Roach giving live boxing coaching. Be EXTREMELY concise - max 15 words.
-
-CURRENT ANALYSIS:
-Stance: {stance_data.get('stance_width_ratio', 0):.1f}
-Guard: {guard_data.get('hand_height', 0):.1f}
-
-EXCLUDE these categories: {excluded_categories}
-
-CRITICAL: Do NOT repeat any recent feedback. Be completely fresh and different.
-Give ONE specific boxing cue. Be direct and actionable.
-
-PROMPT_JITTER_{jitter}"""
-                
-                # Use higher temperature for retries
-                temperature = 1.2 if attempt > 0 else 0.9
-                
-                # Real streaming from Gemini 2.5 Pro
+                # Generate response
                 response_text = await self._generate_streaming_feedback(prompt)
+                
+                # Sanitize response
+                response_text = self._sanitize_response(response_text)
                 
                 # Enforce 15 word limit
                 words = response_text.split()
                 if len(words) > 15:
                     response_text = " ".join(words[:15])
+                
+                # Check if response is empty or too short after sanitization
+                if len(response_text.strip()) < 5:
+                    if attempt < max_retries:
+                        logger.warning(f"🔄 Retry {attempt + 1}/{max_retries} - response too short after sanitization")
+                        prompt += "\nAvoid nicknames."
+                        continue
+                    else:
+                        return "Adjust distance, stay active."
                 
                 # Check variety
                 if self._check_variety(response_text):
@@ -459,26 +574,54 @@ PROMPT_JITTER_{jitter}"""
                     if verb:
                         self.verb_history.append(verb)
                     
-                    # Add category to history (simple detection)
+                    # Add category to history
                     if any(word in response_text.lower() for word in ['chin', 'guard', 'hands', 'elbow']):
                         self.category_history.append('guard')
                     elif any(word in response_text.lower() for word in ['foot', 'step', 'move', 'bounce']):
                         self.category_history.append('footwork')
                     elif any(word in response_text.lower() for word in ['head', 'slip', 'duck']):
                         self.category_history.append('head_movement')
+                    elif any(word in response_text.lower() for word in ['punch', 'jab', 'cross', 'hook']):
+                        self.category_history.append('punch_mechanics')
+                    elif any(word in response_text.lower() for word in ['rhythm', 'breathe', 'tempo']):
+                        self.category_history.append('rhythm')
+                    elif any(word in response_text.lower() for word in ['block', 'parry', 'counter']):
+                        self.category_history.append('defense')
+                    elif any(word in response_text.lower() for word in ['power', 'hip', 'core']):
+                        self.category_history.append('power_chain')
                     
-                    logger.info(f"✅ Generated unique feedback: '{response_text}'")
+                    logger.info(f"✅ Generated feedback: '{response_text}' (praise: {should_praise})")
                     return response_text.strip()
                 else:
                     if attempt < max_retries:
                         logger.warning(f"🔄 Retry {attempt + 1}/{max_retries} - variety check failed")
-                        prompt += "\n[RETRY] Try again—use different wording and do NOT mention the same guard cue."
+                        prompt += "\nUse different wording and a different opening verb."
                     else:
                         logger.error("❌ Max retries reached, using fallback")
                         return "Adjust distance, stay active."
             
             except Exception as e:
-                logger.error(f"❌ Gemini 2.5 Pro error on attempt {attempt + 1}: {e}")
+                logger.error(f"❌ Gemini error on attempt {attempt + 1}: {e}")
+                
+                # Handle 429 rate limit specifically
+                if "429" in str(e) or "rate limit" in str(e).lower():
+                    # Parse retry delay from error if possible
+                    retry_delay = 12.0  # Default 12 seconds
+                    if "retry_delay" in str(e):
+                        try:
+                            import re
+                            match = re.search(r'retry_delay[:\s]*(\d+(?:\.\d+)?)', str(e))
+                            if match:
+                                retry_delay = float(match.group(1))
+                        except:
+                            pass
+                    
+                    # Add jitter (±30%)
+                    jitter = random.uniform(0.7, 1.3)
+                    self.backoff_until = current_time + (retry_delay * jitter)
+                    logger.warning(f"⏰ Rate limited, backoff until {self.backoff_until:.1f}s")
+                    return "Shadowbox four beats while I reconnect."
+                
                 if attempt < max_retries:
                     continue
                 else:
@@ -567,16 +710,16 @@ RESPONSE (≤15 words, be different):"""
         return instructions.get(category, "FOCUS ON: Overall technique improvement.")
     
     async def _generate_streaming_feedback(self, prompt: str) -> str:
-        """Generate feedback using REAL Gemini 2.5 Pro streaming"""
+        """Generate feedback using gemini-2.5-flash streaming (buffered to return one clean sentence)"""
         try:
-            # Use real streaming generation with Gemini 2.5 Pro
+            # Use gemini-2.5-flash for high RPM micro-cues
             generation_config = {
-                'temperature': 0.9,
-                'max_output_tokens': 50,  # Keep it short
+                'temperature': 0.8,  # Balanced creativity and consistency
+                'max_output_tokens': 32,  # Keep it short for micro-cues
                 'top_p': 0.9
             }
             
-            # Use the correct streaming method
+            # Stream response and buffer to completion for one clean sentence
             response_stream = await asyncio.to_thread(
                 self.model.generate_content, 
                 prompt,
@@ -595,14 +738,14 @@ RESPONSE (≤15 words, be different):"""
                 if len(words) > 15:
                     response_text = ' '.join(words[:15])
                 
-                logger.info(f"🔥 REAL Gemini 2.5 Pro response: '{response_text}'")
+                logger.info(f"🔥 {self.model.model_name} response: '{response_text}'")
                 return response_text.strip()
             else:
-                logger.error("❌ Empty response from REAL Gemini 2.5 Pro")
-                raise Exception("Empty response from Gemini 2.5 Pro")
+                logger.error(f"❌ Empty response from {self.model.model_name}")
+                raise Exception(f"Empty response from {self.model.model_name}")
                 
         except Exception as e:
-            logger.error(f"❌ REAL Gemini 2.5 Pro streaming error: {e}")
+            logger.error(f"❌ {self.model.model_name} streaming error: {e}")
             raise
     
 
