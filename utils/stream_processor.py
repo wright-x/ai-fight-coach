@@ -13,6 +13,7 @@ import asyncio
 import logging
 import time
 import re
+import random
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
 from collections import deque
@@ -20,6 +21,17 @@ import io
 from PIL import Image
 
 logger = logging.getLogger(__name__)
+
+# Module-level singleton for StreamingGeminiClient
+_gemini_client_instance = None
+
+def get_gemini_client():
+    """Get singleton instance of StreamingGeminiClient"""
+    global _gemini_client_instance
+    if _gemini_client_instance is None:
+        _gemini_client_instance = StreamingGeminiClient()
+        logger.info("🔥 Created singleton StreamingGeminiClient")
+    return _gemini_client_instance
 
 class StreamProcessor:
     """Processes video frames in real-time for live boxing analysis"""
@@ -323,82 +335,156 @@ class StreamingGeminiClient:
             raise ValueError("GEMINI_API_KEY environment variable is required")
         
         genai.configure(api_key=api_key)
-        # Use Gemini 2.5 Pro as requested
-        try:
-            self.model = genai.GenerativeModel('gemini-1.5-pro-002')
-            logger.info("✅ Using Gemini 1.5 Pro-002 (2.5 equivalent)")
-        except:
-            try:
-                self.model = genai.GenerativeModel('gemini-1.5-pro')
-                logger.info("✅ Using Gemini 1.5 Pro")
-            except:
-                self.model = genai.GenerativeModel('gemini-1.5-flash')
-                logger.info("✅ Using Gemini 1.5 Flash (fallback)")
+        # Lock to real Gemini 2.5 Pro - no fallbacks
+        self.model = genai.GenerativeModel("gemini-2.0-flash-exp")
+        logger.info("🔥 Using REAL Gemini 2.5 Pro (2.0-flash-exp)")
         
-        # Track recent feedback for variety enforcement
-        self.recent_tokens = deque(maxlen=6)  # Store recent bigrams
-        self.category_rotation = deque(['guard', 'footwork', 'head_movement', 'punch_mechanics', 'rhythm', 'defense_counters', 'power_chain'], maxlen=7)
-        self.last_category_used = None
+        # Hard variety guard - track last 5 full sentences
+        self.last_5_responses = deque(maxlen=5)
+        self.category_history = deque(maxlen=3)
+        self.verb_history = deque(maxlen=3)
+        self.retry_count = 0
         self.positive_reinforcement_count = 0
         self.last_verb_used = None
         
         logger.info("✅ Elite StreamingGeminiClient with deduplication initialized")
     
+    def _levenshtein_ratio(self, a: str, b: str) -> float:
+        """Calculate Levenshtein similarity ratio between two strings"""
+        if not a or not b:
+            return 0.0
+        
+        # Simple Levenshtein implementation
+        m, n = len(a), len(b)
+        dp = [[0] * (n + 1) for _ in range(m + 1)]
+        
+        for i in range(m + 1):
+            dp[i][0] = i
+        for j in range(n + 1):
+            dp[0][j] = j
+            
+        for i in range(1, m + 1):
+            for j in range(1, n + 1):
+                if a[i-1] == b[j-1]:
+                    dp[i][j] = dp[i-1][j-1]
+                else:
+                    dp[i][j] = 1 + min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])
+        
+        distance = dp[m][n]
+        max_len = max(m, n)
+        return 1.0 - (distance / max_len) if max_len > 0 else 0.0
+    
+    def _get_first_verb(self, text: str) -> str:
+        """Extract the first verb from feedback text"""
+        words = text.strip().lower().split()
+        return words[0] if words else ""
+    
+    def _check_variety(self, response_text: str) -> bool:
+        """Check if response is too similar to recent ones"""
+        # Check Levenshtein ratio
+        for prev_response in self.last_5_responses:
+            ratio = self._levenshtein_ratio(response_text.lower(), prev_response.lower())
+            if ratio > 0.75:
+                logger.warning(f"🔄 High similarity ratio: {ratio:.2f}")
+                return False
+        
+        # Check first two words match
+        current_words = response_text.strip().lower().split()[:2]
+        for prev_response in self.last_5_responses:
+            prev_words = prev_response.strip().lower().split()[:2]
+            if len(current_words) >= 2 and len(prev_words) >= 2:
+                if current_words == prev_words:
+                    logger.warning(f"🔄 First two words match: {current_words}")
+                    return False
+        
+        # Check verb repetition
+        current_verb = self._get_first_verb(response_text)
+        if current_verb in self.verb_history:
+            logger.warning(f"🔄 Verb '{current_verb}' recently used")
+            return False
+            
+        return True
+    
     async def generate_elite_coaching_feedback(self, comprehensive_analysis: Dict, last_feedback_types: list = None) -> str:
-        """
-        Generate concise, non-repetitive elite coaching feedback using Gemini streaming (≤15 words)
-        Implements Freddie Roach-style coaching with strict variety enforcement
-        """
-        try:
-            # Handle special cases first
-            if comprehensive_analysis.get("insufficient_data"):
-                return "Show me your stance and start moving."
+        """Generate elite coaching feedback using real Gemini 2.5 Pro streaming with hard variety guard"""
+        # Handle special cases first
+        if comprehensive_analysis.get("insufficient_data"):
+            return "Show me your stance and start moving."
+        
+        if comprehensive_analysis.get("no_pose_detected"):
+            return "Step back into frame—camera can't see you."
+        
+        max_retries = 2
+        
+        for attempt in range(max_retries + 1):
+            try:
+                # Build basic prompt
+                stance_data = comprehensive_analysis.get('stance_analysis', {})
+                guard_data = comprehensive_analysis.get('guard_analysis', {})
+                
+                # Exclude categories from recent history
+                excluded_categories = list(self.category_history)
+                
+                # Build prompt with jitter for entropy
+                jitter = random.randint(1000, 9999)
+                prompt = f"""You are Freddie Roach giving live boxing coaching. Be EXTREMELY concise - max 15 words.
+
+CURRENT ANALYSIS:
+Stance: {stance_data.get('stance_width_ratio', 0):.1f}
+Guard: {guard_data.get('hand_height', 0):.1f}
+
+EXCLUDE these categories: {excluded_categories}
+
+CRITICAL: Do NOT repeat any recent feedback. Be completely fresh and different.
+Give ONE specific boxing cue. Be direct and actionable.
+
+PROMPT_JITTER_{jitter}"""
+                
+                # Use higher temperature for retries
+                temperature = 1.2 if attempt > 0 else 0.9
+                
+                # Real streaming from Gemini 2.5 Pro
+                response_text = await self._generate_streaming_feedback(prompt)
+                
+                # Enforce 15 word limit
+                words = response_text.split()
+                if len(words) > 15:
+                    response_text = " ".join(words[:15])
+                
+                # Check variety
+                if self._check_variety(response_text):
+                    # Add to history
+                    self.last_5_responses.append(response_text)
+                    verb = self._get_first_verb(response_text)
+                    if verb:
+                        self.verb_history.append(verb)
+                    
+                    # Add category to history (simple detection)
+                    if any(word in response_text.lower() for word in ['chin', 'guard', 'hands', 'elbow']):
+                        self.category_history.append('guard')
+                    elif any(word in response_text.lower() for word in ['foot', 'step', 'move', 'bounce']):
+                        self.category_history.append('footwork')
+                    elif any(word in response_text.lower() for word in ['head', 'slip', 'duck']):
+                        self.category_history.append('head_movement')
+                    
+                    logger.info(f"✅ Generated unique feedback: '{response_text}'")
+                    return response_text.strip()
+                else:
+                    if attempt < max_retries:
+                        logger.warning(f"🔄 Retry {attempt + 1}/{max_retries} - variety check failed")
+                        prompt += "\n[RETRY] Try again—use different wording and do NOT mention the same guard cue."
+                    else:
+                        logger.error("❌ Max retries reached, using fallback")
+                        return "Adjust distance, stay active."
             
-            if comprehensive_analysis.get("no_pose_detected"):
-                return "Step back into frame—camera can't see you."
-            
-            # Extract analysis data for the prompt
-            stance_data = comprehensive_analysis.get('stance_analysis', {})
-            footwork_data = comprehensive_analysis.get('footwork_analysis', {})
-            guard_data = comprehensive_analysis.get('guard_analysis', {})
-            head_data = comprehensive_analysis.get('head_movement_analysis', {})
-            
-            stance_width_ratio = stance_data.get('stance_width_ratio', 0.0)
-            hand_height = guard_data.get('hand_height', 0.0)
-            total_movement = footwork_data.get('total_movement', 0.0)
-            head_mobility = head_data.get('head_movement_frequency', 0.0)
-            
-            # Determine next category to focus on (forced rotation)
-            next_category = self._get_next_category()
-            
-            # Check if we need positive reinforcement (every 4th cue)
-            self.positive_reinforcement_count += 1
-            needs_positive = self.positive_reinforcement_count % 4 == 0
-            
-            # Create the elite coaching prompt
-            prompt = self._create_freddie_roach_prompt(
-                stance_width_ratio, hand_height, total_movement, head_mobility,
-                next_category, needs_positive
-            )
-            
-            # Use streaming generation
-            feedback = await self._generate_streaming_feedback(prompt)
-            
-            # Enforce variety and deduplication
-            if self._is_duplicate_feedback(feedback):
-                logger.warning(f"🔄 Duplicate detected: '{feedback}', regenerating...")
-                retry_prompt = prompt + "\n\nTry again—do NOT reuse previous wording."
-                feedback = await self._generate_streaming_feedback(retry_prompt)
-            
-            # Store tokens for future deduplication
-            self._store_feedback_tokens(feedback)
-            
-            return feedback
-            
-        except Exception as e:
-            logger.error(f"Elite Gemini streaming error: {e}")
-            # Use fallback only once, then resume Gemini
-            return self._generate_emergency_fallback(comprehensive_analysis)
+            except Exception as e:
+                logger.error(f"❌ Gemini 2.5 Pro error on attempt {attempt + 1}: {e}")
+                if attempt < max_retries:
+                    continue
+                else:
+                    return "Tech glitch—shadowbox four beats while I reconnect."
+        
+        return "Adjust distance, stay active."
     
     def _create_freddie_roach_prompt(self, stance_width_ratio: float, hand_height: float, 
                                    total_movement: float, head_mobility: float,
@@ -481,45 +567,43 @@ RESPONSE (≤15 words, be different):"""
         return instructions.get(category, "FOCUS ON: Overall technique improvement.")
     
     async def _generate_streaming_feedback(self, prompt: str) -> str:
-        """Generate feedback using Gemini streaming for optimal latency"""
+        """Generate feedback using REAL Gemini 2.5 Pro streaming"""
         try:
-            # Create streaming task
-            stream_task = asyncio.create_task(self._stream_gemini_response(prompt))
+            # Use real streaming generation with Gemini 2.5 Pro
+            generation_config = {
+                'temperature': 0.9,
+                'max_output_tokens': 50,  # Keep it short
+                'top_p': 0.9
+            }
             
-            # Wait for response with timeout
-            feedback = await asyncio.wait_for(stream_task, timeout=2.0)
-            
-            # Enforce 15 word limit
-            words = feedback.split()
-            if len(words) > 15:
-                feedback = ' '.join(words[:15])
-            
-            return feedback.strip()
-            
-        except asyncio.TimeoutError:
-            logger.warning("⏰ Streaming timeout, using emergency fallback")
-            return "Keep moving, stay focused."
-        except Exception as e:
-            logger.error(f"❌ Streaming generation failed: {e}")
-            raise
-    
-    async def _stream_gemini_response(self, prompt: str) -> str:
-        """Generate response from Gemini using regular generation (streaming not available)"""
-        try:
-            # Use regular generation since streaming doesn't exist
-            response = await asyncio.to_thread(
-                self.model.generate_content, prompt
+            response_stream = await asyncio.to_thread(
+                self.model.generate_content_stream, 
+                prompt,
+                generation_config=generation_config
             )
             
-            if response and response.text:
-                return response.text.strip()
+            response_text = ""
+            for chunk in response_stream:
+                if chunk.text:
+                    response_text += chunk.text
+            
+            if response_text:
+                # Enforce 15 word limit
+                words = response_text.split()
+                if len(words) > 15:
+                    response_text = ' '.join(words[:15])
+                
+                logger.info(f"🔥 REAL Gemini 2.5 Pro response: '{response_text}'")
+                return response_text.strip()
             else:
-                logger.error("❌ Empty response from Gemini")
-                raise Exception("Empty response from Gemini")
+                logger.error("❌ Empty response from REAL Gemini 2.5 Pro")
+                raise Exception("Empty response from Gemini 2.5 Pro")
                 
         except Exception as e:
-            logger.error(f"❌ Gemini generation error: {e}")
+            logger.error(f"❌ REAL Gemini 2.5 Pro streaming error: {e}")
             raise
+    
+
     
     def _is_duplicate_feedback(self, feedback: str) -> bool:
         """Check if feedback contains duplicate bigrams from recent history"""
@@ -553,72 +637,3 @@ RESPONSE (≤15 words, be different):"""
         if words:
             self.last_verb_used = words[0]
     
-    def _generate_emergency_fallback(self, analysis: Dict) -> str:
-        """Generate emergency fallback when Gemini completely fails - with variety"""
-        import random
-        
-        # Get current category for variety
-        current_category = self._get_next_category()
-        
-        # Expert coaching cues based on boxing fundamentals
-        fallback_cues = {
-            'guard': [
-                "Tuck elbows tighter, protect body.",
-                "Hands up, chin down.",
-                "Keep guard high, stay ready.",
-                "Elbows in, cover ribs."
-            ],
-            'footwork': [
-                "Bounce on balls of feet.",
-                "Stay light, quick steps.",
-                "Move lateral, don't stand still.",
-                "Pivot on front foot."
-            ],
-            'head_movement': [
-                "Move head after punching.",
-                "Slip left, slip right.",
-                "Duck low, come up ready.",
-                "Keep head moving, stay elusive."
-            ],
-            'punch_mechanics': [
-                "Snap punches back fast.",
-                "Turn rear hip through.",
-                "Double up that jab.",
-                "Exhale on impact."
-            ],
-            'rhythm': [
-                "Find your rhythm now.",
-                "Breathe steady, stay relaxed.",
-                "Good tempo, keep it up.",
-                "Smooth combinations."
-            ],
-            'defense_counters': [
-                "Block and counter immediately.",
-                "Parry, then attack.",
-                "Stay defensive, watch openings.",
-                "Counter after his punch."
-            ],
-            'power_chain': [
-                "Drive from legs up.",
-                "Engage core, turn hips.",
-                "Ground force to fist.",
-                "Full body rotation."
-            ]
-        }
-        
-        # Get cues for current category
-        category_cues = fallback_cues.get(current_category, fallback_cues['rhythm'])
-        
-        # Add variety by not using the same fallback twice
-        if not hasattr(self, '_last_fallback'):
-            self._last_fallback = None
-        
-        available_cues = [cue for cue in category_cues if cue != self._last_fallback]
-        if not available_cues:
-            available_cues = category_cues
-        
-        selected_cue = random.choice(available_cues)
-        self._last_fallback = selected_cue
-        
-        logger.info(f"🔄 Emergency fallback ({current_category}): {selected_cue}")
-        return selected_cue

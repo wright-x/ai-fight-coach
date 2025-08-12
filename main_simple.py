@@ -102,7 +102,7 @@ class DatabaseService:
             
             logger.info(f"Created new user: {user.id}")
             return user
-        except Exception as e:
+    except Exception as e:
             logger.error(f"Error creating user: {e}")
             self.db.rollback()
             return None
@@ -121,7 +121,7 @@ class DatabaseService:
             self.db.commit()
             self.db.refresh(job)
             return job
-        except Exception as e:
+    except Exception as e:
             logger.error(f"Error creating job: {e}")
             self.db.rollback()
             raise
@@ -175,7 +175,7 @@ logger = logging.getLogger(__name__)
 try:
     from utils.video_processor import VideoProcessor
     from utils.gemini_client import GeminiClient
-    from utils.tts_client import TTSClient
+        from utils.tts_client import TTSClient
 
     try:
         video_processor = VideoProcessor()
@@ -189,7 +189,7 @@ try:
     logger.info(f"   - VideoProcessor: {type(video_processor)}")
     logger.info(f"   - GeminiClient: {type(gemini_client)}")
     logger.info(f"   - TTSClient: {type(tts_client)}")
-except Exception as e:
+    except Exception as e:
     logger.error(f"❌ Component initialization failed: {e}")
     raise
 
@@ -467,7 +467,7 @@ async def upload_video(
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             logger.info(f"File saved to {file_path}")
-        except Exception as e:
+            except Exception as e:
             logger.error(f"File save failed: {e}")
             return JSONResponse({
                 "success": False,
@@ -485,7 +485,7 @@ async def upload_video(
         try:
             await process_video_analysis(job.id, db)
             logger.info(f"Video processing completed for job {job.id}")
-        except Exception as e:
+            except Exception as e:
             logger.error(f"Video processing failed: {e}")
             # Don't fail the upload, just log the error
         
@@ -622,7 +622,7 @@ async def process_video_analysis(job_id: str, db: Session):
                 logger.info(f"Highlight video created successfully: {output_video_path}")
             except Exception as video_error:
                 logger.error(f"Video creation failed for job {job_id}: {video_error}")
-        else:
+    else:
             logger.warning(f"No highlights found for job {job_id}")
                 
         # Update job status
@@ -833,9 +833,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 # Get feedback history to avoid repetition
                 recent_feedback_types = manager.get_feedback_history(client_id)
                 
-                # Initialize streaming Gemini client for elite coaching
-                from utils.stream_processor import StreamingGeminiClient
-                gemini_coach = StreamingGeminiClient()
+                # Get singleton streaming Gemini client for elite coaching
+                from utils.stream_processor import get_gemini_client
+                gemini_coach = get_gemini_client()
                 
                 # Get elite-level coaching feedback (short and non-repetitive)
                 elite_feedback = await gemini_coach.generate_elite_coaching_feedback(
