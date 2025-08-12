@@ -576,10 +576,12 @@ RESPONSE (≤15 words, be different):"""
                 'top_p': 0.9
             }
             
+            # Use the correct streaming method
             response_stream = await asyncio.to_thread(
-                self.model.generate_content_stream, 
+                self.model.generate_content, 
                 prompt,
-                generation_config=generation_config
+                generation_config=generation_config,
+                stream=True
             )
             
             response_text = ""
