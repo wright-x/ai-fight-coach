@@ -520,40 +520,58 @@ class StreamingGeminiClient:
         excluded_categories = list(self.category_history)
         jitter = random.randint(1000, 9999)
         
+        # Get last opening verb for variety enforcement
+        last_opening_verb = self.verb_history[-1] if self.verb_history else "None"
+        
         prompt = f"""ROLE
-You are a world-class boxing coach. Sound urgent, specific, and professional—never condescending.
+You are an elite boxing coach delivering live micro-cues. Be urgent, specific, and professional.
 
 HARD BANS
-Never use address terms or nicknames (e.g., "kid", "bro", "champ", "buddy", "pal").
-Never use profanity. No trash talk. No filler like "come on".
+Never use address terms or nicknames: kid, bro, champ, buddy, pal, dude, man.
+No profanity. No hashtags, emojis, or filler ("come on", "let's go", "you got this").
 
-OUTPUT
-One sentence, ≤ 15 words. Direct, actionable, specific boxing cue.
-No repeated opening verb across consecutive tips. No repeated bigrams within 90 seconds.
+OUTPUT FORMAT
+Return ONE sentence, plain text only (no quotes, no colons, no code blocks), ≤ 15 words.
+Start with a direct, actionable cue (imperative or concise declarative). Avoid hedging.
 
-FOCUS ROTATION (skip categories used in last 3 tips)
-1) Guard (hands, elbows, chin), 
-2) Footwork (stance width, pivots, lateral movement), 
-3) Head movement (slips, rolls, angles), 
-4) Punch mechanics (hip rotation, snap, retraction), 
-5) Rhythm/breathing (tempo, relaxation), 
-6) Defense & counters (blocks, parries, timing), 
-7) Power chain (ground force, core engagement).
+VARIETY & REPETITION
+Do NOT reuse the same opening word as the previous tip: {last_opening_verb}.
+Avoid any bigram that appeared in the last 90 seconds (the app enforces; you must try).
+If you cannot be fresh, pick a different focus area (see rotation) or rephrase.
+
+FOCUS ROTATION (skip any in ExcludedCategories)
+1) Guard (hands, elbows, chin)
+2) Footwork (stance width, pivots, lateral movement)
+3) Head movement (slips, rolls, angles)
+4) Punch mechanics (hip rotation, snap, retraction)
+5) Rhythm/breathing (tempo, relaxation)
+6) Defense & counters (blocks, parries, timing)
+7) Power chain (ground force, core engagement)
 
 POSITIVE REINFORCEMENT (subtle, optional)
-If a metric is above target or improving vs. 30-frame average, prefix with 1–2 words of praise
-(e.g., "Nice guard.", "Good rhythm.") then give the cue. Do this at most 1 in every 4 tips.
+If a metric is above target or improving ≥10% vs. 30-frame average, prefix with 1–2 words of praise
+(e.g., "Nice guard." "Good rhythm.") then the cue. Use praise at most 1 in 4 tips.
 
-LIVE CONTEXT
-StanceWidthRatio: {current_metrics['stance_width_ratio']:.2f}   (target ~0.55–0.70)
-GuardHeight: {current_metrics['hand_height']:.2f}          (higher = better)
-FootworkActivity: {current_metrics['total_movement']:.2f}
-HeadMobility: {current_metrics['head_mobility']:.2f}
-RecentlyExcludedCategories: {excluded_categories}
+LIVE CONTEXT (use these numbers to choose and phrase the cue)
+StanceWidthRatio: {current_metrics['stance_width_ratio']:.2f}   (target 0.55–0.70)
+GuardHeight:     {current_metrics['hand_height']:.2f}         (higher is better)
+FootworkActivity:{current_metrics['total_movement']:.2f}
+HeadMobility:    {current_metrics['head_mobility']:.2f}
+ExcludedCategories: {excluded_categories}
 ShouldPraise: {should_praise}
 
+FAIL-SAFES (only emit these exact lines when true)
+- If no pose detected for >3s: Step back into frame—camera can't see you.
+- If insufficient data (<5 frames): Show me your stance and start moving.
+
+TONE EXAMPLES (style only; do not reuse wording)
+"Tuck elbows; bring rear hand to cheek."
+"Angle off right, double jab—don't square up."
+"Good rhythm; add a slip after the cross."
+"Rotate hip through, snap and retract fast."
+
 RESPONSE
-Return only the final one-sentence cue (≤15 words). No preamble, no hashtags, no emojis.
+Output only the final one-sentence cue (≤15 words), plain text, nothing else.
 PROMPT_JITTER_{jitter}"""
         
         max_retries = 2
@@ -768,17 +786,8 @@ RESPONSE (≤15 words, be different):"""
             # Final mode uses non-stream to avoid StopIteration/uvloop weirdness
             def _blocking_once():
                 resp = self.model.generate_content(prompt, generation_config=generation_config)
-                txt = getattr(resp, "text", None)
-                if not txt and hasattr(resp, "candidates"):
-                    parts = []
-                    for c in (resp.candidates or []):
-                        content = getattr(c, "content", None)
-                        if content and getattr(content, "parts", None):
-                            for p in content.parts:
-                                if getattr(p, "text", None):
-                                    parts.append(p.text)
-                    txt = " ".join(parts)
-                return (txt or "").strip()
+                txt = self._extract_plain_text(resp)  # Use the safe helper
+                return txt
             
             # Run non-streaming call in executor
             loop = asyncio.get_running_loop()
@@ -833,6 +842,32 @@ RESPONSE (≤15 words, be different):"""
         # Store first verb
         if words:
             self.last_verb_used = words[0]
+    
+    def _extract_plain_text(self, resp) -> str:
+        """
+        Safely flatten Gemini responses to plain text.
+        - Ignores non-text parts
+        - Skips SAFETY-stopped candidates
+        - Returns '' on failure
+        """
+        try:
+            parts_out = []
+            for c in getattr(resp, "candidates", []) or []:
+                # If SDK exposes finish_reason, skip hard-stopped candidates
+                fr = getattr(c, "finish_reason", None)
+                if isinstance(fr, str) and fr.upper() == "SAFETY":
+                    continue
+                content = getattr(c, "content", None)
+                if content is None:
+                    continue
+                for p in getattr(content, "parts", []) or []:
+                    t = getattr(p, "text", None)
+                    if t:
+                        parts_out.append(t)
+            return " ".join(parts_out).strip()
+        except Exception:
+            logger.exception("extract_plain_text failed")
+            return ""
     
     def _safe_tokenize(self, chunk_text: str) -> list[str]:
         """Split on whitespace, keep punctuation on the word but use a clean compare"""
@@ -973,19 +1008,26 @@ RESPONSE (≤15 words, be different):"""
         excluded_categories = list(self.category_history)
         jitter = random.randint(1000, 9999)
         
+        # Get last opening verb for variety enforcement
+        last_opening_verb = self.verb_history[-1] if self.verb_history else "None"
+        
         prompt = f"""ROLE
-You are a world-class boxing coach. Urgent, specific, professional—never condescending.
+You are an elite boxing coach delivering live micro-cues. Be urgent, specific, and professional.
 
 HARD BANS
-Never use address terms or nicknames ("kid", "bro", "champ", "buddy", "pal").
-No profanity. No filler ("come on", "let's go"), no hashtags or emojis.
+Never use address terms or nicknames: kid, bro, champ, buddy, pal, dude, man.
+No profanity. No hashtags, emojis, or filler ("come on", "let's go", "you got this").
 
-OUTPUT
-One sentence, ≤ 15 words. Direct, actionable, specific boxing cue.
-Do not reuse the same opening verb as the previous tip.
-Avoid repeating any bigram used within the last 90 seconds.
+OUTPUT FORMAT
+Return ONE sentence, plain text only (no quotes, no colons, no code blocks), ≤ 15 words.
+Start with a direct, actionable cue (imperative or concise declarative). Avoid hedging.
 
-FOCUS ROTATION (skip categories used in last 3 tips)
+VARIETY & REPETITION
+Do NOT reuse the same opening word as the previous tip: {last_opening_verb}.
+Avoid any bigram that appeared in the last 90 seconds (the app enforces; you must try).
+If you cannot be fresh, pick a different focus area (see rotation) or rephrase.
+
+FOCUS ROTATION (skip any in ExcludedCategories)
 1) Guard (hands, elbows, chin)
 2) Footwork (stance width, pivots, lateral movement)
 3) Head movement (slips, rolls, angles)
@@ -994,23 +1036,30 @@ FOCUS ROTATION (skip categories used in last 3 tips)
 6) Defense & counters (blocks, parries, timing)
 7) Power chain (ground force, core engagement)
 
-POSITIVE REINFORCEMENT (light, optional)
-If a metric is above target or improving vs. 30-frame average, prefix with 1–2 words of praise
-(e.g., "Nice guard.", "Good rhythm."). Do this at most 1 in 4 tips.
+POSITIVE REINFORCEMENT (subtle, optional)
+If a metric is above target or improving ≥10% vs. 30-frame average, prefix with 1–2 words of praise
+(e.g., "Nice guard." "Good rhythm.") then the cue. Use praise at most 1 in 4 tips.
 
-LIVE CONTEXT
-StanceWidthRatio: {current_metrics['stance_width_ratio']:.2f}   (target ~0.55–0.70)
-GuardHeight: {current_metrics['hand_height']:.2f}         (higher = better)
-FootworkActivity: {current_metrics['total_movement']:.2f}
-HeadMobility: {current_metrics['head_mobility']:.2f}
-RecentlyExcludedCategories: {excluded_categories}
+LIVE CONTEXT (use these numbers to choose and phrase the cue)
+StanceWidthRatio: {current_metrics['stance_width_ratio']:.2f}   (target 0.55–0.70)
+GuardHeight:     {current_metrics['hand_height']:.2f}         (higher is better)
+FootworkActivity:{current_metrics['total_movement']:.2f}
+HeadMobility:    {current_metrics['head_mobility']:.2f}
+ExcludedCategories: {excluded_categories}
+ShouldPraise: {should_praise}
 
-FAIL-SAFES
-If no pose for >3s: "Step back into frame—camera can't see you."
-If insufficient data (<5 frames): "Show me your stance and start moving."
+FAIL-SAFES (only emit these exact lines when true)
+- If no pose detected for >3s: Step back into frame—camera can't see you.
+- If insufficient data (<5 frames): Show me your stance and start moving.
+
+TONE EXAMPLES (style only; do not reuse wording)
+"Tuck elbows; bring rear hand to cheek."
+"Angle off right, double jab—don't square up."
+"Good rhythm; add a slip after the cross."
+"Rotate hip through, snap and retract fast."
 
 RESPONSE
-Return only the one-sentence cue (≤15 words). No preamble.
+Output only the final one-sentence cue (≤15 words), plain text, nothing else.
 PROMPT_JITTER_{jitter}"""
         
         # Update request time
