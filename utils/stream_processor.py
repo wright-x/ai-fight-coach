@@ -14,11 +14,16 @@ import logging
 import time
 import re
 import random
+import threading
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
 from collections import deque
+from queue import Queue, Empty
 import io
 from PIL import Image
+
+# Sentinel for queue communication
+_SENTINEL = object()
 
 logger = logging.getLogger(__name__)
 
@@ -338,7 +343,11 @@ class StreamingGeminiClient:
         # Use gemini-2.5-flash for high RPM micro-cues
         model_name = os.getenv("GEMINI_MODEL_COACH", "gemini-2.5-flash")
         self.model = genai.GenerativeModel(model_name)
-        logger.info(f"🔥 Using {model_name} for live coaching")
+        
+        # Stream mode configuration
+        self.stream_mode = os.getenv("GEMINI_STREAM_MODE", "final").lower()  # "final" or "tokens"
+        
+        logger.info(f"🔥 Using {model_name} for live coaching (stream_mode: {self.stream_mode})")
         
         # Hard variety guard - track last 5 full sentences
         self.last_5_responses = deque(maxlen=5)
@@ -811,4 +820,221 @@ RESPONSE (≤15 words, be different):"""
         # Store first verb
         if words:
             self.last_verb_used = words[0]
+    
+    def _safe_tokenize(self, chunk_text: str) -> list[str]:
+        """Split on whitespace, keep punctuation on the word but use a clean compare"""
+        safe = []
+        for raw in chunk_text.split():
+            cleaned = raw.lower().strip(",.!?;:\"'()[]{}")
+            if cleaned in self.BANNED:
+                continue  # skip banned nicknames mid-stream
+            safe.append(raw)
+        return safe
+    
+    def _token_producer(self, prompt: str, generation_config: dict, q: Queue, stop_evt: threading.Event):
+        """Producer (worker thread) — consume SDK stream safely"""
+        try:
+            # IMPORTANT: contain the iterator in this thread; uvloop never sees it
+            with self.model.generate_content(prompt, generation_config=generation_config, stream=True) as resp:
+                for chunk in resp:
+                    if stop_evt.is_set():
+                        break
+                    text = getattr(chunk, "text", None)
+                    if not text:
+                        continue
+                    # Push raw text; async side will tokenize/filter
+                    q.put(text)
+        except StopIteration:
+            # Normal end-of-stream in some SDK internals — swallow it
+            pass
+        except Exception as e:
+            q.put(e)  # signal failure to async side
+        finally:
+            q.put(_SENTINEL)
+    
+    async def _generate_token_stream(self, prompt: str, send_delta, send_final) -> str:
+        """
+        - send_delta: async function(str) -> None    (stream partial tokens to WS)
+        - send_final: async function(str) -> None    (send final sanitized sentence)
+        Returns final sanitized sentence (for TTS), or "" on failure.
+        """
+        generation_config = {'temperature': 0.8, 'max_output_tokens': 32, 'top_p': 0.9}
+        q: Queue = Queue(maxsize=64)
+        stop_evt = threading.Event()
+        t = threading.Thread(target=self._token_producer, args=(prompt, generation_config, q, stop_evt), daemon=True)
+        t.start()
+
+        assembled = []
+        loop = asyncio.get_running_loop()
+        tokens_emitted = 0
+        start_time = time.time()
+
+        try:
+            while True:
+                item = await loop.run_in_executor(None, q.get)  # don't block event loop
+                if item is _SENTINEL:
+                    break
+                if isinstance(item, Exception):
+                    # Soft fail: stop streaming; caller will fallback line
+                    logger.warning(f"token stream error: {item}")
+                    return ""
+                # Tokenize + filter banned terms so nicknames never render
+                tokens = self._safe_tokenize(str(item))
+                if not tokens:
+                    continue
+                delta = " ".join(tokens)
+                assembled.extend(tokens)
+                tokens_emitted += 1
+                # Stream delta to client
+                await send_delta(delta)
+        finally:
+            stop_evt.set()
+
+        # Build final sentence, sanitize, trim to ≤15 words, variety check
+        final_text = " ".join(assembled).strip()
+        if not final_text:
+            return ""
+
+        # Enforce 15-word limit
+        words = final_text.split()
+        if len(words) > 15:
+            final_text = " ".join(words[:15])
+
+        # Final sanitation pass (in case punctuation hid a banned term)
+        sanitized = self._sanitize_response(final_text) or ""
+        if not sanitized:
+            return ""
+
+        duration = time.time() - start_time
+        logger.info(f"🔥 Token stream completed: {tokens_emitted} tokens, {duration:.2f}s duration")
+
+        await send_final(sanitized)
+        return sanitized
+    
+    async def generate_elite_coaching_feedback_with_stream(self, comprehensive_analysis: Dict, send_delta, send_final) -> str:
+        """Generate coaching feedback with token streaming support"""
+        # Build the same prompt as the regular method
+        import time
+        
+        # Handle special cases first
+        if comprehensive_analysis.get("insufficient_data"):
+            await send_final("Show me your stance and start moving.")
+            return "Show me your stance and start moving."
+        
+        if comprehensive_analysis.get("no_pose_detected"):
+            await send_final("Step back into frame—camera can't see you.")
+            return "Step back into frame—camera can't see you."
+        
+        # Rate limiting check
+        current_time = time.time()
+        if current_time < self.backoff_until:
+            logger.info(f"⏰ Rate limit backoff active until {self.backoff_until:.1f}s")
+            await send_final("Shadowbox four beats while I reconnect.")
+            return "Shadowbox four beats while I reconnect."
+        
+        if current_time - self.last_request_time < self.rate_limit_delay:
+            logger.info(f"⏰ Rate limit delay: {self.rate_limit_delay - (current_time - self.last_request_time):.1f}s remaining")
+            await send_final("Keep moving, stay focused.")
+            return "Keep moving, stay focused."
+        
+        # Update metric history
+        stance_data = comprehensive_analysis.get('stance_analysis', {})
+        guard_data = comprehensive_analysis.get('guard_analysis', {})
+        footwork_data = comprehensive_analysis.get('footwork_analysis', {})
+        head_data = comprehensive_analysis.get('head_movement_analysis', {})
+        
+        current_metrics = {
+            'hand_height': guard_data.get('hand_height', 0.0),
+            'stance_width_ratio': stance_data.get('stance_width_ratio', 0.0),
+            'total_movement': footwork_data.get('total_movement', 0.0),
+            'head_mobility': head_data.get('head_movement_frequency', 0.0)
+        }
+        
+        for metric, value in current_metrics.items():
+            self.metric_history[metric].append(value)
+        
+        # Determine if we should praise
+        should_praise = self._should_praise(current_metrics)
+        
+        # Build the new coaching prompt
+        excluded_categories = list(self.category_history)
+        jitter = random.randint(1000, 9999)
+        
+        prompt = f"""ROLE
+You are a world-class boxing coach. Urgent, specific, professional—never condescending.
+
+HARD BANS
+Never use address terms or nicknames ("kid", "bro", "champ", "buddy", "pal").
+No profanity. No filler ("come on", "let's go"), no hashtags or emojis.
+
+OUTPUT
+One sentence, ≤ 15 words. Direct, actionable, specific boxing cue.
+Do not reuse the same opening verb as the previous tip.
+Avoid repeating any bigram used within the last 90 seconds.
+
+FOCUS ROTATION (skip categories used in last 3 tips)
+1) Guard (hands, elbows, chin)
+2) Footwork (stance width, pivots, lateral movement)
+3) Head movement (slips, rolls, angles)
+4) Punch mechanics (hip rotation, snap, retraction)
+5) Rhythm/breathing (tempo, relaxation)
+6) Defense & counters (blocks, parries, timing)
+7) Power chain (ground force, core engagement)
+
+POSITIVE REINFORCEMENT (light, optional)
+If a metric is above target or improving vs. 30-frame average, prefix with 1–2 words of praise
+(e.g., "Nice guard.", "Good rhythm."). Do this at most 1 in 4 tips.
+
+LIVE CONTEXT
+StanceWidthRatio: {current_metrics['stance_width_ratio']:.2f}   (target ~0.55–0.70)
+GuardHeight: {current_metrics['hand_height']:.2f}         (higher = better)
+FootworkActivity: {current_metrics['total_movement']:.2f}
+HeadMobility: {current_metrics['head_mobility']:.2f}
+RecentlyExcludedCategories: {excluded_categories}
+
+FAIL-SAFES
+If no pose for >3s: "Step back into frame—camera can't see you."
+If insufficient data (<5 frames): "Show me your stance and start moving."
+
+RESPONSE
+Return only the one-sentence cue (≤15 words). No preamble.
+PROMPT_JITTER_{jitter}"""
+        
+        # Update request time
+        self.last_request_time = current_time
+        
+        # Generate with token streaming
+        final_sentence = await self._generate_token_stream(prompt, send_delta, send_final)
+        
+        if final_sentence:
+            # Add to history for variety checking
+            self.last_5_responses.append(final_sentence)
+            verb = self._get_first_verb(final_sentence)
+            if verb:
+                self.verb_history.append(verb)
+            
+            # Add category to history
+            if any(word in final_sentence.lower() for word in ['chin', 'guard', 'hands', 'elbow']):
+                self.category_history.append('guard')
+            elif any(word in final_sentence.lower() for word in ['foot', 'step', 'move', 'bounce']):
+                self.category_history.append('footwork')
+            elif any(word in final_sentence.lower() for word in ['head', 'slip', 'duck']):
+                self.category_history.append('head_movement')
+            elif any(word in final_sentence.lower() for word in ['punch', 'jab', 'cross', 'hook']):
+                self.category_history.append('punch_mechanics')
+            elif any(word in final_sentence.lower() for word in ['rhythm', 'breathe', 'tempo']):
+                self.category_history.append('rhythm')
+            elif any(word in final_sentence.lower() for word in ['block', 'parry', 'counter']):
+                self.category_history.append('defense')
+            elif any(word in final_sentence.lower() for word in ['power', 'hip', 'core']):
+                self.category_history.append('power_chain')
+            
+            logger.info(f"✅ Generated streaming feedback: '{final_sentence}' (praise: {should_praise})")
+            return final_sentence
+        else:
+            # Fallback to non-streaming
+            logger.warning("🔄 Token streaming failed, falling back to non-streaming")
+            response_text = await self._generate_streaming_feedback(prompt)
+            await send_final(response_text)
+            return response_text
     
