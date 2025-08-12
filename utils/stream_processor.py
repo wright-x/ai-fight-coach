@@ -351,6 +351,7 @@ class StreamingGeminiClient:
         self.rate_limit_delay = 1.2  # seconds between requests
         self.backoff_until = 0
         self.banned_terms = {"kid", "bro", "champ", "buddy", "pal"}
+        self.BANNED = {"kid", "bro", "champ", "buddy", "pal"}  # For sanitizer
         
         # Rolling averages for compliment logic
         self.metric_history = {
@@ -395,18 +396,24 @@ class StreamingGeminiClient:
         return words[0] if words else ""
     
     def _sanitize_response(self, response: str) -> str:
-        """Remove banned terms and clean up response"""
-        response_lower = response.lower()
-        for term in self.banned_terms:
-            if term in response_lower:
-                # Remove the banned term (case-insensitive)
-                import re
-                pattern = re.compile(re.escape(term), re.IGNORECASE)
-                response = pattern.sub('', response)
+        """Remove banned terms and clean up response - returns None if too short after sanitization"""
+        # Remove banned terms (case-insensitive)
+        words = response.split()
+        filtered_words = []
+        for word in words:
+            # Strip punctuation for comparison
+            clean_word = word.lower().strip(",.!?")
+            if clean_word not in self.BANNED:
+                filtered_words.append(word)
         
-        # Clean up extra whitespace
-        response = ' '.join(response.split())
-        return response.strip()
+        # Reconstruct response
+        out = " ".join(filtered_words)
+        
+        # Safety: if we removed too much, return None to trigger retry
+        if not out or len(out.split()) < 2:
+            return None
+            
+        return out.strip()
     
     def _should_praise(self, current_metrics: dict) -> bool:
         """Determine if we should add praise based on metrics"""
@@ -550,21 +557,23 @@ PROMPT_JITTER_{jitter}"""
                 response_text = await self._generate_streaming_feedback(prompt)
                 
                 # Sanitize response
-                response_text = self._sanitize_response(response_text)
+                sanitized_text = self._sanitize_response(response_text)
                 
-                # Enforce 15 word limit
-                words = response_text.split()
-                if len(words) > 15:
-                    response_text = " ".join(words[:15])
-                
-                # Check if response is empty or too short after sanitization
-                if len(response_text.strip()) < 5:
+                # Check if sanitization removed too much
+                if sanitized_text is None:
                     if attempt < max_retries:
                         logger.warning(f"🔄 Retry {attempt + 1}/{max_retries} - response too short after sanitization")
                         prompt += "\nAvoid nicknames."
                         continue
                     else:
                         return "Adjust distance, stay active."
+                
+                response_text = sanitized_text
+                
+                # Enforce 15 word limit
+                words = response_text.split()
+                if len(words) > 15:
+                    response_text = " ".join(words[:15])
                 
                 # Check variety
                 if self._check_variety(response_text):
@@ -709,8 +718,36 @@ RESPONSE (≤15 words, be different):"""
         }
         return instructions.get(category, "FOCUS ON: Overall technique improvement.")
     
+    def _blocking_stream_once(self, prompt: str, generation_config: dict) -> str:
+        """Fully consume stream in this thread - no generator crosses await boundary"""
+        try:
+            # Generate content with streaming
+            response = self.model.generate_content(
+                prompt,
+                generation_config=generation_config,
+                stream=True
+            )
+            
+            # Consume all chunks in this thread
+            text = ""
+            for chunk in response:
+                if getattr(chunk, "text", None):
+                    text += chunk.text
+            
+            # SDK recommends resolving at the end of iteration
+            try:
+                response.resolve()
+            except Exception:
+                pass  # Ignore resolve errors
+                
+            return text.strip()  # Return plain string, never a generator
+            
+        except Exception as e:
+            logger.error(f"❌ Blocking stream error: {e}")
+            raise
+
     async def _generate_streaming_feedback(self, prompt: str) -> str:
-        """Generate feedback using gemini-2.5-flash streaming (buffered to return one clean sentence)"""
+        """Generate feedback using gemini-2.5-flash streaming (async wrapper)"""
         try:
             # Use gemini-2.5-flash for high RPM micro-cues
             generation_config = {
@@ -719,18 +756,11 @@ RESPONSE (≤15 words, be different):"""
                 'top_p': 0.9
             }
             
-            # Stream response and buffer to completion for one clean sentence
-            response_stream = await asyncio.to_thread(
-                self.model.generate_content, 
-                prompt,
-                generation_config=generation_config,
-                stream=True
+            # Run blocking stream in executor - no generator crosses await boundary
+            loop = asyncio.get_running_loop()
+            response_text = await loop.run_in_executor(
+                None, self._blocking_stream_once, prompt, generation_config
             )
-            
-            response_text = ""
-            for chunk in response_stream:
-                if chunk.text:
-                    response_text += chunk.text
             
             if response_text:
                 # Enforce 15 word limit

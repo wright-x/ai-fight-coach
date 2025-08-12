@@ -14,15 +14,19 @@ class GeminiClient:
     """Simplified Gemini client for Railway environment"""
     
     def __init__(self):
-        self.api_key = os.getenv("GOOGLE_API_KEY")
+        # Support both GEMINI_API_KEY and GOOGLE_API_KEY
+        self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if not self.api_key:
-            print("❌ No Google API key found")
+            print("❌ No Gemini API key found (GEMINI_API_KEY or GOOGLE_API_KEY)")
             return
             
         # Configure Gemini
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
-        print("✅ GeminiClient initialized (simplified mode)")
+        
+        # Use gemini-2.5-flash for better performance
+        model_name = os.getenv("GEMINI_MODEL_COACH", "gemini-2.5-flash")
+        self.model = genai.GenerativeModel(model_name)
+        print(f"✅ GeminiClient initialized with {model_name}")
     
     def analyze_video(self, video_path: str, analysis_type: str = "everything") -> Dict[str, Any]:
         """Analyze video and return results"""
