@@ -756,7 +756,7 @@ RESPONSE (≤15 words, be different):"""
             raise
 
     async def _generate_streaming_feedback(self, prompt: str) -> str:
-        """Generate feedback using gemini-2.5-flash streaming (async wrapper)"""
+        """Generate feedback using gemini-2.5-flash (final mode uses non-stream to avoid StopIteration)"""
         try:
             # Use gemini-2.5-flash for high RPM micro-cues
             generation_config = {
@@ -765,11 +765,24 @@ RESPONSE (≤15 words, be different):"""
                 'top_p': 0.9
             }
             
-            # Run blocking stream in executor - no generator crosses await boundary
+            # Final mode uses non-stream to avoid StopIteration/uvloop weirdness
+            def _blocking_once():
+                resp = self.model.generate_content(prompt, generation_config=generation_config)
+                txt = getattr(resp, "text", None)
+                if not txt and hasattr(resp, "candidates"):
+                    parts = []
+                    for c in (resp.candidates or []):
+                        content = getattr(c, "content", None)
+                        if content and getattr(content, "parts", None):
+                            for p in content.parts:
+                                if getattr(p, "text", None):
+                                    parts.append(p.text)
+                    txt = " ".join(parts)
+                return (txt or "").strip()
+            
+            # Run non-streaming call in executor
             loop = asyncio.get_running_loop()
-            response_text = await loop.run_in_executor(
-                None, self._blocking_stream_once, prompt, generation_config
-            )
+            response_text = await loop.run_in_executor(None, _blocking_once)
             
             if response_text:
                 # Enforce 15 word limit
@@ -784,7 +797,7 @@ RESPONSE (≤15 words, be different):"""
                 raise Exception(f"Empty response from {self.model.model_name}")
                 
         except Exception as e:
-            logger.error(f"❌ {self.model.model_name} streaming error: {e}")
+            logger.error(f"❌ {self.model.model_name} error: {e}")
             raise
     
 
