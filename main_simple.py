@@ -400,9 +400,10 @@ async def upload_video(
     file: UploadFile = File(...),
     email: str = Form(...),
     analysis_type: str = Form("general"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    background: BackgroundTasks = None
 ):
-    """Upload and process video"""
+    """Upload and enqueue video for processing (returns immediately)."""
     try:
         logger.info(f"Upload request started: email={email}, analysis_type={analysis_type}")
         logger.info(f"File details: filename={file.filename}, content_type={file.content_type}")
@@ -448,7 +449,7 @@ async def upload_video(
         if not job:
             logger.error(f"Upload failed: Could not create job for user {user.id}")
             return JSONResponse({
-            "success": False,
+                "success": False,
                 "message": "Job creation failed"
             }, status_code=500)
         
@@ -476,21 +477,27 @@ async def upload_video(
             "analysis_type": analysis_type
         }
         
-        # Start background processing (synchronous for now)
-        logger.info(f"Starting video processing for job {job.id}")
-        try:
-            await process_video_analysis(job.id, db)
-            logger.info(f"Video processing completed for job {job.id}")
-        except Exception as e:
-            logger.error(f"Video processing failed: {e}")
-            # Don't fail the upload, just log the error
+        # Enqueue background processing and return immediately
+        async def _process(job_id: str):
+            try:
+                await process_video_analysis(job_id, db)
+                logger.info(f"Video processing completed for job {job_id}")
+            except Exception as e:
+                logger.error(f"Video processing failed: {e}")
         
-        logger.info(f"Job {job.id} created successfully for user {email}")
+        if background is not None:
+            background.add_task(_process, job.id)
+        else:
+            # Fallback: fire-and-forget without blocking the response
+            import asyncio
+            asyncio.create_task(_process(job.id))
+        
+        logger.info(f"Job {job.id} enqueued successfully for user {email}")
         
         return JSONResponse({
             "success": True,
             "job_id": job.id,
-            "message": "Video uploaded successfully"
+            "message": "Video uploaded; processing started"
         })
         
     except Exception as e:
