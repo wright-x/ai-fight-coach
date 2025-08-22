@@ -975,16 +975,27 @@
         
         function uploadVideo(file, analysisType) {
             const formData = new FormData();
-            formData.append('file', file);
+            // Include filename explicitly for iOS Safari reliability
+            formData.append('file', file, (file && file.name) ? file.name : 'upload.mov');
             formData.append('analysis_type', analysisType);
             
             // Get user email from cookies
             const userEmail = getCookie('user_email') || 'guest@example.com';
             formData.append('email', userEmail);
 
+            // Detect iOS Safari (covers iPhone/iPad, including iPadOS on Mac hardware)
+            const isIOS = /iP(hone|od|ad)/.test(navigator.platform) || (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
+
+            if (isIOS) {
+                // Use XHR path for iOS due to fetch/FormData quirks with file uploads
+                uploadVideoXHR(formData);
+                return;
+            }
+
             fetch('/upload-video', {
                 method: 'POST',
-                body: formData
+                body: formData,
+                cache: 'no-store'
             })
             .then(response => response.json())
             .then(data => {
@@ -1005,6 +1016,52 @@
                 // Reset to upload page on error
                 showPage('rootPage');
             });
+        }
+
+        function uploadVideoXHR(formData) {
+            try {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/upload-video', true);
+                // Allow long-running uploads on cellular
+                xhr.timeout = 300000; // 5 minutes
+
+                xhr.onload = function() {
+                    try {
+                        const text = xhr.responseText || '';
+                        const data = text ? JSON.parse(text) : {};
+                        if (xhr.status >= 200 && xhr.status < 300 && data && data.success) {
+                            console.log('[UPLOAD][iOS] Success, job ID:', data.job_id);
+                            startRealJobPolling(data.job_id);
+                        } else {
+                            console.error('[UPLOAD][iOS] Failed:', xhr.status, text);
+                            alert(`Upload failed: ${data && data.message ? data.message : 'Server error'}`);
+                            showPage('rootPage');
+                        }
+                    } catch (e) {
+                        console.error('[UPLOAD][iOS] Response parse error:', e, xhr.responseText);
+                        alert('Upload failed (invalid server response).');
+                        showPage('rootPage');
+                    }
+                };
+
+                xhr.onerror = function() {
+                    console.error('[UPLOAD][iOS] XHR network error');
+                    alert('Network error during upload.');
+                    showPage('rootPage');
+                };
+
+                xhr.ontimeout = function() {
+                    console.error('[UPLOAD][iOS] XHR timeout');
+                    alert('Upload timed out. Try a smaller clip or better connection.');
+                    showPage('rootPage');
+                };
+
+                xhr.send(formData);
+            } catch (err) {
+                console.error('[UPLOAD][iOS] Unexpected error:', err);
+                alert('Upload failed unexpectedly.');
+                showPage('rootPage');
+            }
         }
 
         // Loading system
