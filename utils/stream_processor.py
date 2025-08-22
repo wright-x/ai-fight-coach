@@ -905,16 +905,16 @@ RESPONSE (≤15 words, be different):"""
     def _token_producer(self, prompt: str, generation_config: dict, q: Queue, stop_evt: threading.Event):
         """Producer (worker thread) — consume SDK stream safely"""
         try:
-            # IMPORTANT: contain the iterator in this thread; uvloop never sees it
-            with self.model.generate_content(prompt, generation_config=generation_config, stream=True) as resp:
-                for chunk in resp:
-                    if stop_evt.is_set():
-                        break
-                    text = self._extract_chunk_text(chunk)
-                    if not text:
-                        continue
-                    # Push raw text; async side will tokenize/filter
-                    q.put(text)
+            # Contain the iterator in this thread; uvloop never sees it
+            stream = self.model.generate_content(prompt, generation_config=generation_config, stream=True)
+            for chunk in stream:
+                if stop_evt.is_set():
+                    break
+                text = self._extract_chunk_text(chunk)
+                if not text:
+                    continue
+                # Push raw text; async side will tokenize/filter
+                q.put(text)
         except StopIteration:
             # Normal end-of-stream in some SDK internals — swallow it
             pass
