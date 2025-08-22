@@ -802,12 +802,14 @@ RESPONSE (≤15 words, be different):"""
                 logger.info(f"🔥 {self.model.model_name} response: '{response_text}'")
                 return response_text.strip()
             else:
-                logger.error(f"❌ Empty response from {self.model.model_name}")
-                raise Exception(f"Empty response from {self.model.model_name}")
+                # Soft fallback instead of raising — avoid WS error path
+                logger.error(f"❌ Empty response from {self.model.model_name}; returning neutral cue")
+                return "Keep moving, stay focused."
                 
         except Exception as e:
             logger.error(f"❌ {self.model.model_name} error: {e}")
-            raise
+            # Soft fallback to keep session alive
+            return "Keep moving, stay focused."
     
 
     
@@ -879,6 +881,27 @@ RESPONSE (≤15 words, be different):"""
             safe.append(raw)
         return safe
     
+    def _extract_chunk_text(self, chunk) -> str:
+        """Safely flatten a streaming chunk to text (handles candidates/parts)."""
+        try:
+            parts_out = []
+            for c in getattr(chunk, "candidates", []) or []:
+                content = getattr(c, "content", None)
+                if content is None:
+                    continue
+                for p in getattr(content, "parts", []) or []:
+                    t = getattr(p, "text", None)
+                    if t:
+                        parts_out.append(t)
+            if parts_out:
+                return " ".join(parts_out)
+            # fallback to common SDK convenience
+            t = getattr(chunk, "text", None)
+            return t or ""
+        except Exception:
+            logger.exception("extract_chunk_text failed")
+            return ""
+    
     def _token_producer(self, prompt: str, generation_config: dict, q: Queue, stop_evt: threading.Event):
         """Producer (worker thread) — consume SDK stream safely"""
         try:
@@ -887,7 +910,7 @@ RESPONSE (≤15 words, be different):"""
                 for chunk in resp:
                     if stop_evt.is_set():
                         break
-                    text = getattr(chunk, "text", None)
+                    text = self._extract_chunk_text(chunk)
                     if not text:
                         continue
                     # Push raw text; async side will tokenize/filter
