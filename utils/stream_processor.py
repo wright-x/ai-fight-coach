@@ -185,7 +185,7 @@ def get_gemini_client():
     global _COACH_SINGLETON
     if _COACH_SINGLETON is None:
         _COACH_SINGLETON = _StreamingCoach()
-        logger.info("🔥 Created singleton StreamingGeminiClient")
+        logger.info("🏎️ Using _StreamingCoach (new)")
     return _COACH_SINGLETON
 
 
@@ -1788,10 +1788,15 @@ PROMPT_JITTER_{jitter}"""
     
     def _get_safety_settings(self):
         """Return permissive safety settings to reduce empty SAFETY-stopped responses."""
+        # Prefer typed enums if available
+        if _TYPED_SAFETY and HarmCategory is not None:
+            return [
+                {"category": HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, "threshold": HarmBlockThreshold.BLOCK_NONE},
+                {"category": HarmCategory.HARM_CATEGORY_HARASSMENT, "threshold": HarmBlockThreshold.BLOCK_MEDIUM},
+            ]
+        # Fallback string form (keep minimal and supported)
         return [
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_SEXUAL_CONTENT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM"},
         ]
     
