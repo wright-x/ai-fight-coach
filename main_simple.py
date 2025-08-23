@@ -102,7 +102,7 @@ class DatabaseService:
             
             logger.info(f"Created new user: {user.id}")
             return user
-        except Exception as e:
+    except Exception as e:
             logger.error(f"Error creating user: {e}")
             self.db.rollback()
             return None
@@ -121,7 +121,7 @@ class DatabaseService:
             self.db.commit()
             self.db.refresh(job)
             return job
-        except Exception as e:
+    except Exception as e:
             logger.error(f"Error creating job: {e}")
             self.db.rollback()
             raise
@@ -175,17 +175,17 @@ logger = logging.getLogger(__name__)
 try:
     from utils.video_processor import VideoProcessor
     from utils.gemini_client import GeminiClient
-    from utils.tts_client import TTSClient
+        from utils.tts_client import TTSClient
 
     video_processor = VideoProcessor()
     gemini_client = GeminiClient()
-    tts_client = TTSClient()
+        tts_client = TTSClient()
     
     logger.info("✅ Components initialized:")
     logger.info(f"   - VideoProcessor: {type(video_processor)}")
     logger.info(f"   - GeminiClient: {type(gemini_client)}")
     logger.info(f"   - TTSClient: {type(tts_client)}")
-except Exception as e:
+    except Exception as e:
     logger.error(f"❌ Component initialization failed: {e}")
     raise
 
@@ -464,7 +464,7 @@ async def upload_video(
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             logger.info(f"File saved to {file_path}")
-        except Exception as e:
+            except Exception as e:
             logger.error(f"File save failed: {e}")
             return JSONResponse({
                 "success": False,
@@ -625,7 +625,7 @@ async def process_video_analysis(job_id: str, db: Session):
                 logger.info(f"Highlight video created successfully: {output_video_path}")
             except Exception as video_error:
                 logger.error(f"Video creation failed for job {job_id}: {video_error}")
-        else:
+    else:
             logger.warning(f"No highlights found for job {job_id}")
                 
         # Update job status
@@ -918,37 +918,45 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket, client_id)
 
 async def generate_fast_tts_audio(text: str) -> Optional[str]:
-    """Generate TTS audio with ElevenLabs and return as base64 string"""
+    """Generate TTS audio with Gemini and return as base64 string"""
     try:
-        # Use ElevenLabs for fast, high-quality TTS
-        from elevenlabs import generate, Voice, set_api_key
-        
-        api_key = os.getenv("ELEVENLABS_API_KEY")
+        import google.generativeai as genai
+        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if not api_key:
-            logger.warning("ELEVENLABS_API_KEY not found, TTS disabled")
+            logger.warning("GEMINI_API_KEY/GOOGLE_API_KEY not found, TTS disabled")
             return None
-        
-        # Set API key
-        set_api_key(api_key)
-        logger.info(f"🔊 Generating TTS for: '{text[:50]}...'")
-        
-        # Use Adam voice (coaching-like) with turbo model for speed
-        audio = generate(
-            text=text,
-            voice=Voice(voice_id="pNInz6obpgDQGcFmaJgB"),  # Adam voice - professional, clear
-            model="eleven_turbo_v2",  # Fastest model
-            stream=False
+        genai.configure(api_key=api_key)
+        model_name = os.getenv("GEMINI_TTS_MODEL", os.getenv("GEMINI_MODEL_COACH", "gemini-2.5-flash"))
+        model = genai.GenerativeModel(model_name)
+        # Ask for mp3 bytes
+        resp = model.generate_content(
+            text,
+            generation_config={
+                "response_mime_type": "audio/mp3",
+                "voice_config": {"gender": "MALE"}
+            }
         )
-        
-        # Convert to base64 for transmission
-        audio_b64 = base64.b64encode(audio).decode()
-        logger.info(f"✅ TTS generated successfully, size: {len(audio_b64)} chars")
-        return audio_b64
-        
+        # SDK returns binary in resp.candidates[0].content.parts[0].inline_data.data
+        data_b64 = None
+        for c in getattr(resp, "candidates", []) or []:
+            content = getattr(c, "content", None)
+            if not content:
+                continue
+            for p in getattr(content, "parts", []) or []:
+                inline = getattr(p, "inline_data", None)
+                if inline and getattr(inline, "data", None):
+                    data_b64 = inline.data
+                    break
+            if data_b64:
+                break
+        if not data_b64:
+            logger.warning("Gemini TTS returned no audio data")
+            return None
+        # Data is already base64 per SDK; pass through
+        logger.info(f"✅ TTS generated successfully, size: {len(data_b64)} chars")
+        return data_b64
     except Exception as e:
-        logger.error(f"❌ ElevenLabs TTS generation error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"❌ Gemini TTS generation error: {e}")
         return None
 
 if __name__ == "__main__":

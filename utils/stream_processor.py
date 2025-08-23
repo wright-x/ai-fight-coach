@@ -785,7 +785,7 @@ RESPONSE (≤15 words, be different):"""
             
             # Final mode uses non-stream to avoid StopIteration/uvloop weirdness
             def _blocking_once():
-                resp = self.model.generate_content(prompt, generation_config=generation_config)
+                resp = self.model.generate_content(prompt, generation_config=generation_config, safety_settings=self._get_safety_settings())
                 txt = self._extract_plain_text(resp)  # Use the safe helper
                 return txt
             
@@ -978,6 +978,8 @@ RESPONSE (≤15 words, be different):"""
 
         duration = time.time() - start_time
         logger.info(f"🔥 Token stream completed: {tokens_emitted} tokens, {duration:.2f}s duration")
+        if tokens_emitted == 0:
+            logger.warning("⚠️ Token stream produced zero tokens; likely SAFETY or non-text parts")
 
         await send_final(sanitized)
         return sanitized
@@ -1122,4 +1124,13 @@ PROMPT_JITTER_{jitter}"""
             response_text = await self._generate_streaming_feedback(prompt)
             await send_final(response_text)
             return response_text
+    
+    def _get_safety_settings(self):
+        """Return permissive safety settings to reduce empty SAFETY-stopped responses."""
+        return [
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUAL_CONTENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ]
     
