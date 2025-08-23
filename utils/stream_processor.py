@@ -1,4 +1,665 @@
 """
+Streaming coach module – rebuilt for low-latency, varied live coaching.
+
+Public API preserved:
+- class StreamProcessor
+- def get_gemini_client()
+- Streaming client exposes:
+  - generate_elite_coaching_feedback(analysis_dict)
+  - generate_elite_coaching_feedback_with_stream(analysis_dict, send_delta, send_final)
+"""
+
+import os
+import cv2
+import io
+import re
+import time
+import json
+import base64
+import queue
+import asyncio
+import logging
+import random
+import threading
+import numpy as np
+import mediapipe as mp
+from PIL import Image
+from typing import Dict, List, Optional, Tuple
+from collections import deque
+from queue import Queue
+
+try:
+    import google.generativeai as genai
+    # Typed safety enums (preferred)
+    try:
+        from google.generativeai.types import HarmCategory, HarmBlockThreshold  # type: ignore
+        _TYPED_SAFETY = True
+    except Exception:  # pragma: no cover
+        HarmCategory = None
+        HarmBlockThreshold = None
+        _TYPED_SAFETY = False
+except Exception as _ge:  # pragma: no cover
+    genai = None
+    HarmCategory = None
+    HarmBlockThreshold = None
+    _TYPED_SAFETY = False
+
+
+logger = logging.getLogger(__name__)
+
+
+# =========================
+# Pose processor (unchanged)
+# =========================
+class StreamProcessor:
+    """Processes video frames in real-time for live boxing analysis"""
+
+    def __init__(self):
+        self.mp_pose = mp.solutions.pose
+        self.mp_drawing = mp.solutions.drawing_utils
+        self.pose = self.mp_pose.Pose(
+            static_image_mode=False,
+            model_complexity=1,
+            enable_segmentation=False,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5,
+        )
+
+        self.frame_count = 0
+        self.pose_history: deque = deque(maxlen=30)
+        self.frames_without_pose = 0
+        logger.info("✅ StreamProcessor initialized with MediaPipe Pose")
+
+    def process_frame(self, frame_data: str) -> Dict:
+        try:
+            img_data = base64.b64decode(frame_data.split(",")[1])
+            img = Image.open(io.BytesIO(img_data))
+            img_array = np.array(img)
+            # Ensure RGB for MediaPipe
+            if len(img_array.shape) == 3 and img_array.shape[2] == 3:
+                rgb_frame = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+            else:
+                rgb_frame = img_array
+
+            results = self.pose.process(rgb_frame)
+            self.frame_count += 1
+
+            if results.pose_landmarks:
+                pose_data = self._extract_pose_data(results.pose_landmarks)
+                self.pose_history.append(pose_data)
+                self.frames_without_pose = 0
+                return {"success": True, "pose_detected": True, "pose_data": pose_data, "frame_count": self.frame_count}
+            else:
+                self.frames_without_pose += 1
+                return {"success": True, "pose_detected": False, "frames_without_pose": self.frames_without_pose, "frame_count": self.frame_count}
+        except Exception as e:
+            logger.error(f"Frame processing error: {e}")
+            return {"success": False, "error": str(e), "frame_count": self.frame_count}
+
+    def _extract_pose_data(self, landmarks) -> Dict:
+        try:
+            nose = landmarks.landmark[self.mp_pose.PoseLandmark.NOSE]
+            l_sh = landmarks.landmark[self.mp_pose.PoseLandmark.LEFT_SHOULDER]
+            r_sh = landmarks.landmark[self.mp_pose.PoseLandmark.RIGHT_SHOULDER]
+            l_wr = landmarks.landmark[self.mp_pose.PoseLandmark.LEFT_WRIST]
+            r_wr = landmarks.landmark[self.mp_pose.PoseLandmark.RIGHT_WRIST]
+            l_hp = landmarks.landmark[self.mp_pose.PoseLandmark.LEFT_HIP]
+            r_hp = landmarks.landmark[self.mp_pose.PoseLandmark.RIGHT_HIP]
+            l_an = landmarks.landmark[self.mp_pose.PoseLandmark.LEFT_ANKLE]
+            r_an = landmarks.landmark[self.mp_pose.PoseLandmark.RIGHT_ANKLE]
+
+            return {
+                "nose": {"x": nose.x, "y": nose.y, "z": nose.z},
+                "shoulders": {
+                    "left": {"x": l_sh.x, "y": l_sh.y, "z": l_sh.z},
+                    "right": {"x": r_sh.x, "y": r_sh.y, "z": r_sh.z},
+                },
+                "wrists": {
+                    "left": {"x": l_wr.x, "y": l_wr.y, "z": l_wr.z},
+                    "right": {"x": r_wr.x, "y": r_wr.y, "z": r_wr.z},
+                },
+                "hips": {
+                    "left": {"x": l_hp.x, "y": l_hp.y, "z": l_hp.z},
+                    "right": {"x": r_hp.x, "y": r_hp.y, "z": r_hp.z},
+                },
+                "ankles": {
+                    "left": {"x": l_an.x, "y": l_an.y, "z": l_an.z},
+                    "right": {"x": r_an.x, "y": r_an.y, "z": r_an.z},
+                },
+                "timestamp": time.time(),
+            }
+        except Exception as e:
+            logger.error(f"Pose data extraction error: {e}")
+            return {}
+
+    # Minimal analysis used by the coach
+    def generate_comprehensive_analysis(self) -> Dict:
+        if len(self.pose_history) < 5:
+            return {"insufficient_data": True}
+        if self.frames_without_pose > 10:
+            return {"no_pose_detected": True}
+
+        recent = list(self.pose_history)[-10:]
+        # stance width proxy
+        widths = []
+        movements = []
+        hand_heights = []
+        head_moves = []
+        for i, pose in enumerate(recent):
+            if "ankles" in pose:
+                l, r = pose["ankles"]["left"], pose["ankles"]["right"]
+                widths.append(abs(l["x"] - r["x"]))
+            if "wrists" in pose and "shoulders" in pose:
+                lh = pose["shoulders"]["left"]["y"] - pose["wrists"]["left"]["y"]
+                rh = pose["shoulders"]["right"]["y"] - pose["wrists"]["right"]["y"]
+                hand_heights.append(max((lh + rh) / 2, 0))
+            if i > 0 and "nose" in pose and "nose" in recent[i - 1]:
+                prev = recent[i - 1]
+                head_moves.append(abs(pose["nose"]["x"] - prev["nose"]["x"]) + abs(pose["nose"]["y"] - prev["nose"]["y"]))
+            if i > 0 and "ankles" in pose and "ankles" in recent[i - 1]:
+                prev = recent[i - 1]
+                lm = abs(pose["ankles"]["left"]["x"] - prev["ankles"]["left"]["x"]) + abs(pose["ankles"]["left"]["y"] - prev["ankles"]["left"]["y"])
+                rm = abs(pose["ankles"]["right"]["x"] - prev["ankles"]["right"]["x"]) + abs(pose["ankles"]["right"]["y"] - prev["ankles"]["right"]["y"])
+                movements.append((lm + rm) / 2)
+
+        stance_width_ratio = float(np.mean(widths)) if widths else 0.55
+        hand_height = float(np.mean(hand_heights)) if hand_heights else 0.5
+        total_movement = min(float(np.sum(movements)) * 5.0, 2.0)
+        head_mobility = min(float(np.mean(head_moves)) * 20.0 if head_moves else 0.0, 1.0)
+
+        return {
+            "stance_analysis": {"stance_width_ratio": min(max(stance_width_ratio, 0.0), 2.0)},
+            "guard_analysis": {"hand_height": min(max(hand_height, 0.0), 1.0)},
+            "footwork_analysis": {"total_movement": total_movement},
+            "head_movement_analysis": {"head_movement_frequency": head_mobility},
+        }
+
+
+# =============================
+# Gemini streaming coach client
+# =============================
+_COACH_SINGLETON = None
+
+
+def get_gemini_client():
+    global _COACH_SINGLETON
+    if _COACH_SINGLETON is None:
+        _COACH_SINGLETON = _StreamingCoach()
+        logger.info("🔥 Created singleton StreamingGeminiClient")
+    return _COACH_SINGLETON
+
+
+class _StreamingCoach:
+    """Low-latency, varied live coaching with true token streaming and safe fallbacks."""
+
+    BANNED = {"kid", "bro", "champ", "buddy", "pal", "dude", "man"}
+    FALLBACKS = deque([
+        "Shorten stance slightly; tuck elbows.",
+        "Angle left, double jab—don’t square up.",
+        "Tuck chin; bring rear hand to cheek.",
+        "Small pivot, reset balance before punching.",
+        "Roll under, step off the line.",
+    ])
+
+    def __init__(self) -> None:
+        if genai is None:
+            raise RuntimeError("google.generativeai is required")
+        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY/GOOGLE_API_KEY is required")
+        genai.configure(api_key=api_key)
+        model_name = os.getenv("GEMINI_MODEL_COACH", "gemini-2.5-flash")
+        self.model = genai.GenerativeModel(model_name)
+        self.stream_mode = os.getenv("GEMINI_STREAM_MODE", "final").lower()
+        logger.info(f"🔥 Using {model_name} for live coaching (stream_mode: {self.stream_mode})")
+
+        # Variety engine state
+        self.last_5_sentences: deque[str] = deque(maxlen=5)
+        self.verb_history: deque[str] = deque(maxlen=3)
+        self.category_history: deque[str] = deque(maxlen=3)
+        self.bigram_window: deque[Tuple[str, float]] = deque(maxlen=200)  # (bigram, ts)
+        self.category_ring: deque[str] = deque([
+            "guard", "footwork", "head_movement", "punch_mechanics", "rhythm", "defense", "power_chain"
+        ])
+        self.bigram_ttl_sec = 90.0
+
+        # Metric rolling windows for praise check
+        self.metric_history = {
+            "hand_height": deque(maxlen=30),
+            "stance_width_ratio": deque(maxlen=30),
+            "total_movement": deque(maxlen=30),
+            "head_mobility": deque(maxlen=30),
+        }
+
+        # Rate limit/backoff
+        self.last_request_time = 0.0
+        self.backoff_until = 0.0
+        self.rate_limit_delay = 0.0  # active streaming path should not throttle
+
+    # ---------------
+    # Safety settings
+    # ---------------
+    def _safety_settings(self):
+        if _TYPED_SAFETY and HarmCategory is not None:
+            return [
+                {"category": HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, "threshold": HarmBlockThreshold.BLOCK_NONE},
+                {"category": HarmCategory.HARM_CATEGORY_HARASSMENT, "threshold": HarmBlockThreshold.BLOCK_MEDIUM},
+            ]
+        # Fallback string form
+        return [
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM"},
+        ]
+
+    def _gen_config(self):
+        return {
+            "temperature": 0.65,
+            "top_p": 0.9,
+            "max_output_tokens": 32,
+            "response_mime_type": "text/plain",
+        }
+
+    # ------------------
+    # Variety evaluation
+    # ------------------
+    def _first_word(self, text: str) -> str:
+        words = text.strip().split()
+        return words[0].lower() if words else ""
+
+    def _lev_ratio(self, a: str, b: str) -> float:
+        if not a or not b:
+            return 0.0
+        m, n = len(a), len(b)
+        dp = [[0] * (n + 1) for _ in range(m + 1)]
+        for i in range(m + 1):
+            dp[i][0] = i
+        for j in range(n + 1):
+            dp[0][j] = j
+        for i in range(1, m + 1):
+            for j in range(1, n + 1):
+                dp[i][j] = dp[i - 1][j - 1] if a[i - 1] == b[j - 1] else 1 + min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
+        dist = dp[m][n]
+        return 1.0 - (dist / max(m, n))
+
+    def _bigrams(self, text: str) -> List[str]:
+        words = text.strip().lower().split()
+        return [f"{words[i]} {words[i+1]}" for i in range(len(words) - 1)]
+
+    def _update_bigrams(self, text: str) -> None:
+        now = time.time()
+        for b in self._bigrams(text):
+            self.bigram_window.append((b, now))
+        # TTL prune
+        while self.bigram_window and (now - self.bigram_window[0][1]) > self.bigram_ttl_sec:
+            self.bigram_window.popleft()
+
+    def _violates_variety(self, candidate: str) -> bool:
+        # Levenshtein against last sentences
+        for prev in self.last_5_sentences:
+            if self._lev_ratio(candidate.lower(), prev.lower()) > 0.75:
+                return True
+        # opening verb
+        if self.verb_history and self._first_word(candidate) == self.verb_history[-1]:
+            return True
+        # bigram repeats
+        recent = {b for (b, _) in self.bigram_window}
+        for b in self._bigrams(candidate):
+            if b in recent:
+                return True
+        return False
+
+    def _rotate_category(self) -> str:
+        # skip any used in last 3 tips
+        for _ in range(len(self.category_ring)):
+            cat = self.category_ring[0]
+            self.category_ring.rotate(-1)
+            if cat not in self.category_history:
+                return cat
+        return self.category_ring[0]
+
+    # --------------
+    # Prompt builder
+    # --------------
+    def _build_prompt(self, metrics: Dict, should_praise: bool) -> str:
+        last_opening = self.verb_history[-1] if self.verb_history else "None"
+        excluded = list(self.category_history)
+        jitter = random.randint(1000, 9999)
+        context_line = "This is non-violent sports training feedback for solo shadowboxing; fitness/technique only."
+        return f"""{context_line}
+ROLE
+You are an elite boxing coach delivering live micro-cues. Be urgent, specific, and professional.
+
+HARD BANS
+Never use address terms or nicknames: kid, bro, champ, buddy, pal, dude, man.
+No profanity. No emojis/hashtags or filler ("come on", "let's go", "you got this").
+
+OUTPUT FORMAT
+Return ONE sentence, plain text only, ≤ 15 words. Start with a direct, actionable cue.
+
+VARIETY & REPETITION
+Do NOT reuse the same opening word as the previous tip: {last_opening}.
+Avoid any bigram used in the last 90 seconds (the app enforces; try your best).
+If you cannot be fresh, switch focus area or rephrase.
+
+FOCUS ROTATION (skip any in ExcludedCategories)
+1) Guard (hands, elbows, chin)
+2) Footwork (stance width, pivots, lateral movement)
+3) Head movement (slips, rolls, angles)
+4) Punch mechanics (hip rotation, snap, retraction)
+5) Rhythm/breathing (tempo, relaxation)
+6) Defense & counters (blocks, parries, timing)
+7) Power chain (ground force, core engagement)
+
+POSITIVE REINFORCEMENT (subtle, optional)
+If metrics exceed target or improve ≥10% vs. 30-frame average, prefix with 1–2 words of praise.
+Use praise at most 1 in 4 tips.
+
+LIVE CONTEXT
+StanceWidthRatio: {metrics['stance_width_ratio']:.2f} (target 0.55–0.70)
+GuardHeight: {metrics['hand_height']:.2f}
+FootworkActivity: {metrics['total_movement']:.2f}
+HeadMobility: {metrics['head_mobility']:.2f}
+ExcludedCategories: {excluded}
+ShouldPraise: {should_praise}
+
+FAIL-SAFES (emit exactly when true)
+- If no pose >3s: Step back into frame—camera can't see you.
+- If insufficient data (<5 frames): Show me your stance and start moving.
+
+TONE EXAMPLES (style only; do not reuse wording)
+"Tuck elbows; bring rear hand to cheek."
+"Angle off right, double jab—don't square up."
+"Good rhythm; add a slip after the cross."
+"Rotate hip through, snap and retract fast."
+
+RESPONSE
+Output only the final one-sentence cue (≤15 words), plain text, nothing else.
+PROMPT_JITTER_{jitter}"""
+
+    # --------------
+    # Sanitizer/token
+    # --------------
+    def _sanitize(self, text: str) -> Optional[str]:
+        words = text.split()
+        out: List[str] = []
+        for w in words:
+            c = w.lower().strip(",.!?;:\"'()[]{}")
+            if c in self.BANNED:
+                continue
+            out.append(w)
+        s = " ".join(out).strip()
+        if not s or len(s.split()) < 2:
+            return None
+        return s
+
+    def _safe_tokenize(self, chunk_text: str) -> List[str]:
+        safe = []
+        for raw in chunk_text.split():
+            c = raw.lower().strip(",.!?;:\"'()[]{}")
+            if c in self.BANNED:
+                continue
+            safe.append(raw)
+        return safe
+
+    # ------------------
+    # Response extractors
+    # ------------------
+    def _extract_text_from_resp(self, resp) -> str:
+        try:
+            # Prefer resp.text if available
+            t = getattr(resp, "text", None)
+            if t:
+                return t.strip()
+            parts_out = []
+            for c in getattr(resp, "candidates", []) or []:
+                content = getattr(c, "content", None)
+                if not content:
+                    continue
+                for p in getattr(content, "parts", []) or []:
+                    tx = getattr(p, "text", None)
+                    if tx:
+                        parts_out.append(tx)
+            return " ".join(parts_out).strip()
+        except Exception:
+            logger.debug("_extract_text_from_resp failed", exc_info=True)
+            return ""
+
+    def _extract_text_from_chunk(self, chunk) -> str:
+        try:
+            parts_out = []
+            for c in getattr(chunk, "candidates", []) or []:
+                content = getattr(c, "content", None)
+                if not content:
+                    continue
+                for p in getattr(content, "parts", []) or []:
+                    tx = getattr(p, "text", None)
+                    if tx:
+                        parts_out.append(tx)
+            if parts_out:
+                return " ".join(parts_out)
+            t = getattr(chunk, "text", None)
+            return t or ""
+        except Exception:
+            logger.debug("_extract_text_from_chunk failed", exc_info=True)
+            return ""
+
+    # ------------------------
+    # Praise gating & metrics
+    # ------------------------
+    def _should_praise(self, metrics: Dict) -> bool:
+        thresholds = {"hand_height": 0.65, "stance_width_ratio": 0.55, "total_movement": 0.30, "head_mobility": 0.20}
+        if any(metrics.get(k, 0.0) > v for k, v in thresholds.items()):
+            return random.random() < 0.25
+        improving = False
+        for k, v in metrics.items():
+            hist = self.metric_history.get(k)
+            if hist and len(hist) >= 10:
+                avg = sum(hist) / len(hist)
+                if avg and v > avg * 1.10:
+                    improving = True
+                    break
+        return improving and (random.random() < 0.25)
+
+    def _update_metric_history(self, metrics: Dict) -> None:
+        for k, v in metrics.items():
+            if k in self.metric_history:
+                self.metric_history[k].append(v)
+
+    # -----------------
+    # Public entrypoints
+    # -----------------
+    async def generate_elite_coaching_feedback(self, analysis: Dict, last_feedback_types: List[str] | None = None) -> str:
+        # Fail-safes
+        if analysis.get("insufficient_data"):
+            return "Show me your stance and start moving."
+        if analysis.get("no_pose_detected"):
+            return "Step back into frame—camera can't see you."
+
+        # Metrics
+        stance = analysis.get("stance_analysis", {})
+        guard = analysis.get("guard_analysis", {})
+        footw = analysis.get("footwork_analysis", {})
+        head = analysis.get("head_movement_analysis", {})
+        metrics = {
+            "stance_width_ratio": float(stance.get("stance_width_ratio", 0.0)),
+            "hand_height": float(guard.get("hand_height", 0.0)),
+            "total_movement": float(footw.get("total_movement", 0.0)),
+            "head_mobility": float(head.get("head_movement_frequency", 0.0)),
+        }
+        self._update_metric_history(metrics)
+        should_praise = self._should_praise(metrics)
+
+        prompt = self._build_prompt(metrics, should_praise)
+
+        def _once():
+            resp = self.model.generate_content(prompt, generation_config=self._gen_config(), safety_settings=self._safety_settings())
+            txt = self._extract_text_from_resp(resp)
+            if not txt:
+                # debug once
+                try:
+                    cand0 = (getattr(resp, "candidates", None) or [None])[0]
+                    finish_reason = getattr(cand0, "finish_reason", None)
+                    safety = getattr(cand0, "safety_ratings", None)
+                    prompt_fb = getattr(resp, "prompt_feedback", None)
+                    parts_types = []
+                    if cand0 and getattr(cand0, "content", None):
+                        parts_types = [type(p).__name__ for p in getattr(cand0.content, "parts", []) or []]
+                    logger.debug(f"[GEMINI DEBUG] finish_reason={finish_reason} parts={parts_types} safety={safety} prompt_feedback={prompt_fb}")
+                except Exception:
+                    logger.debug("[GEMINI DEBUG] inspect failed", exc_info=True)
+            return txt
+
+        loop = asyncio.get_running_loop()
+        text = await loop.run_in_executor(None, _once)
+        if not text:
+            fb = self._rotating_fallback()
+            return fb
+
+        text = self._postprocess_sentence(text)
+        if not text or self._violates_variety(text):
+            # single retry with appended instruction
+            text2 = await loop.run_in_executor(None, lambda: self._extract_text_from_resp(self.model.generate_content(prompt + "\nRephrase with a different opening verb and wording.", generation_config=self._gen_config(), safety_settings=self._safety_settings())))
+            text = self._postprocess_sentence(text2) or self._rotating_fallback()
+
+        self._record_sentence(text)
+        return text
+
+    async def generate_elite_coaching_feedback_with_stream(self, analysis: Dict, send_delta, send_final) -> str:
+        # Fail-safes
+        if analysis.get("insufficient_data"):
+            await send_final("Show me your stance and start moving.")
+            return "Show me your stance and start moving."
+        if analysis.get("no_pose_detected"):
+            await send_final("Step back into frame—camera can't see you.")
+            return "Step back into frame—camera can't see you."
+
+        # Metrics
+        stance = analysis.get("stance_analysis", {})
+        guard = analysis.get("guard_analysis", {})
+        footw = analysis.get("footwork_analysis", {})
+        head = analysis.get("head_movement_analysis", {})
+        metrics = {
+            "stance_width_ratio": float(stance.get("stance_width_ratio", 0.0)),
+            "hand_height": float(guard.get("hand_height", 0.0)),
+            "total_movement": float(footw.get("total_movement", 0.0)),
+            "head_mobility": float(head.get("head_movement_frequency", 0.0)),
+        }
+        self._update_metric_history(metrics)
+        should_praise = self._should_praise(metrics)
+        prompt = self._build_prompt(metrics, should_praise)
+
+        # Token streaming via worker thread + queue bridge
+        q: Queue = Queue(maxsize=64)
+        stop_evt = threading.Event()
+
+        def _producer():
+            try:
+                start = time.time()
+                stream = self.model.generate_content(prompt, generation_config=self._gen_config(), stream=True, safety_settings=self._safety_settings())
+                first_sent = False
+                for chunk in stream:
+                    if stop_evt.is_set():
+                        break
+                    text = self._extract_text_from_chunk(chunk)
+                    if not text:
+                        continue
+                    if not first_sent:
+                        first_sent = True
+                        logger.info(f"⏱️ first-token-latency={(time.time()-start)*1000:.0f}ms")
+                    q.put(text)
+            except Exception as e:
+                q.put(e)
+            finally:
+                q.put(None)  # sentinel
+
+        threading.Thread(target=_producer, daemon=True).start()
+
+        assembled: List[str] = []
+        loop = asyncio.get_running_loop()
+        tokens_emitted = 0
+        t0 = time.time()
+
+        # Zero-chunk timeout -> one non-stream retry
+        got_any = False
+        while True:
+            item = await loop.run_in_executor(None, q.get)
+            if item is None:
+                break
+            if isinstance(item, Exception):
+                logger.warning(f"token stream error: {item}")
+                break
+            got_any = True
+            tokens = self._safe_tokenize(str(item))
+            if not tokens:
+                continue
+            tokens_emitted += len(tokens)
+            delta = " ".join(tokens)
+            assembled.extend(tokens)
+            await send_delta(delta)
+
+            # Prevent overrun – stop if more than ~20 words assembled
+            if len(assembled) >= 20:
+                break
+
+        if not got_any and (time.time() - t0) >= 0.8:
+            # metadata could be sent here if supported; skip to keep API stable
+            logger.warning("⚠️ Zero token chunks within 800ms; retrying non-stream once")
+            text = await self.generate_elite_coaching_feedback(analysis)
+            await send_final(text)
+            return text
+
+        final_text = " ".join(assembled).strip()
+        if not final_text:
+            text = await self.generate_elite_coaching_feedback(analysis)
+            await send_final(text)
+            return text
+
+        final_text = self._postprocess_sentence(final_text) or self._rotating_fallback()
+        self._record_sentence(final_text)
+        logger.info(f"✅ stream tokens={tokens_emitted} sentence='{final_text}'")
+        await send_final(final_text)
+        return final_text
+
+    # --------------
+    # Helpers
+    # --------------
+    def _postprocess_sentence(self, text: str) -> Optional[str]:
+        s = re.sub(r"\s+", " ", text or "").strip()
+        # enforce ≤ 15 words
+        words = s.split()
+        if len(words) > 15:
+            s = " ".join(words[:15])
+        s = self._sanitize(s) or ""
+        if not s:
+            return None
+        return s
+
+    def _record_sentence(self, text: str) -> None:
+        self.last_5_sentences.append(text)
+        self.verb_history.append(self._first_word(text))
+        self._update_bigrams(text)
+        # category guess for rotation memory
+        lower = text.lower()
+        if any(k in lower for k in ["chin", "guard", "elbow", "hand"]):
+            self.category_history.append("guard")
+        elif any(k in lower for k in ["foot", "step", "move", "pivot"]):
+            self.category_history.append("footwork")
+        elif any(k in lower for k in ["head", "slip", "roll"]):
+            self.category_history.append("head_movement")
+        elif any(k in lower for k in ["jab", "cross", "hook", "hip", "snap", "retract"]):
+            self.category_history.append("punch_mechanics")
+        elif any(k in lower for k in ["rhythm", "breathe", "tempo"]):
+            self.category_history.append("rhythm")
+        elif any(k in lower for k in ["block", "parry", "counter"]):
+            self.category_history.append("defense")
+        elif any(k in lower for k in ["power", "core", "ground"]):
+            self.category_history.append("power_chain")
+
+    def _rotating_fallback(self) -> str:
+        self.FALLBACKS.rotate(-1)
+        return self.FALLBACKS[0]
+
+"""
 Real-time video analysis processor for live streaming
 Handles frame analysis, pose detection, and feedback generation
 """
